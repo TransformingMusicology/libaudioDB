@@ -1,0 +1,12 @@
+
+CFLAGS=-ggdb
+LIBDIR=
+LIBS=
+SOAPDIR=bin_x86_osx/soapcpp-macosx-2.1.6
+SOAPOBS=${SOAPDIR}/stdsoap2.o soapServer.cpp soapClient.cpp soapC.cpp
+CMDOBS=cmdline.c
+INCDIR=-I${SOAPDIR}
+
+all: audioDB.h audioDB.cpp ${SOAPOBS} ${CMDOBS} Makefile.osx
+	${SOAPDIR}/soapcpp2 audioDBws.h
+	g++ -o audioDB ${CFLAGS} audioDB.cpp ${SOAPOBS} ${CMDOBS} ${CFLAGS} ${INCDIR} ${LIBDIR} ${LIBS}

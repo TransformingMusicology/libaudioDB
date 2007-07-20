@@ -1,0 +1,10 @@
+CFLAGS=-ggdb
+LIBDIR=
+LIBS=
+SOAPDIR=bin_x86_win/gsoap-win32-2.7
+SOAPOBS=${SOAPDIR}/stdsoap2.o soapServer.cpp soapClient.cpp soapC.cpp
+INCDIR=-I${SOAPDIR}
+
+all: audioDB.h audioDB.cpp ${SOAPOBS} Makefile.win32
+	${SOAPDIR}/soapcpp2 audioDBws.h
+	g++ -o audioDB ${CFLAGS} audioDB.cpp ${SOAPOBS} ${CFLAGS} ${INCDIR} ${LIBDIR} ${LIBS}

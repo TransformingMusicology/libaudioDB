@@ -1,0 +1,28 @@
+audioDB 
+Goldsmiths, University of London
+GPL
+
+Dependencies
+------------
+
+audioDB uses libgsoap++ for SOAP Web Services support, this can be installed on most linux distributions using the package manager.
+The binary distribution will suffice.
+
+For OSX and Win32 systems, the gsoap distribution is currently included in the bin_x86_{osx,win32} directories
+
+Use the following Makefiles to compile audioDB on your system.
+
+Linux
+-----
+make -f Makefile.linux
+
+OSX
+---
+
+make -f Makefile.osx
+
+Win32
+-----
+
+make -f Makefile.win32
+
