@@ -14,7 +14,7 @@ Use the following Makefiles to compile audioDB on your system.
 
 Linux
 -----
-make -f Makefile.linux
+make -f Makefile
 
 OSX
 ---

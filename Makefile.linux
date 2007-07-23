@@ -1,9 +1,0 @@
-
-CFLAGS=-ggdb
-LIBDIR=-L/usr/include 
-LIBS=-lgsoap++
-
-all: audioDB.h audioDB.cpp soapServer.cpp soapClient.cpp soapC.cpp cmdline.c Makefile
-	soapcpp2 audioDBws.h
-	g++ -o audioDB ${CFLAGS} audioDB.cpp soapServer.cpp soapClient.cpp soapC.cpp cmdline.c ${CFLAGS} ${LIBDIR} ${LIBS}
-
