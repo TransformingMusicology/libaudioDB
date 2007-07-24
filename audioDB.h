@@ -119,8 +119,8 @@ Web Services:
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_SEGNN  (10U)
 
-//#define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
-#define O2_DEFAULTDBSIZE (1000000000U) // 1GB table size
+#define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
+//#define O2_DEFAULTDBSIZE (1000000000U) // 1GB table size
 
 //#define O2_MAXFILES (1000000)
 #define O2_MAXFILES (10000U)           // 10,000 files

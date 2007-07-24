@@ -1,9 +1,0 @@
-
-audioDB FIXME:
-
-command line processing: need better syntax for commands
-interactive shell processing: make a query shell
-
-zero-length input: do something sensible with null files
-
-
