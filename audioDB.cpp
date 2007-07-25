@@ -416,8 +416,8 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
 */
 
 void audioDB::create(const char* dbName){
-  if ((dbfid = open (dbName, O_RDWR | O_CREAT | O_TRUNC)) < 0)
-    error("Can't open database file:", dbName);
+  if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
+    error("Can't open database file", dbName);
 
   // go to the location corresponding to the last byte
   if (lseek (dbfid, O2_DEFAULTDBSIZE - 1, SEEK_SET) == -1)
