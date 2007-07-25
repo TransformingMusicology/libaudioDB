@@ -47,7 +47,7 @@ option "STATUS" S "output database information to stdout." dependon="database" o
 option "DUMP"   D "output all entries: index key size." dependon="database" optional
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
-option "INSERT"      I "add feature vectors to an existing database." dependon="features" dependon="database" optional
+option "INSERT"      I "add feature vectors to an existing database." dependon="features" optional
 option "UPDATE"      U "replace inserted vectors associated with key with new input vectors." dependon="features" dependon="key" dependon="database" optional hidden
 option "features" f "binary series of vectors file {int sz:ieee double[][sz]:eof}." string typestr="filename" dependon="database" optional
 option "times"    t "list of time points (ascii) for feature vectors." string typestr="filename" dependon="features" optional

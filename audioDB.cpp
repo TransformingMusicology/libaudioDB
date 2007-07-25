@@ -464,7 +464,7 @@ void audioDB::initTables(const char* dbName, const char* inFile=0){
   
   // open the input file
   if (inFile && (infid = open (inFile, O_RDONLY)) < 0)
-    error("can't open feature file for reading", inFile);
+    error("can't open input file for reading", inFile);
 
   // find size of input file
   if (inFile && fstat (infid,&statbuf) < 0)
