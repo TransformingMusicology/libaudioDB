@@ -208,6 +208,7 @@ class audioDB{
   unsigned isServer;
   unsigned port;
   double timesTol;
+  unsigned ignoreCols;
 
   // Timers
   struct timeval tv1;

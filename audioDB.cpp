@@ -135,7 +135,8 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
   isClient(0),
   isServer(0),
   port(0),
-  timesTol(0.1){
+  timesTol(0.1),
+  ignoreCols(0){
   
   if(processArgs(argc, argv)<0){
     printf("No command found.\n");
@@ -281,6 +282,15 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
      }
    }
    return 0;
+ }
+ 
+ if(args_info.ignore_given){
+   ignoreCols=args_info.ignore_arg;
+   if(ignoreCols<0 || ignoreCols>100){
+     if(verbose)
+       cout << "warning: ignoring ignore which is out of range:" << ignoreCols << endl;
+     ignoreCols=0;
+   }
  }
 
  if(args_info.BATCHINSERT_given){
