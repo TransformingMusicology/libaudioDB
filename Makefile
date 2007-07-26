@@ -1,4 +1,4 @@
-CFLAGS=-O3
+CFLAGS=-ggdb
 LIBS=-lgsoap++
 
 EXECUTABLE=audioDB

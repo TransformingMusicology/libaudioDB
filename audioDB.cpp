@@ -1234,15 +1234,10 @@ void audioDB::segPointQuery(const char* dbName, const char* inFile, adb__queryRe
 
   gettimeofday(&tv1, NULL); 
         
-  for(seg=0 ; seg < dbH->numFiles ; seg++, processedSegs++){
+  for(processedSegs=0, seg=0 ; processedSegs < dbH->numFiles ; seg++, processedSegs++){
     if(segFile){
       if(!segFile->eof()){
-	//*segFile>>seg;
 	segFile->getline(nextKey,MAXSTR);
-	if(verbosity>3){
-	  cerr << nextKey << endl;
-	  cerr.flush();
-	}
 	seg=getKeyPos(nextKey);
       }
       else
