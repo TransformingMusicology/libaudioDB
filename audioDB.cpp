@@ -817,6 +817,11 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     close(infid);
     munmap(db,O2_DEFAULTDBSIZE);
   }while(!filesIn->eof());
+
+  // mmap the database file
+  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
+			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
+    error("mmap error for creating database");
   
   if(verbosity)
     cerr << COM_BATCHINSERT << " " << dbName << " " << totalVectors << " vectors " 
@@ -824,7 +829,8 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   
   // Report status
   status(dbName);
-
+  
+  munmap(db,O2_DEFAULTDBSIZE);
 }
 
 void audioDB::ws_status(const char*dbName, char* hostport){
@@ -1233,6 +1239,10 @@ void audioDB::segPointQuery(const char* dbName, const char* inFile, adb__queryRe
       if(!segFile->eof()){
 	//*segFile>>seg;
 	segFile->getline(nextKey,MAXSTR);
+	if(verbosity>3){
+	  cerr << nextKey << endl;
+	  cerr.flush();
+	}
 	seg=getKeyPos(nextKey);
       }
       else
@@ -1455,6 +1465,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
       SILENCE_THRESH+=*pn;
       processedSegs++;
     }
+    ps = sNorm + segTable[i];
   }
   if(verbosity>1)
     cerr << "processedSegs: " << processedSegs << endl;
@@ -1590,7 +1601,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
   }
 
   char nextKey [MAXSTR];
-  for(seg=0 ; seg < dbH->numFiles ; seg++, processedSegs++){
+  for(processedSegs=0, seg=0 ; processedSegs < dbH->numFiles ; seg++, processedSegs++){
 
     // get segID from file if using a control file
     if(segFile){
@@ -1601,6 +1612,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
       else
 	break;
     }
+
     segOffset=segOffsetTable[seg];     // numDoubles offset
     segIndexOffset=segOffset/dbH->dim; // numVectors offset
 
@@ -1661,7 +1673,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
 	  }
       }
       
-      if(verbosity>3){
+      if(verbosity>3 && usingTimes){
 	cerr << "meanQdur=" << meanQdur << " meanDBdur=" << meanDBdur[seg] << endl;
 	cerr.flush();
       }
@@ -1670,7 +1682,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
 	 (usingTimes 
 	  && fabs(meanDBdur[seg]-meanQdur)<meanQdur*timesTol)){
 
-	if(verbosity>3){
+	if(verbosity>3 && usingTimes){
 	  cerr << "within duration tolerance." << endl;
 	  cerr.flush();
 	}
@@ -1685,7 +1697,7 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
 	       // Threshold on mean L2 of Q and S sequences
 	       (USE_THRESH && qNorm[j]>SILENCE_THRESH && sNorm[k]>SILENCE_THRESH && 
 		// Are both query and target windows above mean energy?
-		(qNorm[j]>qMeanL2*.25 && sNorm[k]>sMeanL2[seg]*.25 &&  diffL2 < DIFF_THRESH )))
+		(qNorm[j]>qMeanL2 && sNorm[k]>sMeanL2[seg] &&  diffL2 < DIFF_THRESH )))
 	      thisDist=DD[j][k]*oneOverWL;
 	    else
 	      thisDist=0.0;
@@ -1715,6 +1727,10 @@ void audioDB::segSequenceQuery(const char* dbName, const char* inFile, adb__quer
 	  thisDist+=distances[m];
 	thisDist/=pointNN;
 	
+	// Let's see the distances then...
+	if(verbosity>3)
+	  cerr << "d[" << fileTable+seg*O2_FILETABLESIZE << "]=" << thisDist << endl;
+
 	// All the seg stuff goes here
 	n=segNN;
 	while(n--){
