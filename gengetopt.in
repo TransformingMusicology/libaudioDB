@@ -18,7 +18,6 @@
 #     -K --keyList keyList.txt
 #     -T --timePointsList.txt
 #     -B --BATCHINSERT dbName
-#     -g --ignore n feature columns 
 #
 #     -Q --QUERY {point|segment|sequence} 
 #     -p --qpoint - ordinal position of query vector in feature input file
@@ -49,7 +48,6 @@ option "DUMP"   D "output all entries: index key size." dependon="database" opti
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
 option "INSERT"      I "add feature vectors to an existing database." dependon="features" optional
-option "ignore"      g "ignore n columns" int typestr="num columns" default="0" dependon="features" optional hidden
 option "UPDATE"      U "replace inserted vectors associated with key with new input vectors." dependon="features" dependon="key" dependon="database" optional hidden
 option "features" f "binary series of vectors file {int sz:ieee double[][sz]:eof}." string typestr="filename" dependon="database" optional
 option "times"    t "list of time points (ascii) for feature vectors." string typestr="filename" dependon="features" optional

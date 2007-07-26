@@ -135,8 +135,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
   isClient(0),
   isServer(0),
   port(0),
-  timesTol(0.1),
-  ignoreCols(0){
+  timesTol(0.1){
   
   if(processArgs(argc, argv)<0){
     printf("No command found.\n");
@@ -284,15 +283,6 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
    return 0;
  }
  
- if(args_info.ignore_given){
-   ignoreCols=args_info.ignore_arg;
-   if(ignoreCols<0 || ignoreCols>100){
-     if(verbose)
-       cout << "warning: ignoring ignore which is out of range:" << ignoreCols << endl;
-     ignoreCols=0;
-   }
- }
-
  if(args_info.BATCHINSERT_given){
    command=COM_BATCHINSERT;
    dbName=args_info.database_arg;
@@ -700,18 +690,6 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   }
 
   
-  // mmap the database file
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
-			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database");
-
-  // Make some handy tables with correct types
-  fileTable= (char*)(db+fileTableOffset);
-  segTable = (unsigned*)(db+segTableOffset);
-  dataBuf  = (double*)(db+dataoffset);
-  l2normTable = (double*)(db+l2normTableOffset);
-  timesTable = (double*)(db+timesTableOffset);
-
   unsigned totalVectors=0;
   char *thisKey = new char[MAXSTR];
   char *thisFile = new char[MAXSTR];
@@ -736,6 +714,18 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     // find size of input file
     if (thisFile && fstat (infid,&statbuf) < 0)
       error("fstat error finding size of input");
+
+    // mmap the database file
+    if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
+			   MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
+      error("mmap error for creating database");
+    
+    // Make some handy tables with correct types
+    fileTable= (char*)(db+fileTableOffset);
+    segTable = (unsigned*)(db+segTableOffset);
+    dataBuf  = (double*)(db+dataoffset);
+    l2normTable = (double*)(db+l2normTableOffset);
+    timesTable = (double*)(db+timesTableOffset);
 
     // Check that there is room for at least 1 more file
     if((char*)timesTable<((char*)dataBuf+(dbH->length+statbuf.st_size-sizeof(int))))
@@ -825,6 +815,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     // CLEAN UP
     munmap(indata,statbuf.st_size);
     close(infid);
+    munmap(db,O2_DEFAULTDBSIZE);
   }while(!filesIn->eof());
   
   if(verbosity)
