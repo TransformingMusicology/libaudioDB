@@ -1,0 +1,14 @@
+
+audioDB FIXME:
+
+o fix segfault when query is zero-length
+o use periodic memunmap on batch insert
+o allow keys to be passed as queries
+o rename 'segments' in help to 'files' or 'keys' ?
+o test suite
+o SOAP to serialize queryFile and keyList
+o SOAP to serialize files on insert / batch insert ?
+
+M. Casey - 24/7/7
+
+
