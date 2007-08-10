@@ -1,5 +1,5 @@
 
-CFLAGS=-ggdb
+CFLAGS=-O3
 LIBDIR=
 LIBS=
 SOAPDIR=bin_x86_osx/soapcpp-macosx-2.1.6

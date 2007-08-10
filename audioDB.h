@@ -130,7 +130,7 @@ Web Services:
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
 #define O2_MAXDIM (1000U)
-#define O2_MAXNN (1000U)
+#define O2_MAXNN (10000U)
 
 // Flags
 #define O2_FLAG_L2NORM (0x1U)
@@ -208,21 +208,19 @@ class audioDB{
   unsigned isServer;
   unsigned port;
   double timesTol;
-  unsigned ignoreCols;
-
+  double radius;
+  
   // Timers
   struct timeval tv1;
   struct timeval tv2;
     
-
-  
-
   // private methods
   void error(const char* a, const char* b = "");
   void pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void sequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void segPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void segSequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void segSequenceQueryEuc(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
 
   void initTables(const char* dbName, const char* inFile);
   void NBestMatchedFilter();
@@ -253,3 +251,4 @@ class audioDB{
   void startServer();
   
 };
+
