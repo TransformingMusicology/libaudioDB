@@ -65,7 +65,7 @@ option "QUERY" Q "content-based search on --database using --features as a query
 option "qpoint" p "ordinal position of query start point in --features file." int typestr="position" default="0" optional
 option "exhaustive" e "exhaustive search: iterate through all query vectors in search. Overrides --qpoint." flag off optional hidden
 option "pointnn" n "number of point nearest neighbours to use in retrieval." int typestr="numpoints" default="10" optional
-option "radius"  R "radius search, returns all points/tracks/sequences inside given radius." double default="1.0" optional hidden
+option "radius"  R "radius search, returns all points/tracks/sequences inside given radius. (Overrides --pointnn)." double default="1.0" optional 
 option "expandfactor" x "time compress/expand factor of result length to query length [1.0 .. 100.0]." double default="1.1" optional hidden
 option "rotate"       o "rotate query vectors for rotationally invariant search." flag off optional hidden
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional
