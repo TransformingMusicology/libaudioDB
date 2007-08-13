@@ -19,13 +19,13 @@
 #     -T --timePointsList.txt
 #     -B --BATCHINSERT dbName
 #
-#     -Q --QUERY {point|segment|sequence} 
+#     -Q --QUERY {point|track|sequence} 
 #     -p --qpoint - ordinal position of query vector in feature input file
-#     -n --pointnn n  - number of nearest neigbour points per segment
-#     -r --resultlength n - number of segments (nearest neighbours) to return
+#     -n --pointnn n  - number of nearest neigbour points per track
+#     -r --resultlength n - number of tracks (nearest neighbours) to return
 #     -l --seqlen len - length of sequence
 #     -h --seqhop hop - hop size of sequence
-#     -R --radius - radius-based search, return all points/segments/sequences < radius (0...Inf)
+#     -R --radius - radius-based search, return all points/tracks/sequences < radius (0...Inf)
 #     -x --x - time expand (compress) factor (ratio of result length to query length (and visa-versa)) [1..Inf]
 #     -o --rotate - rotate the query feature vectors on search
 #
@@ -54,18 +54,18 @@ option "times"    t "list of time points (ascii) for feature vectors." string ty
 option "key"      k "unique identifier associated with features." string typestr="identifier" dependon="features" optional
 text ""
 option "BATCHINSERT" B "add feature vectors named in a --featureList file (with optional keys in a --keyList file) to the named database." dependon="featureList" optional
-option "featureList" F "text file containing list of binary feature vector files to process" string typestr="filename" dependon="database" optional
+option "featureList" F "text file containing list of binary feature vector files to process, one per track" string typestr="filename" dependon="database" optional
 option "timesList"   T "text file containing list of ascii --times for each --features file in --featureList." string typestr="filename" dependon="featureList" optional
 option "keyList"     K "text file containing list of unique identifiers associated with --features." string typestr="filename" optional
 
 
 section "Database Search" sectiondesc="Thse commands control the retrieval behaviour.\n"
 
-option "QUERY" Q "content-based search on --database using --features as a query. Optionally restrict the search to those segments identified in a --keyList." values="point","segment","sequence" typestr="searchtype" dependon="database" dependon="features" optional
+option "QUERY" Q "content-based search on --database using --features as a query. Optionally restrict the search to those tracks identified in a --keyList." values="point","track","sequence" typestr="searchtype" dependon="database" dependon="features" optional
 option "qpoint" p "ordinal position of query start point in --features file." int typestr="position" default="0" optional
 option "exhaustive" e "exhaustive search: iterate through all query vectors in search. Overrides --qpoint." flag off optional hidden
 option "pointnn" n "number of point nearest neighbours to use in retrieval." int typestr="numpoints" default="10" optional
-option "radius"  R "radius search, returns all points/segments/sequences inside given radius." double default="1.0" optional hidden
+option "radius"  R "radius search, returns all points/tracks/sequences inside given radius." double default="1.0" optional hidden
 option "expandfactor" x "time compress/expand factor of result length to query length [1.0 .. 100.0]." double default="1.1" optional hidden
 option "rotate"       o "rotate query vectors for rotationally invariant search." flag off optional hidden
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional

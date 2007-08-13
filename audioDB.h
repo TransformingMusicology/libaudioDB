@@ -16,7 +16,7 @@ Database Setup:
   -d, --database=filename      database name to be used with database commands
   -N, --new                    make a new database
   -S, --status                 database information
-  -D, --dump                   list all segments: index key size
+  -D, --dump                   list all tracks: index key size
 
 Database Insertion:
   The following commands process a binary input feature file and optional 
@@ -46,12 +46,12 @@ Database Search:
                                  database using the named feature vector file 
                                  as a query
   -q, --qtype=type             the type of search  (possible values="point", 
-                                 "segment", "sequence" default=`sequence')
+                                 "track", "sequence" default=`sequence')
   -p, --qpoint=position        ordinal position of query vector (or start of 
                                  sequence) in feature vector input file  
                                  (default=`0')
   -n, --pointnn=numpoints      number of point nearest neighbours to use [per 
-                                 segment in segment and sequence mode]  
+                                 track in track and sequence mode]  
                                  (default=`10')
   -r, --resultlength=length    maximum length of the result list  
                                  (default=`10')
@@ -107,7 +107,7 @@ Web Services:
 #define COM_SEQLEN "--sequencelength"
 #define COM_SEQHOP "--sequencehop"
 #define COM_POINTNN "--pointnn"
-#define COM_SEGNN "--resultlength"
+#define COM_TRACKNN "--resultlength"
 #define COM_QPOINT "--qpoint"
 #define COM_FEATURES "--features"
 #define COM_QUERYKEY "--key"
@@ -117,7 +117,7 @@ Web Services:
 #define O2_MAGIC 1111765583 // 'B'<<24|'D'<<16|'2'<<8|'O' reads O2DB in little endian order
 
 #define O2_DEFAULT_POINTNN (10U)
-#define O2_DEFAULT_SEGNN  (10U)
+#define O2_DEFAULT_TRACKNN  (10U)
 
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 //#define O2_DEFAULTDBSIZE (1000000000U) // 1GB table size
@@ -126,7 +126,7 @@ Web Services:
 #define O2_MAXFILES (10000U)           // 10,000 files
 #define O2_MAXFILESTR (256U)
 #define O2_FILETABLESIZE (O2_MAXFILESTR)
-#define O2_SEGTABLESIZE (sizeof(unsigned))
+#define O2_TRACKTABLESIZE (sizeof(unsigned))
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
 #define O2_MAXDIM (1000U)
@@ -137,7 +137,7 @@ Web Services:
 #define O2_FLAG_MINMAX (0x2U)
 #define O2_FLAG_POINT_QUERY (0x4U)
 #define O2_FLAG_SEQUENCE_QUERY (0x8U)
-#define O2_FLAG_SEG_QUERY (0x10U)
+#define O2_FLAG_TRACK_QUERY (0x10U)
 #define O2_FLAG_TIMES (0x20U)
 
 // Error Codes
@@ -167,8 +167,8 @@ class audioDB{
   const char *inFile;
   const char *hostport;
   const char *key;
-  const char* segFileName;
-  ifstream *segFile;
+  const char* trackFileName;
+  ifstream *trackFile;
   const char *command;
   const char *timesFileName;
   ifstream *timesFile;
@@ -180,13 +180,13 @@ class audioDB{
   struct stat statbuf;  
   dbTableHeaderPtr dbH;
   size_t fileTableOffset;
-  size_t segTableOffset;
+  size_t trackTableOffset;
   size_t dataoffset;
   size_t l2normTableOffset;
   size_t timesTableOffset;
   
   char *fileTable;
-  unsigned* segTable;
+  unsigned* trackTable;
   double* dataBuf;
   double* inBuf;
   double* l2normTable;
@@ -198,7 +198,7 @@ class audioDB{
   unsigned verbosity;   // how much do we want to know?
   unsigned queryType; // point queries default
   unsigned pointNN;   // how many point NNs ?
-  unsigned segNN;   // how many seg NNs ?
+  unsigned trackNN;   // how many track NNs ?
   unsigned sequenceLength;
   unsigned sequenceHop;
   unsigned queryPoint;
@@ -218,9 +218,9 @@ class audioDB{
   void error(const char* a, const char* b = "");
   void pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void sequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void segPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void segSequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void segSequenceQueryEuc(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void trackSequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void trackSequenceQueryEuc(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
 
   void initTables(const char* dbName, const char* inFile);
   void NBestMatchedFilter();
@@ -242,7 +242,7 @@ class audioDB{
   void query(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void status(const char* dbName);
   void ws_status(const char*dbName, char* hostport);
-  void ws_query(const char*dbName, const char *segKey, const char* hostport);
+  void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
   void dump(const char* dbName);
   void deleteDB(const char* dbName, const char* inFile);
