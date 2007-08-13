@@ -217,13 +217,11 @@ class audioDB{
   // private methods
   void error(const char* a, const char* b = "");
   void pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void sequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void trackSequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void trackSequenceQueryEuc(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
 
   void initTables(const char* dbName, const char* inFile);
-  void NBestMatchedFilter();
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
   void normalize(double* X, int dim, int n);
@@ -245,7 +243,6 @@ class audioDB{
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
   void dump(const char* dbName);
-  void deleteDB(const char* dbName, const char* inFile);
 
   // web services
   void startServer();

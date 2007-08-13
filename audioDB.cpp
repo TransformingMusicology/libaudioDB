@@ -945,9 +945,9 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResult *ad
     break;
   case O2_FLAG_SEQUENCE_QUERY:
     if(radius==0)
-      trackSequenceQuery(dbName, inFile, adbQueryResult);
+      trackSequenceQueryNN(dbName, inFile, adbQueryResult);
     else
-      trackSequenceQueryEuc(dbName, inFile, adbQueryResult);
+      trackSequenceQueryRad(dbName, inFile, adbQueryResult);
     break;
   case O2_FLAG_TRACK_QUERY:
     trackPointQuery(dbName, inFile, adbQueryResult);
@@ -1138,10 +1138,6 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     delete timesdata;
   if(dbdurs)
     delete dbdurs;
-}
-
-void audioDB::sequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){  
-
 }
 
 // trackPointQuery  
@@ -1391,15 +1387,13 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     delete meanDBdur;
 
 }
-  
-void audioDB::deleteDB(const char* dbName, const char* inFile){
 
-}
 
-// NBest matched filter distance between query and target tracks
-// efficient implementation
-// outputs average of N minimum matched filter distances
-void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
+// k nearest-neighbor (k-NN) search between query and target tracks
+// efficient implementation based on matched filter
+// assumes normed shingles
+// outputs distances of retrieved shingles, max retreived = pointNN shingles per per track
+void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
   
   initTables(dbName, inFile);
   
@@ -1425,6 +1419,7 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   if(verbosity>1)
     cerr << "performing norms ... "; cerr.flush();
   unsigned dbVectors = dbH->length/(sizeof(double)*dbH->dim);
+
   // Make a copy of the query
   queryCopy = new double[numVectors*dbH->dim];
   memcpy(queryCopy, query, numVectors*dbH->dim*sizeof(double));
@@ -1434,16 +1429,18 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   assert(qNorm&&sNorm&&queryCopy&&sMeanL2&&sequenceLength);    
   unitNorm(queryCopy, dbH->dim, numVectors, qNorm);
   query = queryCopy;
+
   // Make norm measurements relative to sequenceLength
   unsigned w = sequenceLength-1;
   unsigned i,j;
   double* ps;
   double tmp1,tmp2;
+
   // Copy the L2 norm values to core to avoid disk random access later on
   memcpy(sNorm, l2normTable, dbVectors*sizeof(double));
   double* snPtr = sNorm;
   for(i=0; i<dbH->numFiles; i++){
-    if(trackTable[i]>sequenceLength){
+    if(trackTable[i]>=sequenceLength){
       tmp1=*snPtr;
       j=1;
       w=sequenceLength-1;
@@ -1453,8 +1450,14 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
       w=trackTable[i]-sequenceLength; // +1 - 1
       while(w--){
 	tmp2=*ps;
-	*ps=*(ps-1)-tmp1+*(ps+sequenceLength);
+	*ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
 	tmp1=tmp2;
+	ps++;
+      }
+      ps = snPtr;
+      w=trackTable[i]-sequenceLength+1;
+      while(w--){
+	*ps=sqrt(*ps);
 	ps++;
       }
     }
@@ -1469,11 +1472,13 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   unsigned processedTracks=0;
   for(i=0; i<dbH->numFiles; i++){
     if(trackTable[i]>sequenceLength-1){
-      w = trackTable[i]-sequenceLength+1;
+      w = trackTable[i]-sequenceLength;
       pn = sMeanL2+i;
+      *pn=0;
       while(w--)
-	*pn+=*ps++;
-      *pn/=trackTable[i]-sequenceLength+1;
+	if(*ps>0)
+	  *pn+=*ps++;
+      *pn/=trackTable[i]-sequenceLength;
       SILENCE_THRESH+=*pn;
       processedTracks++;
     }
@@ -1481,27 +1486,36 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   }
   if(verbosity>1)
     cerr << "processedTracks: " << processedTracks << endl;
+
+    
   SILENCE_THRESH/=processedTracks;
   USE_THRESH=1; // Turn thresholding on
-  DIFF_THRESH=SILENCE_THRESH/2; // 50% of the mean shingle power
-  SILENCE_THRESH/=10; // 10% of the mean shingle power is SILENCE
-  
+  DIFF_THRESH=SILENCE_THRESH; //  mean shingle power
+  SILENCE_THRESH/=5; // 20% of the mean shingle power is SILENCE
+  if(verbosity>4)
+    cerr << "silence thresh: " << SILENCE_THRESH;
   w=sequenceLength-1;
   i=1;
   tmp1=*qNorm;
   while(w--)
     *qNorm+=qNorm[i++];
   ps = qNorm+1;
-  qMeanL2 = *qNorm;
-  w=numVectors-sequenceLength;
+  w=numVectors-sequenceLength; // +1 -1
   while(w--){
     tmp2=*ps;
-    *ps=*(ps-1)-tmp1+*(ps+sequenceLength);
+    *ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
     tmp1=tmp2;
-    qMeanL2+=*ps;
-    *ps++;
+    ps++;
+  }
+  ps = qNorm;
+  qMeanL2 = 0;
+  w=numVectors-sequenceLength+1;
+  while(w--){
+    *ps=sqrt(*ps);
+    qMeanL2+=*ps++;
   }
   qMeanL2 /= numVectors-sequenceLength+1;
+
   if(verbosity>1)
     cerr << "done." << endl;    
   
@@ -1528,13 +1542,13 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   double oneOverWL=1.0/wL;
   
   for(k=0; k<pointNN; k++){
-    distances[k]=0.0;
+    distances[k]=1.0e6;
     qIndexes[k]=~0;
     sIndexes[k]=~0;    
   }
   
   for(k=0; k<trackNN; k++){
-    trackDistances[k]=0.0;
+    trackDistances[k]=1.0e6;
     trackQIndexes[k]=~0;
     trackSIndexes[k]=~0;
     trackIDs[k]=~0;
@@ -1586,7 +1600,7 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
       numVectors=wL;
     }
   
-  double ** D = 0;    // Cross-correlation between query and target 
+  double ** D = 0;    // Differences query and target 
   double ** DD = 0;   // Matched filter distance
 
   D = new double*[numVectors];
@@ -1613,6 +1627,15 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   }
 
   char nextKey [MAXSTR];
+
+  // chi^2 statistics
+  double sampleCount = 0;
+  double sampleSum = 0;
+  double logSampleSum = 0;
+  double minSample = 1e9;
+  double maxSample = 0;
+
+  // Track loop 
   for(processedTracks=0, track=0 ; processedTracks < dbH->numFiles ; track++, processedTracks++){
 
     // get trackID from file if using a control file
@@ -1633,7 +1656,7 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
       if(verbosity>7)
 	cerr << track << "." << trackIndexOffset << "." << trackTable[track] << " | ";cerr.flush();
 		
-      // Cross-correlation matrix
+      // Sum products matrix
       for(j=0; j<numVectors;j++){
 	D[j]=new double[trackTable[track]]; 
 	assert(D[j]);
@@ -1646,7 +1669,8 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 	assert(DD[j]);
       }
 
-      // Cross Correlation
+      double tmp;
+      // Dot product
       for(j=0; j<numVectors; j++)
 	for(k=0; k<trackTable[track]; k++){
 	  qp=query+j*dbH->dim;
@@ -1672,6 +1696,7 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 	      *sp+++=*spd++;
 	  }
       }
+
       else{ // HOP_SIZE != 1
 	for(w=0; w<wL; w++)
 	  for(j=0; j<numVectors-w; j+=HOP_SIZE){
@@ -1700,23 +1725,38 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 	}
 
 	// Search for minimum distance by shingles (concatenated vectors)
-	for(j=0;j<numVectors-wL+1;j+=HOP_SIZE)
-	  for(k=0;k<trackTable[track]-wL+1;k+=HOP_SIZE){
-	    
-	    diffL2 = fabs(qNorm[j] - sNorm[k]);
+	for(j=0;j<numVectors-wL;j+=HOP_SIZE)
+	  for(k=0;k<trackTable[track]-wL;k+=HOP_SIZE){
+	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
+	    if(verbosity>10)
+	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
+	    // Gather chi^2 statistics
+	    if(thisDist<minSample)
+	      minSample=thisDist;
+	    else if(thisDist>maxSample)
+	      maxSample=thisDist;
+	    if(thisDist>1e-9){
+	      sampleCount++;
+	      sampleSum+=thisDist;
+	      logSampleSum+=log(thisDist);
+	    }
+
+	    // diffL2 = fabs(qNorm[j] - sNorm[trackIndexOffset+k]);
 	    // Power test
 	    if(!USE_THRESH || 
 	       // Threshold on mean L2 of Q and S sequences
-	       (USE_THRESH && qNorm[j]>SILENCE_THRESH && sNorm[k]>SILENCE_THRESH && 
+	       (USE_THRESH && qNorm[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
 		// Are both query and target windows above mean energy?
-		(qNorm[j]>qMeanL2 && sNorm[k]>sMeanL2[track] &&  diffL2 < DIFF_THRESH )))
-	      thisDist=DD[j][k]*oneOverWL;
+		(qNorm[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
+	      thisDist=thisDist; // Computed above
 	    else
-	      thisDist=0.0;
-	    
-	    // NBest match algorithm
-	    for(m=0; m<pointNN; m++){
-	      if(thisDist>=distances[m]){	  
+	      thisDist=1000000.0;
+
+	    // k-NN match algorithm
+	    m=pointNN;
+	    while(m--){
+	      if(thisDist<=distances[m])
+		if(m==0 || thisDist>=distances[m-1]){
 		// Shuffle distances up the list
 		for(l=pointNN-1; l>m; l--){
 		  distances[l]=distances[l-1];
@@ -1730,29 +1770,25 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 		  qIndexes[m]=j;
 		sIndexes[m]=k;
 		break;
-	      }
+		}
 	    }
 	  }
 	// Calculate the mean of the N-Best matches
 	thisDist=0.0;
 	for(m=0; m<pointNN; m++)
-	  if(distances[m]<0.000001){ // Stop rubbish songs getting good scores
-	    thisDist=0.0;
-	    break;
-	  }
-	  else
-	    thisDist+=distances[m];
+	  thisDist+=distances[m];
 	thisDist/=pointNN;
 	
 	// Let's see the distances then...
 	if(verbosity>3)
 	  cerr << fileTable+track*O2_FILETABLESIZE << " " << thisDist << endl;
 
+
 	// All the track stuff goes here
 	n=trackNN;
 	while(n--){
-	  if(thisDist>=trackDistances[n]){
-	    if((n==0 || thisDist<=trackDistances[n-1])){
+	  if(thisDist<=trackDistances[n]){
+	    if((n==0 || thisDist>=trackDistances[n-1])){
 	      // Copy all values above up the queue
 	      for( l=trackNN-1 ; l > n ; l--){
 		trackDistances[l]=trackDistances[l-1];
@@ -1772,14 +1808,7 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 	    break;
 	}
       } // Duration match
-      
-      // per-track reset array values
-      for(unsigned k=0; k<pointNN; k++){
-	distances[k]=0.0;
-	qIndexes[k]=~0;
-	sIndexes[k]=~0;    
-      }
-      
+            
       // Clean up current track
       if(D!=NULL){
 	for(j=0; j<numVectors; j++)
@@ -1791,20 +1820,29 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 	  delete[] DD[j];
       }
     }
+    // per-track reset array values
+    for(unsigned k=0; k<pointNN; k++){
+      distances[k]=1.0e6;
+      qIndexes[k]=~0;
+      sIndexes[k]=~0;    
+    }
   }
 
   gettimeofday(&tv2,NULL);
-  if(verbosity>1)
+  if(verbosity>1){
     cerr << endl << "processed tracks :" << processedTracks << " matched tracks: " << successfulTracks << " elapsed time:" 
 	 << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
-  
+    cerr << "sampleCount: " << sampleCount << " sampleSum: " << sampleSum << " logSampleSum: " << logSampleSum 
+	 << " minSample: " << minSample << " maxSample: " << maxSample << endl;
+  }  
   if(adbQueryResult==0){
     if(verbosity>1)
       cerr<<endl;
     // Output answer
     // Loop over nearest neighbours
     for(k=0; k < min(trackNN,successfulTracks); k++)
-      cout << fileTable+trackIDs[k]*O2_FILETABLESIZE << " " << trackDistances[k] << " " << trackQIndexes[k] << " " << trackSIndexes[k] << endl;
+      cout << fileTable+trackIDs[k]*O2_FILETABLESIZE << " " << trackDistances[k] << " " 
+	   << trackQIndexes[k] << " " << trackSIndexes[k] << endl;
   }
   else{ // Process Web Services Query
     int listLen = min(trackNN, processedTracks);
@@ -1828,9 +1866,9 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
 
   // Clean up
   if(trackOffsetTable)
-    delete trackOffsetTable;
+    delete[] trackOffsetTable;
   if(queryCopy)
-    delete queryCopy;
+    delete[] queryCopy;
   //if(qNorm)
   //delete qNorm;
   if(D)
@@ -1838,17 +1876,18 @@ void audioDB::trackSequenceQuery(const char* dbName, const char* inFile, adb__qu
   if(DD)
     delete[] DD;
   if(timesdata)
-    delete timesdata;
+    delete[] timesdata;
   if(meanDBdur)
-    delete meanDBdur;
+    delete[] meanDBdur;
 
 
 }
 
-// NBest matched filter distance between query and target tracks
-// efficient implementation
-// outputs average of N minimum matched filter distances
-void audioDB::trackSequenceQueryEuc(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
+// Radius search between query and target tracks
+// efficient implementation based on matched filter
+// assumes normed shingles
+// outputs count of retrieved shingles, max retreived = one shingle per query shingle per track
+void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
   
   initTables(dbName, inFile);
   
