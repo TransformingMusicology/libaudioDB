@@ -221,7 +221,7 @@ class audioDB{
   void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
 
-  void initTables(const char* dbName, const char* inFile);
+  void initTables(const char* dbName, bool forWrite, const char* inFile);
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
   void normalize(double* X, int dim, int n);

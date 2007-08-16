@@ -470,8 +470,8 @@ void audioDB::drop(){
 
 // initTables - memory map files passed as arguments
 // Precondition: database has already been created
-void audioDB::initTables(const char* dbName, const char* inFile=0){
-  if ((dbfid = open (dbName, O_RDWR)) < 0)
+void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0){
+  if ((dbfid = open (dbName, forWrite ? O_RDWR : O_RDONLY)) < 0)
     error("Can't open database file", dbName);
   
   // open the input file
@@ -518,7 +518,7 @@ void audioDB::initTables(const char* dbName, const char* inFile=0){
     error("mmap error for input");
 
   // mmap the database file
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
+  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
     error("mmap error for creating database");
 
@@ -533,7 +533,7 @@ void audioDB::initTables(const char* dbName, const char* inFile=0){
 
 void audioDB::insert(const char* dbName, const char* inFile){
 
-  initTables(dbName, inFile);
+  initTables(dbName, 1, inFile);
 
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
@@ -886,7 +886,7 @@ void audioDB::ws_query(const char*dbName, const char *trackKey, const char* host
 
 void audioDB::status(const char* dbName){
   if(!dbH)
-    initTables(dbName, 0);
+    initTables(dbName, 0, 0);
   
   // Update Header information
   cout << "num files:" << dbH->numFiles << endl;
@@ -915,7 +915,7 @@ void audioDB::status(const char* dbName){
 
 void audioDB::dump(const char* dbName){
   if(!dbH)
-    initTables(dbName,0);
+    initTables(dbName, 0, 0);
   
   for(unsigned k=0, j=0; k<dbH->numFiles; k++){
     cout << fileTable+k*O2_FILETABLESIZE << " " << trackTable[k] << endl;
@@ -926,7 +926,7 @@ void audioDB::dump(const char* dbName){
 }
 
 void audioDB::l2norm(const char* dbName){
-  initTables(dbName,0);
+  initTables(dbName, 0, 0);
   if(dbH->length>0){
     unsigned numVectors = dbH->length/(sizeof(double)*dbH->dim);
     unitNormAndInsertL2(dataBuf, dbH->dim, numVectors, 0); // No append
@@ -970,7 +970,7 @@ unsigned audioDB::getKeyPos(char* key){
 // Basic point query engine
 void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
   
-  initTables(dbName, inFile);
+  initTables(dbName, 0, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
@@ -1144,7 +1144,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
 // return the trackNN closest tracks to the query track
 // uses average of pointNN points per track 
 void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){  
-  initTables(dbName, inFile);
+  initTables(dbName, 0, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
@@ -1395,7 +1395,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
 // outputs distances of retrieved shingles, max retreived = pointNN shingles per per track
 void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
   
-  initTables(dbName, inFile);
+  initTables(dbName, 0, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
@@ -1889,7 +1889,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 // outputs count of retrieved shingles, max retreived = one shingle per query shingle per track
 void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
   
-  initTables(dbName, inFile);
+  initTables(dbName, 0, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
