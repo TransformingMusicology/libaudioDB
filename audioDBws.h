@@ -1,7 +1,11 @@
 // audioDBws.h -- web services interface to audioDB
 //
+//FIXME: this hard-coding of the service location might be right for
+//its internal use at Goldsmiths (for now) but really isn't in
+//general.  Find a way to bind this later (at install time?  Or maybe
+//just require that the installer edit the resulting wsdl file?)
 //
-//
+//gsoap adb service location: http://gibbons.doc.gold.ac.uk:20703/
 
 typedef int xsd__int;
 typedef double xsd__double;
