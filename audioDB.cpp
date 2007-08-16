@@ -472,7 +472,7 @@ void audioDB::drop(){
 // Precondition: database has already been created
 void audioDB::initTables(const char* dbName, const char* inFile=0){
   if ((dbfid = open (dbName, O_RDWR)) < 0)
-    error("Can't open database file:", dbName);
+    error("Can't open database file", dbName);
   
   // open the input file
   if (inFile && (infid = open (inFile, O_RDONLY)) < 0)
@@ -666,7 +666,7 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
 void audioDB::batchinsert(const char* dbName, const char* inFile){
 
   if ((dbfid = open (dbName, O_RDWR)) < 0)
-    error("Can't open database file:", dbName);
+    error("Can't open database file", dbName);
 
   if(!key)
     key=inFile;
