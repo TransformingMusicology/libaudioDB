@@ -24,4 +24,5 @@ clean:
 	-rm cmdline.c cmdline.h
 	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
 	-rm adb.nsmap adb.xsd adb.wsdl adb.query.req.xml adb.query.res.xml adb.status.req.xml adb.status.res.xml
+	-rm README.txt
 	-rm ${EXECUTABLE} ${EXECUTABLE}.1
