@@ -2508,8 +2508,8 @@ void audioDB::startServer(){
 
 // SERVER SIDE
 int adb__status(struct soap* soap, xsd__string dbName, xsd__int &adbCreateResult){
-  char* const argv[]={"audioDB",COM_STATUS,dbName};
-  const unsigned argc = 3;
+  char* const argv[]={"audioDB",COM_STATUS,"-d",dbName};
+  const unsigned argc = 4;
   audioDB(argc,argv);
   adbCreateResult=100;
   return SOAP_OK;
