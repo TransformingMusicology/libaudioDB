@@ -427,9 +427,49 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
 
 */
 
+void audioDB::get_lock(int fd, bool exclusive) {
+  struct flock lock;
+  int status;
+  
+  lock.l_type = exclusive ? F_WRLCK : F_RDLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0; /* "the whole file" */
+
+ retry:
+  do {
+    status = fcntl(fd, F_SETLKW, &lock);
+  } while (status != 0 && errno == EINTR);
+
+  if (status) {
+    if (errno == EAGAIN) {
+      sleep(1);
+      goto retry;
+    } else {
+      error("fcntl lock error");
+    }
+  }
+}
+
+void audioDB::release_lock(int fd) {
+  struct flock lock;
+  int status;
+
+  lock.l_type = F_UNLCK;
+  lock.l_whence = SEEK_SET;
+  lock.l_start = 0;
+  lock.l_len = 0;
+
+  status = fcntl(fd, F_SETLKW, &lock);
+
+  if (status)
+    error("fcntl unlock error");
+}
+
 void audioDB::create(const char* dbName){
   if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
     error("Can't open database file", dbName);
+  get_lock(dbfid, 1);
 
   // go to the location corresponding to the last byte
   if (lseek (dbfid, O2_DEFAULTDBSIZE - 1, SEEK_SET) == -1)
@@ -473,7 +513,8 @@ void audioDB::drop(){
 void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0){
   if ((dbfid = open (dbName, forWrite ? O_RDWR : O_RDONLY)) < 0)
     error("Can't open database file", dbName);
-  
+  get_lock(dbfid, forWrite);
+
   // open the input file
   if (inFile && (infid = open (inFile, O_RDONLY)) < 0)
     error("can't open input file for reading", inFile);
@@ -667,6 +708,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
 
   if ((dbfid = open (dbName, O_RDWR)) < 0)
     error("Can't open database file", dbName);
+  get_lock(dbfid, 1);
 
   if(!key)
     key=inFile;

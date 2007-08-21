@@ -233,6 +233,8 @@ class audioDB{
   audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult=0);
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
+  void get_lock(int fd, bool exclusive);
+  void release_lock(int fd);
   void create(const char* dbName);
   void drop();
   void insert(const char* dbName, const char* inFile);
