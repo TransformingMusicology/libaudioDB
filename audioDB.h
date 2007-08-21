@@ -215,7 +215,7 @@ class audioDB{
   struct timeval tv2;
     
   // private methods
-  void error(const char* a, const char* b = "");
+  void error(const char* a, const char* b = "", const char *sysFunc = 0);
   void pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
   void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);

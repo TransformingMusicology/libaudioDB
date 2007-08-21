@@ -97,8 +97,11 @@ Web Services:
 
 #define O2_DEBUG
 
-void audioDB::error(const char* a, const char* b) {
+void audioDB::error(const char* a, const char* b, const char *sysFunc) {
   cerr << a << ": " << b << endl;
+  if (sysFunc) {
+    perror(sysFunc);
+  }
   exit(1);
 }
 
@@ -446,7 +449,7 @@ void audioDB::get_lock(int fd, bool exclusive) {
       sleep(1);
       goto retry;
     } else {
-      error("fcntl lock error");
+      error("fcntl lock error", "", "fcntl");
     }
   }
 }
@@ -463,28 +466,28 @@ void audioDB::release_lock(int fd) {
   status = fcntl(fd, F_SETLKW, &lock);
 
   if (status)
-    error("fcntl unlock error");
+    error("fcntl unlock error", "", "fcntl");
 }
 
 void audioDB::create(const char* dbName){
   if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
-    error("Can't create database file", dbName);
+    error("Can't create database file", dbName, "open");
   get_lock(dbfid, 1);
 
   // go to the location corresponding to the last byte
   if (lseek (dbfid, O2_DEFAULTDBSIZE - 1, SEEK_SET) == -1)
-    error("lseek error in db file");
+    error("lseek error in db file", "", "lseek");
 
   // write a dummy byte at the last location
   if (write (dbfid, "", 1) != 1)
-    error("write error");
+    error("write error", "", "write");
   
   // mmap the output file
   if(verbosity)
     cerr << "header size:" << O2_HEADERSIZE << endl;
   if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database");
+    error("mmap error for creating database", "", "mmap");
   
   dbH = new dbTableHeaderT();
   assert(dbH);
@@ -512,16 +515,16 @@ void audioDB::drop(){
 // Precondition: database has already been created
 void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0){
   if ((dbfid = open (dbName, forWrite ? O_RDWR : O_RDONLY)) < 0)
-    error("Can't open database file", dbName);
+    error("Can't open database file", dbName, "open");
   get_lock(dbfid, forWrite);
 
   // open the input file
   if (inFile && (infid = open (inFile, O_RDONLY)) < 0)
-    error("can't open input file for reading", inFile);
+    error("can't open input file for reading", inFile, "open");
 
   // find size of input file
   if (inFile && fstat (infid,&statbuf) < 0)
-    error("fstat error finding size of input");
+    error("fstat error finding size of input", "", "fstat");
   
   // Get the database header info
   dbH = new dbTableHeaderT();
@@ -556,12 +559,12 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0
   // mmap the input file 
   if (inFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
       == (caddr_t) -1)
-    error("mmap error for input");
+    error("mmap error for input", "", "mmap");
 
   // mmap the database file
   if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database");
+    error("mmap error for initting tables of database", "", "mmap");
 
   // Make some handy tables with correct types
   fileTable= (char*)(db+fileTableOffset);
@@ -707,7 +710,7 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
 void audioDB::batchinsert(const char* dbName, const char* inFile){
 
   if ((dbfid = open (dbName, O_RDWR)) < 0)
-    error("Can't open database file", dbName);
+    error("Can't open database file", dbName, "open");
   get_lock(dbfid, 1);
 
   if(!key)
@@ -763,16 +766,16 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
 
     // open the input file
     if (thisFile && (infid = open (thisFile, O_RDONLY)) < 0)
-      error("can't open feature file for reading", thisFile);
+      error("can't open feature file for reading", thisFile, "open");
   
     // find size of input file
     if (thisFile && fstat (infid,&statbuf) < 0)
-      error("fstat error finding size of input");
+      error("fstat error finding size of input", "", "fstat");
 
     // mmap the database file
     if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
 			   MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-      error("mmap error for creating database");
+      error("mmap error for batchinsert into database", "", "mmap");
     
     // Make some handy tables with correct types
     fileTable= (char*)(db+fileTableOffset);
@@ -800,7 +803,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     // mmap the input file 
     if (thisFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
 	== (caddr_t) -1)
-      error("mmap error for input");
+      error("mmap error for input", "", "mmap");
   
   
     // Linear scan of filenames check for pre-existing feature
@@ -875,7 +878,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   // mmap the database file
   if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database");
+    error("mmap error for creating database", "", "mmap");
   
   if(verbosity)
     cerr << COM_BATCHINSERT << " " << dbName << " " << totalVectors << " vectors " 
