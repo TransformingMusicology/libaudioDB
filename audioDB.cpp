@@ -97,9 +97,9 @@ Web Services:
 
 #define O2_DEBUG
 
-  void audioDB::error(const char* a, const char* b){
-    cerr << a << ":" << b << endl;
-    exit(1);
+void audioDB::error(const char* a, const char* b) {
+  cerr << a << ": " << b << endl;
+  exit(1);
 }
 
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult):
@@ -467,8 +467,8 @@ void audioDB::release_lock(int fd) {
 }
 
 void audioDB::create(const char* dbName){
-  if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
-    error("Can't open database file", dbName);
+  if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
+    error("Can't create database file", dbName);
   get_lock(dbfid, 1);
 
   // go to the location corresponding to the last byte
