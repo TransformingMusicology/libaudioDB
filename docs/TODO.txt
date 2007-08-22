@@ -8,6 +8,7 @@ o allow keys to be passed as queries
 o test suite
 o SOAP to serialize queryFile and keyList
 o SOAP to serialize files on insert / batch insert ?
+:-) DONE don't overwrite existing files on db create
 
 M. Casey 13/08/07
 
