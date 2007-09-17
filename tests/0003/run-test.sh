@@ -6,6 +6,10 @@ if [ -f testdb ]; then rm -f testdb; fi
 
 ${AUDIODB} -d testdb -N
 
+# We could contemplate putting the test feature (and the expected
+# query output) under svn control if we trust its binary file
+# handling.
+
 # FIXME: endianness!
 printf "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf0\x3f" > testfeature
 
