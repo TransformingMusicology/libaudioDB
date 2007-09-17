@@ -26,3 +26,4 @@ clean:
 	-rm adb.nsmap adb.xsd adb.wsdl adb.query.req.xml adb.query.res.xml adb.status.req.xml adb.status.res.xml
 	-rm README.txt
 	-rm ${EXECUTABLE} ${EXECUTABLE}.1
+	-sh -c "cd tests && sh ./clean.sh"
