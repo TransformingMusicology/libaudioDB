@@ -1,5 +1,15 @@
 #! /bin/sh
 
+AUDIODB=../../${EXECUTABLE:-audioDB}
+export AUDIODB
+
+if [ -x ${AUDIODB:3} ]; then 
+  :
+else 
+  echo Cannot execute audioDB: ${AUDIODB:3}
+  exit 1
+fi
+
 for file in [0-9][0-9][0-9][0-9]*; do
   if [ -d ${file} ]; then
     if [ -f ${file}/run-test.sh ]; then
