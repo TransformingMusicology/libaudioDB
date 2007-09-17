@@ -15,11 +15,11 @@ printf "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf0\x3f" > testfeature
 
 ${AUDIODB} -d testdb -I -f testfeature
 
-${AUDIODB} -d testdb -Q point -f testfeature > query-output
+${AUDIODB} -d testdb -Q point -f testfeature > test-query-output
 
-echo testfeature 1 0 0 > test-query-output
+echo testfeature 1 0 0 > test-expected-query-output
 
-cmp query-output test-query-output
+cmp test-query-output test-expected-query-output
 
 # failure cases
 ${AUDIODB} -d testdb -I && exit 1
