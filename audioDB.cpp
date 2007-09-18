@@ -971,7 +971,7 @@ void audioDB::dump(const char* dbName){
 }
 
 void audioDB::l2norm(const char* dbName){
-  initTables(dbName, 0, 0);
+  initTables(dbName, true, 0);
   if(dbH->length>0){
     unsigned numVectors = dbH->length/(sizeof(double)*dbH->dim);
     unitNormAndInsertL2(dataBuf, dbH->dim, numVectors, 0); // No append
