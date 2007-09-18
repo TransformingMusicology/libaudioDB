@@ -1,6 +1,6 @@
 #! /bin/sh
 
-trap "exit 1" ERR
+. ../test-utils.sh
 
 if [ -f testdb ]; then rm -f testdb; fi
 
@@ -11,7 +11,8 @@ ${AUDIODB} -d testdb -N
 # handling.
 
 # FIXME: endianness!
-printf "\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf0\x3f" > testfeature
+intstring 1 > testfeature
+floatstring 1 >> testfeature
 
 ${AUDIODB} -d testdb -I -f testfeature
 

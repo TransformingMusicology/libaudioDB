@@ -1,6 +1,6 @@
 #! /bin/sh
 
-trap "exit 1" ERR
+. ../test-utils.sh
 
 if [ -f testdb ]; then rm -f testdb; fi
 
