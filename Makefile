@@ -17,10 +17,8 @@ cmdline.c cmdline.h: gengetopt.in
 soapServer.cpp soapClient.cpp soapC.cpp: audioDBws.h
 	soapcpp2 audioDBws.h
 
-audioDB.o: audioDB.cpp audioDB.h soapServer.cpp soapClient.cpp soapC.cpp cmdline.c cmdline.h
+${EXECUTABLE}: audioDB.cpp soapServer.cpp soapClient.cpp soapC.cpp cmdline.c cmdline.h
 	g++ -c ${CFLAGS} -Wall -Werror audioDB.cpp
-
-${EXECUTABLE}: audioDB.o soapServer.cpp soapClient.cpp soapC.cpp cmdline.c cmdline.h
 	g++ -o ${EXECUTABLE} ${CFLAGS} audioDB.o soapServer.cpp soapClient.cpp soapC.cpp cmdline.c ${LIBS}
 
 clean:
