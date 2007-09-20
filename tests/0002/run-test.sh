@@ -12,6 +12,6 @@ ${AUDIODB} -S -d testdb
 ${AUDIODB} -d testdb -S
 
 # should fail (no db given)
-${AUDIODB} -S && exit 1
+expect_clean_error_exit ${AUDIODB} -S
 
 exit 104

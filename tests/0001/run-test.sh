@@ -10,9 +10,9 @@ ${AUDIODB} -N -d testdb
 stat testdb
 
 # should fail (testdb exists)
-${AUDIODB} -N -d testdb && exit 1
+expect_clean_error_exit ${AUDIODB} -N -d testdb
 
 # should fail (no db given)
-${AUDIODB} -N && exit 1
+expect_clean_error_exit ${AUDIODB} -N
 
 exit 104

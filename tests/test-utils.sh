@@ -11,6 +11,18 @@ fi
 # encode.  This might involve writing some C code, as Bash doesn't do
 # Floating Point.  (scanf() is probably enough).
 
+expect_clean_error_exit() {
+  trap - ERR
+  "$@"
+  exit_code=$?
+  trap "exit 1" ERR
+  if [ $exit_code -eq 0 ]; then
+    exit 1
+  elif [ $exit_code -ge 126 ]; then
+    exit 1
+  fi
+}
+
 floatstring() {
   for arg in "$@"; do
     case ${arg} in

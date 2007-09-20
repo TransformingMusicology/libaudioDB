@@ -2,16 +2,12 @@
 
 . ../test-utils.sh
 
-# this is the same as tests/0006, except without the -l 1 to ask for a
-# sequence search of length 1; as of 2007-09-19, this causes
-# segfaults.  The default behaviour might not be to work completely
-# without the -l 1, but it shouldn't segfault.  (There's not much
-# that's sensible other than defaulting to -l 1, because the query
-# feature file is of length 1).
-
 if [ -f testdb ]; then rm -f testdb; fi
 
 ${AUDIODB} -d testdb -N
+
+# tests that the lack of -l when the query sequence is shorter doesn't
+# segfault.
 
 intstring 2 > testfeature
 floatstring 0 1 >> testfeature
@@ -26,22 +22,14 @@ echo "query point (0.0,0.5)"
 intstring 2 > testquery
 floatstring 0 0.5 >> testquery
 
-${AUDIODB} -d testdb -Q sequence -f testquery > testoutput
-echo testfeature 1 0 0 > test-expected-output
-cmp testoutput test-expected-output
-${AUDIODB} -d testdb -Q sequence -f testquery -n 1 > testoutput
-echo testfeature 0 0 0 > test-expected-output
-cmp testoutput test-expected-output
+expect_clean_error_exit ${AUDIODB} -d testdb -Q sequence -f testquery
+expect_clean_error_exit ${AUDIODB} -d testdb -Q sequence -f testquery -n 1
 
 echo "query point (0.5,0.0)"
 intstring 2 > testquery
 floatstring 0.5 0 >> testquery
 
-${AUDIODB} -d testdb -Q sequence -f testquery > testoutput
-echo testfeature 1 0 1 > test-expected-output
-cmp testoutput test-expected-output
-${AUDIODB} -d testdb -Q sequence -f testquery -n 1 > testoutput
-echo testfeature 0 0 1 > test-expected-output
-cmp testoutput test-expected-output
+expect_clean_error_exit ${AUDIODB} -d testdb -Q sequence -f testquery
+expect_clean_error_exit ${AUDIODB} -d testdb -Q sequence -f testquery -n 1
 
 exit 104
