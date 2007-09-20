@@ -1520,13 +1520,13 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   unsigned processedTracks=0;
   for(i=0; i<dbH->numFiles; i++){
     if(trackTable[i]>sequenceLength-1){
-      w = trackTable[i]-sequenceLength;
+      w = trackTable[i]-sequenceLength+1;
       pn = sMeanL2+i;
       *pn=0;
       while(w--)
 	if(*ps>0)
 	  *pn+=*ps++;
-      *pn/=trackTable[i]-sequenceLength;
+      *pn/=trackTable[i]-sequenceLength+1;
       SILENCE_THRESH+=*pn;
       processedTracks++;
     }
@@ -1699,7 +1699,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     trackOffset=trackOffsetTable[track];     // numDoubles offset
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
-    if(sequenceLength<trackTable[track]){  // test for short sequences
+    if(sequenceLength<=trackTable[track]){  // test for short sequences
       
       if(verbosity>7)
 	cerr << track << "." << trackIndexOffset << "." << trackTable[track] << " | ";cerr.flush();
@@ -1801,7 +1801,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	      thisDist=1000000.0;
 
 	    // k-NN match algorithm
-	    m=pointNN;
+	    m=pointNN; /* FIXME: -1?  distances[pointNN] */
 	    while(m--){
 	      if(thisDist<=distances[m])
 		if(m==0 || thisDist>=distances[m-1]){
@@ -1835,7 +1835,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
 
 	// All the track stuff goes here
-	n=trackNN;
+	n=trackNN; /* FIXME: trackNN-1 */
 	while(n--){
 	  if(thisDist<=trackDistances[n]){
 	    if((n==0 || thisDist>=trackDistances[n-1])){
