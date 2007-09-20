@@ -224,8 +224,6 @@ class audioDB{
   void initTables(const char* dbName, bool forWrite, const char* inFile);
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
-  void normalize(double* X, int dim, int n);
-  void normalize(double* X, int dim, int n, double minval, double maxval);
   void insertTimeStamps(unsigned n, ifstream* timesFile, double* timesdata);
   unsigned getKeyPos(char* key);
  public:

@@ -110,31 +110,31 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
   dbName(0),
   inFile(0),
   key(0),
-  trackFile(0),
   trackFileName(0),
-  timesFile(0),
-  timesFileName(0),
-  usingTimes(0),
+  trackFile(0),
   command(0),
+  timesFileName(0),
+  timesFile(0),
   dbfid(0),
-  db(0),
-  dbH(0),
   infid(0),
+  db(0),
   indata(0),
-  queryType(O2_FLAG_POINT_QUERY),
-  verbosity(1),
-  pointNN(O2_DEFAULT_POINTNN),
-  trackNN(O2_DEFAULT_TRACKNN),
-  trackTable(0),
+  dbH(0),
   fileTable(0),
+  trackTable(0),
   dataBuf(0),
   l2normTable(0),
-  timesTable(0),
   qNorm(0),
+  timesTable(0),
+  verbosity(1),
+  queryType(O2_FLAG_POINT_QUERY),
+  pointNN(O2_DEFAULT_POINTNN),
+  trackNN(O2_DEFAULT_TRACKNN),
   sequenceLength(16),
   sequenceHop(1),
   queryPoint(0),
   usingQueryPoint(0),
+  usingTimes(0),
   isClient(0),
   isServer(0),
   port(0),
@@ -1158,7 +1158,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     adbQueryResult->Dist = new double[listLen];
     adbQueryResult->Qpos = new int[listLen];
     adbQueryResult->Spos = new int[listLen];
-    for(k=0; k<adbQueryResult->__sizeRlist; k++){
+    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=distances[k];
       adbQueryResult->Qpos[k]=qIndexes[k];
@@ -1193,8 +1193,6 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   
   // For each input vector, find the closest pointNN matching output vectors and report
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-  unsigned numTracks = dbH->numFiles;
-
   double* query = (double*)(indata+sizeof(int));
   double* data = dataBuf;
   double* queryCopy = 0;
@@ -1409,7 +1407,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     adbQueryResult->Dist = new double[listLen];
     adbQueryResult->Qpos = new int[listLen];
     adbQueryResult->Spos = new int[listLen];
-    for(k=0; k<adbQueryResult->__sizeRlist; k++){
+    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
       adbQueryResult->Qpos[k]=trackQIndexes[k];
@@ -1445,10 +1443,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-  unsigned numTracks = dbH->numFiles;
-  
   double* query = (double*)(indata+sizeof(int));
-  double* data = dataBuf;
   double* queryCopy = 0;
 
   double qMeanL2;
@@ -1587,7 +1582,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
   unsigned k,l,m,n,track,trackOffset=0, HOP_SIZE=sequenceHop, wL=sequenceLength;
   double thisDist;
-  double oneOverWL=1.0/wL;
   
   for(k=0; k<pointNN; k++){
     distances[k]=1.0e6;
@@ -1663,7 +1657,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   double* qp;
   double* sp;
   double* dp;
-  double diffL2;
 
   // build track offset table
   unsigned *trackOffsetTable = new unsigned[dbH->numFiles];
@@ -1717,7 +1710,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	assert(DD[j]);
       }
 
-      double tmp;
       // Dot product
       for(j=0; j<numVectors; j++)
 	for(k=0; k<trackTable[track]; k++){
@@ -1904,7 +1896,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     adbQueryResult->Dist = new double[listLen];
     adbQueryResult->Qpos = new int[listLen];
     adbQueryResult->Spos = new int[listLen];
-    for(k=0; k<adbQueryResult->__sizeRlist; k++){
+    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
       adbQueryResult->Qpos[k]=trackQIndexes[k];
@@ -1944,10 +1936,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-  unsigned numTracks = dbH->numFiles;
-  
   double* query = (double*)(indata+sizeof(int));
-  double* data = dataBuf;
   double* queryCopy = 0;
 
   double qMeanL2;
@@ -2081,9 +2070,8 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   unsigned sIndexes[pointNN];
   
 
-  unsigned k,l,m,n,track,trackOffset=0, HOP_SIZE=sequenceHop, wL=sequenceLength;
+  unsigned k,l,n,track,trackOffset=0, HOP_SIZE=sequenceHop, wL=sequenceLength;
   double thisDist;
-  double oneOverWL=1.0/wL;
   
   for(k=0; k<pointNN; k++){
     distances[k]=0.0;
@@ -2159,7 +2147,6 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   double* qp;
   double* sp;
   double* dp;
-  double diffL2;
 
   // build track offset table
   unsigned *trackOffsetTable = new unsigned[dbH->numFiles];
@@ -2213,7 +2200,6 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	assert(DD[j]);
       }
 
-      double tmp;
       // Dot product
       for(j=0; j<numVectors; j++)
 	for(k=0; k<trackTable[track]; k++){
@@ -2377,7 +2363,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     adbQueryResult->Dist = new double[listLen];
     adbQueryResult->Qpos = new int[listLen];
     adbQueryResult->Spos = new int[listLen];
-    for(k=0; k<adbQueryResult->__sizeRlist; k++){
+    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
       adbQueryResult->Qpos[k]=trackQIndexes[k];
@@ -2406,45 +2392,10 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 
 }
 
-void audioDB::normalize(double* X, int dim, int n){
-  unsigned c = n*dim;
-  double minval,maxval,v,*p;
-
-  p=X;  
-  while(c--){
-    v=*p++;
-    if(v<minval)
-      minval=v;
-    else if(v>maxval)
-      maxval=v;
-  }
-
-  normalize(X, dim, n, minval, maxval);
-
-}
-
-void audioDB::normalize(double* X, int dim, int n, double minval, double maxval){
-  unsigned c = n*dim;
-  double *p;
-
-
-  if(maxval==minval)
-    return;
-
-  maxval=1.0/(maxval-minval);
-  c=n*dim;
-  p=X;
-
-  while(c--){
-    *p=(*p-minval)*maxval;
-    p++;
-  }
-}
-
 // Unit norm block of features
 void audioDB::unitNorm(double* X, unsigned dim, unsigned n, double* qNorm){
   unsigned d;
-  double L2, oneOverL2, *p;
+  double L2, *p;
   if(verbosity>2)
     cerr << "norming " << n << " vectors...";cerr.flush();
   while(n--){
@@ -2474,7 +2425,7 @@ void audioDB::unitNorm(double* X, unsigned dim, unsigned n, double* qNorm){
 // Unit norm block of features
 void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append=0){
   unsigned d;
-  double L2, oneOverL2, *p;
+  double *p;
   unsigned nn = n;
 
   assert(l2normTable);
@@ -2541,7 +2492,7 @@ void audioDB::startServer(){
 	      soap_print_fault(&soap, stderr);
 	      break;
 	    }
-	  fprintf(stderr, "%d: accepted connection from IP=%d.%d.%d.%d socket=%d\n", i,
+	  fprintf(stderr, "%d: accepted connection from IP=%lud.%lud.%lud.%lud socket=%d\n", i,
 		  (soap.ip >> 24)&0xFF, (soap.ip >> 16)&0xFF, (soap.ip >> 8)&0xFF, soap.ip&0xFF, s);
 	  if (soap_serve(&soap) != SOAP_OK) // process RPC request
 	    soap_print_fault(&soap, stderr); // print error
