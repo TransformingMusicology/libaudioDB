@@ -1050,7 +1050,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
   unsigned qIndexes[pointNN];
   unsigned sIndexes[pointNN];
   for(unsigned k=0; k<pointNN; k++){
-    distances[k]=0.0;
+    distances[k]=-DBL_MAX;
     qIndexes[k]=~0;
     sIndexes[k]=~0;    
   }

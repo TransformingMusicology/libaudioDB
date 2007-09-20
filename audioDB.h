@@ -82,6 +82,7 @@ Web Services:
 #include <math.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <float.h>
 
 // includes for web services
 #include "soapH.h"
