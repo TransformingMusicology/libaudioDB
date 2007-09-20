@@ -1801,7 +1801,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	      thisDist=1000000.0;
 
 	    // k-NN match algorithm
-	    m=pointNN; /* FIXME: -1?  distances[pointNN] */
+	    m=pointNN;
 	    while(m--){
 	      if(thisDist<=distances[m])
 		if(m==0 || thisDist>=distances[m-1]){
@@ -1835,7 +1835,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
 
 	// All the track stuff goes here
-	n=trackNN; /* FIXME: trackNN-1 */
+	n=trackNN;
 	while(n--){
 	  if(thisDist<=trackDistances[n]){
 	    if((n==0 || thisDist>=trackDistances[n-1])){
