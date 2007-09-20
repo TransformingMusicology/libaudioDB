@@ -1459,7 +1459,10 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   double DIFF_THRESH=0;
 
   if(!(dbH->flags & O2_FLAG_L2NORM) )
-    error("Database must be L2 normed for sequence query","use -l2norm");
+    error("Database must be L2 normed for sequence query","use -L2NORM");
+
+  if(numVectors<sequenceLength)
+    error("Query shorter than requested sequence length", "maybe use -l");
   
   if(verbosity>1)
     cerr << "performing norms ... "; cerr.flush();
