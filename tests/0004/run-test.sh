@@ -17,17 +17,23 @@ intstring 2 > testquery
 floatstring 0 0.5 >> testquery
 
 ${AUDIODB} -d testdb -Q point -f testquery > testoutput
-wc -l testoutput | grep 2
+echo testfeature 0.5 0 0 > test-expected-output
+echo testfeature 0 0 1 >> test-expected-output
+cmp testoutput test-expected-output
 ${AUDIODB} -d testdb -Q point -f testquery -n 1 > testoutput
-wc -l testoutput | grep 1
+echo testfeature 0.5 0 0 > test-expected-output
+cmp testoutput test-expected-output
 
 echo "query point (0.5,0.0)"
 intstring 2 > testquery
 floatstring 0.5 0 >> testquery
 
 ${AUDIODB} -d testdb -Q point -f testquery > testoutput
-wc -l testoutput | grep 2
+echo testfeature 0.5 0 1 > test-expected-output
+echo testfeature 0 0 0 >> test-expected-output
+cmp testoutput test-expected-output
 ${AUDIODB} -d testdb -Q point -f testquery -n 1 > testoutput
-wc -l testoutput | grep 1
+echo testfeature 0.5 0 1 > test-expected-output
+cmp testoutput test-expected-output
 
 exit 104
