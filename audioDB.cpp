@@ -1770,8 +1770,8 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	}
 
 	// Search for minimum distance by shingles (concatenated vectors)
-	for(j=0;j<numVectors-wL;j+=HOP_SIZE)
-	  for(k=0;k<trackTable[track]-wL;k+=HOP_SIZE){
+	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
+	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
 	    if(verbosity>10)
 	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
@@ -1820,9 +1820,11 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	  }
 	// Calculate the mean of the N-Best matches
 	thisDist=0.0;
-	for(m=0; m<pointNN; m++)
+	for(m=0; m<pointNN; m++) {
+          if (distances[m] == 1000000.0) break;
 	  thisDist+=distances[m];
-	thisDist/=pointNN;
+        }
+	thisDist/=m;
 	
 	// Let's see the distances then...
 	if(verbosity>3)
