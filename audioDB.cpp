@@ -237,8 +237,9 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
       exit(1);
     }
     else 
-      if(verbosity>3)
+      if(verbosity>3) {
 	cerr << "Setting radius to " << radius << endl;
+      }
   }
   
   if(args_info.SERVER_given){
@@ -483,8 +484,9 @@ void audioDB::create(const char* dbName){
     error("write error", "", "write");
   
   // mmap the output file
-  if(verbosity)
+  if(verbosity) {
     cerr << "header size:" << O2_HEADERSIZE << endl;
+  }
   if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
     error("mmap error for creating database", "", "mmap");
@@ -500,9 +502,9 @@ void audioDB::create(const char* dbName){
   dbH->flags=0; //O2_FLAG_L2NORM;
 
   memcpy (db, dbH, O2_HEADERSIZE);
-  if(verbosity)
+  if(verbosity) {
     cerr << COM_CREATE << " " << dbName << endl;
-
+  }
 }
 
 
@@ -597,16 +599,18 @@ void audioDB::insert(const char* dbName, const char* inFile){
     }
 
   if(alreadyInserted){
-    if(verbosity)
+    if(verbosity) {
       cerr << "Warning: key already exists in database, ignoring: " <<inFile << endl;
+    }
     return;
   }
   
   // Make a track index table of features to file indexes
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
   if(!numVectors){
-    if(verbosity)
+    if(verbosity) {
       cerr << "Warning: ignoring zero-length feature vector file:" << key << endl;
+    }
     // CLEAN UP
     munmap(indata,statbuf.st_size);
     munmap(db,O2_DEFAULTDBSIZE);
@@ -646,9 +650,10 @@ void audioDB::insert(const char* dbName, const char* inFile){
 
   // Report status
   status(dbName);
-  if(verbosity)
+  if(verbosity) {
     cerr << COM_INSERT << " " << dbName << " " << numVectors << " vectors " 
 	 << (statbuf.st_size-sizeof(int)) << " bytes." << endl;
+  }
 
   // CLEAN UP
   munmap(indata,statbuf.st_size);
@@ -701,8 +706,9 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
        cerr << "expected " << numVectors << " found " << numtimes << endl;
        error("Times file is incorrect length for features file",inFile);
      }
-     if(verbosity>2)
+     if(verbosity>2) {
        cerr << "numtimes: " << numtimes << endl;
+     }
    }
  }
 }
@@ -816,16 +822,18 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
       }
   
     if(alreadyInserted){
-      if(verbosity)
+      if(verbosity) {
 	cerr << "Warning: key already exists in database:" << thisKey << endl;
+      }
     }
     else{
   
       // Make a track index table of features to file indexes
       unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
       if(!numVectors){
-	if(verbosity)
+	if(verbosity) {
 	  cerr << "Warning: ignoring zero-length feature vector file:" << thisKey << endl;
+        }
       }
       else{	
 	if(usingTimes){
@@ -880,9 +888,10 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
     error("mmap error for creating database", "", "mmap");
   
-  if(verbosity)
+  if(verbosity) {
     cerr << COM_BATCHINSERT << " " << dbName << " " << totalVectors << " vectors " 
 	 << totalVectors*dbH->dim*sizeof(double) << " bytes." << endl;
+  }
   
   // Report status
   status(dbName);
@@ -1083,8 +1092,9 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     if(queryPoint>numVectors-1)
       error("queryPoint > numVectors in query");
     else{
-      if(verbosity>1)
+      if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
+      }
       query=query+queryPoint*dbH->dim;
       numVectors=queryPoint+1;
       j=1;
@@ -1129,8 +1139,9 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
   }
 
   gettimeofday(&tv2, NULL); 
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << endl << " elapsed time:" << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
+  }
 
   if(adbQueryResult==0){
     // Output answer
@@ -1271,8 +1282,9 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     if(queryPoint>numVectors-1)
       error("queryPoint > numVectors in query");
     else{
-      if(verbosity>1)
+      if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
+      }
       query=query+queryPoint*dbH->dim;
       numVectors=queryPoint+1;
     }
@@ -1301,8 +1313,9 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     }
     trackOffset=trackOffsetTable[track];     // numDoubles offset
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
-    if(verbosity>7)
+    if(verbosity>7) {
       cerr << track << "." << trackOffset/(dbH->dim) << "." << trackTable[track] << " | ";cerr.flush();
+    }
 
     if(dbH->flags & O2_FLAG_L2NORM)
       usingQueryPoint?query=queryCopy+queryPoint*dbH->dim:query=queryCopy;
@@ -1384,13 +1397,15 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   } // tracks
   gettimeofday(&tv2, NULL); 
 
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << endl << "processed tracks :" << processedTracks 
 	 << " elapsed time:" << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
+  }
 
   if(adbQueryResult==0){
-    if(verbosity>1)
+    if(verbosity>1) {
       cerr<<endl;
+    }
     // Output answer
     // Loop over nearest neighbours
     for(k=0; k < min(trackNN,processedTracks); k++)
@@ -1459,8 +1474,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   if(numVectors<sequenceLength)
     error("Query shorter than requested sequence length", "maybe use -l");
   
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "performing norms ... "; cerr.flush();
+  }
   unsigned dbVectors = dbH->length/(sizeof(double)*dbH->dim);
 
   // Make a copy of the query
@@ -1527,16 +1543,17 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     }
     ps = sNorm + trackTable[i];
   }
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "processedTracks: " << processedTracks << endl;
-
+  }
     
   SILENCE_THRESH/=processedTracks;
   USE_THRESH=1; // Turn thresholding on
   DIFF_THRESH=SILENCE_THRESH; //  mean shingle power
   SILENCE_THRESH/=5; // 20% of the mean shingle power is SILENCE
-  if(verbosity>4)
+  if(verbosity>4) {
     cerr << "silence thresh: " << SILENCE_THRESH;
+  }
   w=sequenceLength-1;
   i=1;
   tmp1=*qNorm;
@@ -1559,12 +1576,13 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   }
   qMeanL2 /= numVectors-sequenceLength+1;
 
-  if(verbosity>1)
-    cerr << "done." << endl;    
+  if(verbosity>1) {
+    cerr << "done." << endl;
+  }
   
-  
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "matching tracks..." << endl;
+  }
   
   assert(pointNN>0 && pointNN<=O2_MAXNN);
   assert(trackNN>0 && trackNN<=O2_MAXNN);
@@ -1619,8 +1637,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
       meanQdur+=timesdata[k];
     }
     meanQdur/=k;
-    if(verbosity>1)
+    if(verbosity>1) {
       cerr << "mean query file duration: " << meanQdur << endl;
+    }
     meanDBdur = new double[dbH->numFiles];
     assert(meanDBdur);
     for(k=0; k<dbH->numFiles; k++){
@@ -1635,8 +1654,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     if(queryPoint>numVectors || queryPoint>numVectors-wL+1)
       error("queryPoint > numVectors-wL+1 in query");
     else{
-      if(verbosity>1)
+      if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
+      }
       query=query+queryPoint*dbH->dim;
       qNorm=qNorm+queryPoint;
       numVectors=wL;
@@ -1694,8 +1714,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
     if(sequenceLength<=trackTable[track]){  // test for short sequences
       
-      if(verbosity>7)
+      if(verbosity>7) {
 	cerr << track << "." << trackIndexOffset << "." << trackTable[track] << " | ";cerr.flush();
+      }
 		
       // Sum products matrix
       for(j=0; j<numVectors;j++){
@@ -1750,7 +1771,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	  }
       }
       
-      if(verbosity>3 && usingTimes){
+      if(verbosity>3 && usingTimes) {
 	cerr << "meanQdur=" << meanQdur << " meanDBdur=" << meanDBdur[track] << endl;
 	cerr.flush();
       }
@@ -1759,7 +1780,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	 (usingTimes 
 	  && fabs(meanDBdur[track]-meanQdur)<meanQdur*timesTol)){
 
-	if(verbosity>3 && usingTimes){
+	if(verbosity>3 && usingTimes) {
 	  cerr << "within duration tolerance." << endl;
 	  cerr.flush();
 	}
@@ -1768,8 +1789,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
-	    if(verbosity>10)
+	    if(verbosity>10) {
 	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
+            }
 	    // Gather chi^2 statistics
 	    if(thisDist<minSample)
 	      minSample=thisDist;
@@ -1822,8 +1844,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	thisDist/=m;
 	
 	// Let's see the distances then...
-	if(verbosity>3)
+	if(verbosity>3) {
 	  cerr << fileTable+track*O2_FILETABLESIZE << " " << thisDist << endl;
+        }
 
 
 	// All the track stuff goes here
@@ -1871,15 +1894,16 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   }
 
   gettimeofday(&tv2,NULL);
-  if(verbosity>1){
+  if(verbosity>1) {
     cerr << endl << "processed tracks :" << processedTracks << " matched tracks: " << successfulTracks << " elapsed time:" 
 	 << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
     cerr << "sampleCount: " << sampleCount << " sampleSum: " << sampleSum << " logSampleSum: " << logSampleSum 
 	 << " minSample: " << minSample << " maxSample: " << maxSample << endl;
   }  
   if(adbQueryResult==0){
-    if(verbosity>1)
+    if(verbosity>1) {
       cerr<<endl;
+    }
     // Output answer
     // Loop over nearest neighbours
     for(k=0; k < min(trackNN,successfulTracks); k++)
@@ -1949,8 +1973,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   if(!(dbH->flags & O2_FLAG_L2NORM) )
     error("Database must be L2 normed for sequence query","use -l2norm");
   
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "performing norms ... "; cerr.flush();
+  }
   unsigned dbVectors = dbH->length/(sizeof(double)*dbH->dim);
 
   // Make a copy of the query
@@ -2017,16 +2042,17 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     }
     ps = sNorm + trackTable[i];
   }
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "processedTracks: " << processedTracks << endl;
-
+  }
     
   SILENCE_THRESH/=processedTracks;
   USE_THRESH=1; // Turn thresholding on
   DIFF_THRESH=SILENCE_THRESH; //  mean shingle power
   SILENCE_THRESH/=5; // 20% of the mean shingle power is SILENCE
-  if(verbosity>4)
+  if(verbosity>4) {
     cerr << "silence thresh: " << SILENCE_THRESH;
+  }
   w=sequenceLength-1;
   i=1;
   tmp1=*qNorm;
@@ -2049,12 +2075,13 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   }
   qMeanL2 /= numVectors-sequenceLength+1;
 
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "done." << endl;    
+  }
   
-  
-  if(verbosity>1)
+  if(verbosity>1) {
     cerr << "matching tracks..." << endl;
+  }
   
   assert(pointNN>0 && pointNN<=O2_MAXNN);
   assert(trackNN>0 && trackNN<=O2_MAXNN);
@@ -2109,8 +2136,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
       meanQdur+=timesdata[k];
     }
     meanQdur/=k;
-    if(verbosity>1)
+    if(verbosity>1) {
       cerr << "mean query file duration: " << meanQdur << endl;
+    }
     meanDBdur = new double[dbH->numFiles];
     assert(meanDBdur);
     for(k=0; k<dbH->numFiles; k++){
@@ -2125,8 +2153,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     if(queryPoint>numVectors || queryPoint>numVectors-wL+1)
       error("queryPoint > numVectors-wL+1 in query");
     else{
-      if(verbosity>1)
+      if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
+      }
       query=query+queryPoint*dbH->dim;
       qNorm=qNorm+queryPoint;
       numVectors=wL;
@@ -2184,9 +2213,10 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 
     if(sequenceLength<trackTable[track]){  // test for short sequences
       
-      if(verbosity>7)
+      if(verbosity>7) {
 	cerr << track << "." << trackIndexOffset << "." << trackTable[track] << " | ";cerr.flush();
-		
+      }
+
       // Sum products matrix
       for(j=0; j<numVectors;j++){
 	D[j]=new double[trackTable[track]]; 
@@ -2240,7 +2270,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	  }
       }
       
-      if(verbosity>3 && usingTimes){
+      if(verbosity>3 && usingTimes) {
 	cerr << "meanQdur=" << meanQdur << " meanDBdur=" << meanDBdur[track] << endl;
 	cerr.flush();
       }
@@ -2249,7 +2279,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	 (usingTimes 
 	  && fabs(meanDBdur[track]-meanQdur)<meanQdur*timesTol)){
 
-	if(verbosity>3 && usingTimes){
+	if(verbosity>3 && usingTimes) {
 	  cerr << "within duration tolerance." << endl;
 	  cerr.flush();
 	}
@@ -2258,8 +2288,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	for(j=0;j<numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
-	    if(verbosity>10)
+	    if(verbosity>10) {
 	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
+            }
 	    // Gather chi^2 statistics
 	    if(thisDist<minSample)
 	      minSample=thisDist;
@@ -2290,8 +2321,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	thisDist=distances[0];
 	
 	// Let's see the distances then...
-	if(verbosity>3)
+	if(verbosity>3) {
 	  cerr << fileTable+track*O2_FILETABLESIZE << " " << thisDist << endl;
+        }
 
 	// All the track stuff goes here
 	n=trackNN;
@@ -2338,7 +2370,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   }
 
   gettimeofday(&tv2,NULL);
-  if(verbosity>1){
+  if(verbosity>1) {
     cerr << endl << "processed tracks :" << processedTracks << " matched tracks: " << successfulTracks << " elapsed time:" 
 	 << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
     cerr << "sampleCount: " << sampleCount << " sampleSum: " << sampleSum << " logSampleSum: " << logSampleSum 
@@ -2346,8 +2378,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   }
   
   if(adbQueryResult==0){
-    if(verbosity>1)
+    if(verbosity>1) {
       cerr<<endl;
+    }
     // Output answer
     // Loop over nearest neighbours
     for(k=0; k < min(trackNN,successfulTracks); k++)
@@ -2396,8 +2429,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 void audioDB::unitNorm(double* X, unsigned dim, unsigned n, double* qNorm){
   unsigned d;
   double L2, *p;
-  if(verbosity>2)
+  if(verbosity>2) {
     cerr << "norming " << n << " vectors...";cerr.flush();
+  }
   while(n--){
     p=X;
     L2=0.0;
@@ -2418,8 +2452,9 @@ void audioDB::unitNorm(double* X, unsigned dim, unsigned n, double* qNorm){
     */
     X+=dim;
   }
-  if(verbosity>2)
+  if(verbosity>2) {
     cerr << "done..." << endl;
+  }
 }
 
 // Unit norm block of features
@@ -2433,8 +2468,9 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
   if( !append && (dbH->flags & O2_FLAG_L2NORM) )
     error("Database is already L2 normed", "automatic norm on insert is enabled");
 
-  if(verbosity>2)
+  if(verbosity>2) {
     cerr << "norming " << n << " vectors...";cerr.flush();
+  }
 
   double* l2buf = new double[n];
   double* l2ptr = l2buf;
@@ -2468,8 +2504,9 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
   memcpy(l2normTable+offset, l2buf, n*sizeof(double));
   if(l2buf)
     delete[] l2buf;
-  if(verbosity>2)
+  if(verbosity>2) {
     cerr << "done..." << endl;
+  }
 }
 
 
