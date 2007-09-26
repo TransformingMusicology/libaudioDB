@@ -1937,13 +1937,13 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   unsigned processedTracks=0;
   for(i=0; i<dbH->numFiles; i++){
     if(trackTable[i]>sequenceLength-1){
-      w = trackTable[i]-sequenceLength;
+      w = trackTable[i]-sequenceLength+1;
       pn = sMeanL2+i;
       *pn=0;
       while(w--)
 	if(*ps>0)
 	  *pn+=*ps++;
-      *pn/=trackTable[i]-sequenceLength;
+      *pn/=trackTable[i]-sequenceLength+1;
       SILENCE_THRESH+=*pn;
       processedTracks++;
     }
@@ -2118,7 +2118,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     trackOffset=trackOffsetTable[track];     // numDoubles offset
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
-    if(sequenceLength<trackTable[track]){  // test for short sequences
+    if(sequenceLength<=trackTable[track]){  // test for short sequences
       
       if(verbosity>7) {
 	cerr << track << "." << trackIndexOffset << "." << trackTable[track] << " | ";cerr.flush();
@@ -2192,8 +2192,8 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	}
 
 	// Search for minimum distance by shingles (concatenated vectors)
-	for(j=0;j<numVectors-wL;j+=HOP_SIZE)
-	  for(k=0;k<trackTable[track]-wL;k+=HOP_SIZE){
+	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
+	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
 	    if(verbosity>10) {
 	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
