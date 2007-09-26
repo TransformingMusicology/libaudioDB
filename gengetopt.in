@@ -73,7 +73,7 @@ option "sequencelength" l "length of sequences for sequence search." int typestr
 option "sequencehop"  h "hop size of sequence window for sequence search." int typestr="hop" default="1" dependon="QUERY" optional
 
 section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
-option "SERVER" s "run as standalone web service on named port." int typestr="port" default="80011" optional
+option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
 option "client" c "run as a client using named host service." string typestr="hostname:port" optional
 
 
