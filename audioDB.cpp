@@ -1141,13 +1141,13 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   double thisDist;
 
   for(k=0; k<pointNN; k++){
-    distances[k]=0.0;
+    distances[k]=-DBL_MAX;
     qIndexes[k]=~0;
     sIndexes[k]=~0;    
   }
 
   for(k=0; k<trackNN; k++){
-    trackDistances[k]=0.0;
+    trackDistances[k]=-DBL_MAX;
     trackQIndexes[k]=~0;
     trackSIndexes[k]=~0;
     trackIDs[k]=~0;
@@ -1269,10 +1269,12 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     // Take the average of this track's distance
     // Test the track distances
     thisDist=0;
-    n=pointNN;
-    while(n--)
-      thisDist+=distances[pointNN-n-1];
-    thisDist/=pointNN;
+    for (n = 0; n < pointNN; n++) {
+      if (distances[n] == -DBL_MAX) break;
+      thisDist += distances[n];
+    }
+    thisDist /= n;
+
     n=trackNN;
     while(n--){
       if(thisDist>=trackDistances[n]){
@@ -1295,7 +1297,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
 	break;
     }
     for(unsigned k=0; k<pointNN; k++){
-      distances[k]=0.0;
+      distances[k]=-DBL_MAX;
       qIndexes[k]=~0;
       sIndexes[k]=~0;    
     }
