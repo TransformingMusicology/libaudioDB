@@ -31,5 +31,5 @@ clean:
 	-rm ${EXECUTABLE} ${EXECUTABLE}.1 audioDB.o
 	-sh -c "cd tests && sh ./clean.sh"
 
-test:
+test: ${EXECUTABLE}
 	-sh -c "cd tests && sh ./run-tests.sh"

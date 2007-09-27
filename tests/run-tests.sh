@@ -32,7 +32,7 @@ for file in [0-9][0-9][0-9][0-9]*; do
   fi
 done
 
-if [ -z ${FAILED} ]; then
+if [ -z "${FAILED}" ]; then
   exit 0
 else
   exit 1
