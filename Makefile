@@ -3,6 +3,8 @@ LIBS=-lgsoap++
 
 EXECUTABLE=audioDB
 
+.PHONY: all clean test
+
 all: ${EXECUTABLE}
 
 ${EXECUTABLE}.1: ${EXECUTABLE}
@@ -28,3 +30,6 @@ clean:
 	-rm README.txt
 	-rm ${EXECUTABLE} ${EXECUTABLE}.1 audioDB.o
 	-sh -c "cd tests && sh ./clean.sh"
+
+test:
+	-sh -c "cd tests && sh ./run-tests.sh"
