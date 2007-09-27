@@ -1280,7 +1280,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
       if(thisDist>=trackDistances[n]){
 	if((n==0 || thisDist<=trackDistances[n-1])){
 	  // Copy all values above up the queue
-	  for( l=pointNN-1 ; l > n ; l--){
+	  for( l=trackNN-1 ; l > n ; l--){
 	    trackDistances[l]=trackDistances[l-1];
 	    trackQIndexes[l]=trackQIndexes[l-1];
 	    trackSIndexes[l]=trackSIndexes[l-1];
