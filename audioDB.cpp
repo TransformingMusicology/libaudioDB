@@ -3,11 +3,20 @@
 #define O2_DEBUG
 
 void audioDB::error(const char* a, const char* b, const char *sysFunc) {
-  cerr << a << ": " << b << endl;
-  if (sysFunc) {
-    perror(sysFunc);
+  if(isServer) {
+    char *err = new char[256]; /* FIXME: overflows */
+    snprintf(err, 255, "%s: %s\n%s", a, b, sysFunc ? strerror(errno) : "");
+    /* FIXME: actually we could usefully do with a properly structured
+       type, so that we can throw separate faultstring and details.
+       -- CSR, 2007-10-01 */
+    throw(err);
+  } else {
+    cerr << a << ": " << b << endl;
+    if (sysFunc) {
+      perror(sysFunc);
+    }
+    exit(1);
   }
-  exit(1);
 }
 
 #define O2_AUDIODB_INITIALIZERS \
@@ -59,7 +68,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     printf("%s\n", gengetopt_args_info_help[0]);
     exit(1);
   }
-  
+
   if(O2_ACTION(COM_SERVER))
     startServer();
 
@@ -97,6 +106,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult): O2_AUDIODB_INITIALIZERS
 {
   processArgs(argc, argv);
+  isServer = 1; // FIXME: Hack
   assert(O2_ACTION(COM_QUERY));
   query(dbName, inFile, adbQueryResult);
 }
@@ -104,6 +114,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult): O2_AUDIODB_INITIALIZERS
 {
   processArgs(argc, argv);
+  isServer = 1; // FIXME: Hack
   assert(O2_ACTION(COM_STATUS));
   status(dbName, adbStatusResult);
 }
@@ -154,8 +165,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   if(args_info.radius_given){
     radius=args_info.radius_arg;
     if(radius<=0 || radius>1000000000){
-      cerr << "Warning: radius out of range" << endl;
-      exit(1);
+      error("radius out of range");
     }
     else 
       if(verbosity>3) {
@@ -2490,8 +2500,13 @@ void audioDB::startServer(){
 int adb__status(struct soap* soap, xsd__string dbName, adb__statusResult &adbStatusResult){
   char* const argv[]={"audioDB",COM_STATUS,"-d",dbName};
   const unsigned argc = 4;
-  audioDB(argc, argv, &adbStatusResult);
-  return SOAP_OK;
+  try {
+    audioDB(argc, argv, &adbStatusResult);
+    return SOAP_OK;
+  } catch(char *err) {
+    soap_receiver_fault(soap, err, "");
+    return SOAP_FAULT;
+  }
 }
 
 // Literal translation of command line to web service
