@@ -2563,8 +2563,13 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
   };
 
   const unsigned argc = 19;
-  audioDB(argc, (char* const*)argv, &adbQueryResult);
-  return SOAP_OK;
+  try {
+    audioDB(argc, (char* const*)argv, &adbQueryResult);
+    return SOAP_OK;
+  } catch (char *err) {
+    soap_receiver_fault(soap, err, "");
+    return SOAP_FAULT;
+  }
 }
 
 int main(const unsigned argc, char* const argv[]){
