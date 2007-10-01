@@ -23,8 +23,17 @@ class adb__queryResult{
   int *Spos;
 };
 
+class adb__statusResult {
+  unsigned numFiles;
+  unsigned dim;
+  unsigned length;
+  unsigned dudCount;
+  unsigned nullCount;
+  unsigned flags;
+};
+    
 // Print the status of an existing adb database
-int adb__status(xsd__string dbName, xsd__int &adbCreateResult);
+int adb__status(xsd__string dbName, adb__statusResult &adbStatusResult);
 
 // Query an existing adb database
 int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, adb__queryResult &adbQueryResult);

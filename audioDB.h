@@ -157,7 +157,9 @@ class audioDB{
   unsigned getKeyPos(char* key);
  public:
 
-  audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult=0);
+  audioDB(const unsigned argc, char* const argv[]);
+  audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult);
+  audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult);
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
   void get_lock(int fd, bool exclusive);
@@ -167,7 +169,7 @@ class audioDB{
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void status(const char* dbName);
+  void status(const char* dbName, adb__statusResult *adbStatusResult=0);
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);

@@ -10,42 +10,44 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
   exit(1);
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult):
-  dim(0),
-  dbName(0),
-  inFile(0),
-  key(0),
-  trackFileName(0),
-  trackFile(0),
-  command(0),
-  timesFileName(0),
-  timesFile(0),
-  dbfid(0),
-  infid(0),
-  db(0),
-  indata(0),
-  dbH(0),
-  fileTable(0),
-  trackTable(0),
-  dataBuf(0),
-  l2normTable(0),
-  qNorm(0),
-  timesTable(0),
-  verbosity(1),
-  queryType(O2_FLAG_POINT_QUERY),
-  pointNN(O2_DEFAULT_POINTNN),
-  trackNN(O2_DEFAULT_TRACKNN),
-  sequenceLength(16),
-  sequenceHop(1),
-  queryPoint(0),
-  usingQueryPoint(0),
-  usingTimes(0),
-  isClient(0),
-  isServer(0),
-  port(0),
-  timesTol(0.1),
-  radius(0){
-  
+#define O2_AUDIODB_INITIALIZERS \
+  dim(0), \
+  dbName(0), \
+  inFile(0), \
+  key(0), \
+  trackFileName(0), \
+  trackFile(0), \
+  command(0), \
+  timesFileName(0), \
+  timesFile(0), \
+  dbfid(0), \
+  infid(0), \
+  db(0), \
+  indata(0), \
+  dbH(0), \
+  fileTable(0), \
+  trackTable(0), \
+  dataBuf(0), \
+  l2normTable(0), \
+  qNorm(0), \
+  timesTable(0), \
+  verbosity(1), \
+  queryType(O2_FLAG_POINT_QUERY), \
+  pointNN(O2_DEFAULT_POINTNN), \
+  trackNN(O2_DEFAULT_TRACKNN), \
+  sequenceLength(16), \
+  sequenceHop(1), \
+  queryPoint(0), \
+  usingQueryPoint(0), \
+  usingTimes(0), \
+  isClient(0), \
+  isServer(0), \
+  port(0), \
+  timesTol(0.1), \
+  radius(0)
+
+audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZERS
+{
   if(processArgs(argc, argv)<0){
     printf("No command found.\n");
     cmdline_parser_print_version ();
@@ -74,7 +76,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
     if(isClient)
       ws_query(dbName, inFile, (char*)hostport);
     else
-      query(dbName, inFile, adbQueryResult);
+      query(dbName, inFile);
 
   else if(O2_ACTION(COM_STATUS))
     if(isClient)
@@ -90,6 +92,20 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQ
   
   else
     error("Unrecognized command",command);
+}
+
+audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult): O2_AUDIODB_INITIALIZERS
+{
+  processArgs(argc, argv);
+  assert(O2_ACTION(COM_QUERY));
+  query(dbName, inFile, adbQueryResult);
+}
+
+audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult): O2_AUDIODB_INITIALIZERS
+{
+  processArgs(argc, argv);
+  assert(O2_ACTION(COM_STATUS));
+  status(dbName, adbStatusResult);
 }
 
 audioDB::~audioDB(){
@@ -804,16 +820,25 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   munmap(db,O2_DEFAULTDBSIZE);
 }
 
+// FIXME: this can't propagate the sequence length argument (used for
+// dudCount).  See adb__status() definition for the other half of
+// this.  -- CSR, 2007-10-01
 void audioDB::ws_status(const char*dbName, char* hostport){
   struct soap soap;
-  int adbStatusResult;  
+  adb__statusResult adbStatusResult;  
   
   // Query an existing adb database
   soap_init(&soap);
-  if(soap_call_adb__status(&soap,hostport,NULL,(char*)dbName,adbStatusResult)==SOAP_OK)
-    std::cout << "result = " << adbStatusResult << std::endl;
-  else
+  if(soap_call_adb__status(&soap,hostport,NULL,(char*)dbName,adbStatusResult)==SOAP_OK) {
+    cout << "numFiles = " << adbStatusResult.numFiles << endl;
+    cout << "dim = " << adbStatusResult.dim << endl;
+    cout << "length = " << adbStatusResult.length << endl;
+    cout << "dudCount = " << adbStatusResult.dudCount << endl;
+    cout << "nullCount = " << adbStatusResult.nullCount << endl;
+    cout << "flags = " << adbStatusResult.flags << endl;
+  } else {
     soap_print_fault(&soap,stderr);
+  }
   
   soap_destroy(&soap);
   soap_end(&soap);
@@ -843,21 +868,9 @@ void audioDB::ws_query(const char*dbName, const char *trackKey, const char* host
 }
 
 
-void audioDB::status(const char* dbName){
+void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
   if(!dbH)
     initTables(dbName, 0, 0);
-  
-  // Update Header information
-  cout << "num files:" << dbH->numFiles << endl;
-  cout << "data dim:" << dbH->dim <<endl;
-  if(dbH->dim>0){
-    cout << "total vectors:" << dbH->length/(sizeof(double)*dbH->dim)<<endl;
-    cout << "vectors available:" << (timesTableOffset-(dataoffset+dbH->length))/(sizeof(double)*dbH->dim) << endl;
-  }
-  cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(timesTableOffset-dataoffset) << "%)" << endl;
-  cout << "bytes available:" << timesTableOffset-(dataoffset+dbH->length) << " (" <<
-    (100.0*(timesTableOffset-(dataoffset+dbH->length)))/(timesTableOffset-dataoffset) << "%)" << endl;
-  cout << "flags:" << dbH->flags << endl;
 
   unsigned dudCount=0;
   unsigned nullCount=0;
@@ -865,12 +878,34 @@ void audioDB::status(const char* dbName){
     if(trackTable[k]<sequenceLength){
       dudCount++;
       if(!trackTable[k])
-	nullCount++;
+        nullCount++;
     }
   }
-  cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << endl;    
-}
+  
+  if(adbStatusResult == 0) {
 
+    // Update Header information
+    cout << "num files:" << dbH->numFiles << endl;
+    cout << "data dim:" << dbH->dim <<endl;
+    if(dbH->dim>0){
+      cout << "total vectors:" << dbH->length/(sizeof(double)*dbH->dim)<<endl;
+      cout << "vectors available:" << (timesTableOffset-(dataoffset+dbH->length))/(sizeof(double)*dbH->dim) << endl;
+    }
+    cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(timesTableOffset-dataoffset) << "%)" << endl;
+    cout << "bytes available:" << timesTableOffset-(dataoffset+dbH->length) << " (" <<
+      (100.0*(timesTableOffset-(dataoffset+dbH->length)))/(timesTableOffset-dataoffset) << "%)" << endl;
+    cout << "flags:" << dbH->flags << endl;
+    
+    cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << endl;    
+  } else {
+    adbStatusResult->numFiles = dbH->numFiles;
+    adbStatusResult->dim = dbH->dim;
+    adbStatusResult->length = dbH->length;
+    adbStatusResult->dudCount = dudCount;
+    adbStatusResult->nullCount = nullCount;
+    adbStatusResult->flags = dbH->flags;
+  }
+}
 
 void audioDB::dump(const char* dbName){
   if(!dbH)
@@ -2452,11 +2487,10 @@ void audioDB::startServer(){
 // web services
 
 // SERVER SIDE
-int adb__status(struct soap* soap, xsd__string dbName, xsd__int &adbCreateResult){
+int adb__status(struct soap* soap, xsd__string dbName, adb__statusResult &adbStatusResult){
   char* const argv[]={"audioDB",COM_STATUS,"-d",dbName};
   const unsigned argc = 4;
-  audioDB(argc,argv);
-  adbCreateResult=100;
+  audioDB(argc, argv, &adbStatusResult);
   return SOAP_OK;
 }
 
