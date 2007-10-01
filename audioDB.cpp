@@ -2436,7 +2436,7 @@ void audioDB::startServer(){
 	      soap_print_fault(&soap, stderr);
 	      break;
 	    }
-	  fprintf(stderr, "%d: accepted connection from IP=%lud.%lud.%lud.%lud socket=%d\n", i,
+	  fprintf(stderr, "%d: accepted connection from IP=%lu.%lu.%lu.%lu socket=%d\n", i,
 		  (soap.ip >> 24)&0xFF, (soap.ip >> 16)&0xFF, (soap.ip >> 8)&0xFF, soap.ip&0xFF, s);
 	  if (soap_serve(&soap) != SOAP_OK) // process RPC request
 	    soap_print_fault(&soap, stderr); // print error
