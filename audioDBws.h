@@ -18,9 +18,9 @@ class adb__queryResult{
   int __sizeDist;  
   double *Dist;
   int __sizeQpos;  
-  int *Qpos;
+  unsigned int *Qpos;
   int __sizeSpos;
-  int *Spos;
+  unsigned int *Spos;
 };
 
 class adb__statusResult {

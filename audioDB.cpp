@@ -1121,8 +1121,8 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     adbQueryResult->__sizeSpos=listLen;
     adbQueryResult->Rlist= new char*[listLen];
     adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new int[listLen];
-    adbQueryResult->Spos = new int[listLen];
+    adbQueryResult->Qpos = new unsigned int[listLen];
+    adbQueryResult->Spos = new unsigned int[listLen];
     for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=distances[k];
@@ -1376,8 +1376,8 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     adbQueryResult->__sizeSpos=listLen;
     adbQueryResult->Rlist= new char*[listLen];
     adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new int[listLen];
-    adbQueryResult->Spos = new int[listLen];
+    adbQueryResult->Qpos = new unsigned int[listLen];
+    adbQueryResult->Spos = new unsigned int[listLen];
     for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
@@ -1874,8 +1874,8 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     adbQueryResult->__sizeSpos=listLen;
     adbQueryResult->Rlist= new char*[listLen];
     adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new int[listLen];
-    adbQueryResult->Spos = new int[listLen];
+    adbQueryResult->Qpos = new unsigned int[listLen];
+    adbQueryResult->Spos = new unsigned int[listLen];
     for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
@@ -2350,8 +2350,8 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     adbQueryResult->__sizeSpos=listLen;
     adbQueryResult->Rlist= new char*[listLen];
     adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new int[listLen];
-    adbQueryResult->Spos = new int[listLen];
+    adbQueryResult->Qpos = new unsigned int[listLen];
+    adbQueryResult->Spos = new unsigned int[listLen];
     for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
       adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
       adbQueryResult->Dist[k]=trackDistances[k];
