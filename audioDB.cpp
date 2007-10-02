@@ -2453,10 +2453,15 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
     X+=dim;
   }
   unsigned offset;
-  if(append)
-    offset=dbH->length/(dbH->dim*sizeof(double)); // number of vectors
-  else
+  if(append) {
+    // FIXME: a hack, a very palpable hack: the vectors have already
+    // been inserted, and dbH->length has already been updated.  We
+    // need to subtract off again the number of vectors that we've
+    // inserted this time...
+    offset=(dbH->length/(dbH->dim*sizeof(double)))-n; // number of vectors
+  } else {
     offset=0;
+  }
   memcpy(l2normTable+offset, l2buf, n*sizeof(double));
   if(l2buf)
     delete[] l2buf;
