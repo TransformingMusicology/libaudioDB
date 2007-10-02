@@ -1114,7 +1114,13 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     }
   }
   else{ // Process Web Services Query
-    int listLen = pointNN;
+    int listLen;
+    for(k = 0; k < pointNN; k++) {
+      if(distances[k] == -DBL_MAX)
+        break;
+    }
+    listLen = k;
+
     adbQueryResult->__sizeRlist=listLen;
     adbQueryResult->__sizeDist=listLen;
     adbQueryResult->__sizeQpos=listLen;
