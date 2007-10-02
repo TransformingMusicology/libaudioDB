@@ -338,31 +338,31 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
    --------------------------------------------------------------------------
    | key 256 bytes                                                          |
    --------------------------------------------------------------------------
-   O2_MAXFILES*02_FILENAMELENGTH
+   O2_MAXFILES*O2_FILENAMELENGTH
 
    trackTable : Maps implicit feature index to a feature vector matrix
    --------------------------------------------------------------------------
    | numVectors (4 bytes)                                                   |
    --------------------------------------------------------------------------
-   O2_MAXFILES * 02_MEANNUMFEATURES * sizeof(INT)
+   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(INT)
 
    featureTable
    --------------------------------------------------------------------------
    | v1 v2 v3 ... vd (double)                                               |
    --------------------------------------------------------------------------
-   O2_MAXFILES * 02_MEANNUMFEATURES * DIM * sizeof(DOUBLE)
+   O2_MAXFILES * O2_MEANNUMFEATURES * DIM * sizeof(DOUBLE)
 
    timesTable
    --------------------------------------------------------------------------
    | timestamp (double)                                                     |
    --------------------------------------------------------------------------
-   O2_MAXFILES * 02_MEANNUMFEATURES * sizeof(DOUBLE)
+   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(DOUBLE)
 
    l2normTable
    --------------------------------------------------------------------------
    | nm (double)                                                            |
    --------------------------------------------------------------------------
-   O2_MAXFILES * 02_MEANNUMFEATURES * sizeof(DOUBLE)
+   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(DOUBLE)
 
 */
 
