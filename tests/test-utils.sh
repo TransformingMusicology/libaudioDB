@@ -47,3 +47,22 @@ intstring() {
   if [ $1 -ge 10 ]; then echo "intstring() arg too large: ${1}"; exit 1; fi
   printf "%b\x00\x00\x00" "\\x${1}"
 }
+
+# Web services utilities
+start_server() {
+  $1 -s $2 &
+  # HACK: deal with race on process creation
+  sleep 1
+}
+
+stop_server() {
+  grep ${AUDIODB} /proc/$1/cmdline > /dev/null
+  kill $1
+  # HACK: deal with race on process exit
+  sleep 1
+  expect_clean_error_exit grep ${AUDIODB} /proc/$1/cmdline
+}
+
+check_server() {
+  grep ${AUDIODB} /proc/$1/cmdline > /dev/null
+}
