@@ -27,11 +27,8 @@ cmp test3 testoutput
 
 check_server $!
 
-# FIXME: maybe at some point these will start exiting with a non-zero
-# exit code.  That's still OK; what's important is that the server
-# doesn't stop running.
-${AUDIODB} -c localhost:10015 -S -d /dev/null
-${AUDIODB} -c localhost:10015 -S -d /tmp/foo-does-not-exist
+expect_server_failure ${AUDIODB} -c localhost:10015 -S -d /dev/null
+expect_server_failure ${AUDIODB} -c localhost:10015 -S -d /tmp/foo-does-not-exist
 
 check_server $!
 

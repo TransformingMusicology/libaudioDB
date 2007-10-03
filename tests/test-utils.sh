@@ -66,3 +66,9 @@ stop_server() {
 check_server() {
   grep ${AUDIODB} /proc/$1/cmdline > /dev/null
 }
+
+expect_server_failure() {
+  # FIXME: work out whether and how the client should report server
+  # errors.  At present, the client exits with a zero exit code.
+  "$@"
+}
