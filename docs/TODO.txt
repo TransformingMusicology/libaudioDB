@@ -1,3 +1,100 @@
+* development of functionality
+
+** matrix of possible queries
+
+At the moment, there are four content-based query types, each of which
+does something slightly different from what you might expect from its
+name.  I think that the space of possible (sensible?) queries is
+larger than this -- though working out the sensible abstraction might
+have to wait for more use cases -- and also that the orthogonality of
+various parameters is missing.  (e.g. a silence threshold should be
+applied to all queries or none, if it makes sense at all.)
+
+Additionally, query by key (filename) might be important.
+
+** results
+
+Need to sort out what the results mean; is it a similarity or a
+distance score, etc.  Also, is it possible to support NN queries in a
+non-Euclidean space?
+
+** SOAP / URIs
+
+At the moment, the query and database are referred to by paths naming
+files on the SOAP server's filesystem.  This makes a limited amount of
+sense for the database (though exposing implementation details of
+ISMS's file system is not a great idea) but makes no sense at all for
+the query.  So we need to define a query data structure that can be
+serialised (preferably automatically) by SOAP for use in queries.
+
+If we ever support inserting or other write functionality over SOAP,
+this will need doing for feature files (the same as queries) and for
+key lists too.
+
+** Memory management tricks
+
+We have a friendly memory access pattern (at least on Unixoids;
+Win32's API isn't a great match for mmap(), so it is significantly
+slower there).  Investigate whether madvise() tricks improve
+performance on any OSes.  Also, maybe investigate a specialized use of
+GetViewOfFile on win32 to make it tolerable on that platform.
+
+** LSH
+
+Integrate the LSH indexing with the database.  Can it be done as a
+separate index file, created on demand?  What are we trying to
+optimize our on-disk format for, and can it be better optimized by
+having multiple files?
+
+** RDF (not necessarily related to audioDB)
+
+Export the results of our experiments (kept in an SQL database) as
+RDF, so that people can infer stuff if they know enough about our
+methods.
+
+Possibly also write an export routine for exporting an audioDB as RDF.
+And laugh hollowly as XML parsers fail completely to ingest such a
+monstrous file.
+
+* architectural issues
+
+** API vs command-line
+
+While having a command line interface is nice, having the only way to
+initialize a new audioDB instance being by faking up enough of a
+command line to call our wacky constructors is less nice.
+Furthermore, having the "business logic" run by the constructor is
+also a little bit weird.
+
+* regression (and other) tests
+
+** Command line interface
+
+There is now broad coverage of the audioDB logic, with the major
+exceptions of the batch insert command, and the specifying of
+different keys on import.
+
+** SOAP
+
+The shell's support for wait() and equivalents is limited, so there
+are "sleep 1"s dotted around to attempt to avoid race conditions.
+Find a better way.  Similarly, using SO_REUSEADDR in bind() is a hack
+that ought not to be necessary just to run the same test twice...
+
+** Locking
+
+The fcntl() locking should be good enough for our uses.  Investigate
+whether it is in fact robust enough (including that EAGAIN workaround
+for OS X; read the kernel source to find out where that's coming from
+and report it if possible).
+
+** Benchmarks
+
+Get together a realistic set of usage cases, preferably testing each
+of the query types, and benchmark them automatically.  This is
+basically a prerequisite of any performance work.
+
+* Michael's old TODO list
 
 audioDB FIXME:
 
