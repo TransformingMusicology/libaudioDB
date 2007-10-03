@@ -2482,6 +2482,13 @@ void audioDB::startServer(){
   struct soap soap;
   int m, s; // master and slave sockets
   soap_init(&soap);
+  // FIXME: largely this use of SO_REUSEADDR is to make writing (and
+  // running) test cases more convenient, so that multiple test runs
+  // in close succession don't fail because of a bin() error.
+  // Investigate whether there are any potential drawbacks in this,
+  // and also whether there's a better way to write the tests.  --
+  // CSR, 2007-10-03
+  soap.bind_flags |= SO_REUSEADDR;
   m = soap_bind(&soap, NULL, port, 100);
   if (m < 0)
     soap_print_fault(&soap, stderr);
