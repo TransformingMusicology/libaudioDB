@@ -27,8 +27,8 @@ cmp test3 testoutput
 
 check_server $!
 
-expect_server_failure ${AUDIODB} -c localhost:10015 -S -d /dev/null
-expect_server_failure ${AUDIODB} -c localhost:10015 -S -d /tmp/foo-does-not-exist
+expect_client_failure ${AUDIODB} -c localhost:10015 -S -d /dev/null
+expect_client_failure ${AUDIODB} -c localhost:10015 -S -d /tmp/foo-does-not-exist
 
 check_server $!
 
