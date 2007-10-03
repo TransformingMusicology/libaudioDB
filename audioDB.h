@@ -160,6 +160,7 @@ class audioDB{
   audioDB(const unsigned argc, char* const argv[]);
   audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult);
   audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult);
+  void cleanup();
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
   void get_lock(int fd, bool exclusive);

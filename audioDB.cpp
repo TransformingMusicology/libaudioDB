@@ -109,22 +109,31 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
 
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult): O2_AUDIODB_INITIALIZERS
 {
-  processArgs(argc, argv);
-  isServer = 1; // FIXME: Hack
-  assert(O2_ACTION(COM_QUERY));
-  query(dbName, inFile, adbQueryResult);
+  try {
+    processArgs(argc, argv);
+    isServer = 1; // FIXME: Hack
+    assert(O2_ACTION(COM_QUERY));
+    query(dbName, inFile, adbQueryResult);
+  } catch(char *err) {
+    cleanup();
+    throw(err);
+  }
 }
 
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult): O2_AUDIODB_INITIALIZERS
 {
-  processArgs(argc, argv);
-  isServer = 1; // FIXME: Hack
-  assert(O2_ACTION(COM_STATUS));
-  status(dbName, adbStatusResult);
+  try {
+    processArgs(argc, argv);
+    isServer = 1; // FIXME: Hack
+    assert(O2_ACTION(COM_STATUS));
+    status(dbName, adbStatusResult);
+  } catch(char *err) {
+    cleanup();
+    throw(err);
+  }
 }
 
-audioDB::~audioDB(){
-  // Clean up
+void audioDB::cleanup() {
   if(indata)
     munmap(indata,statbuf.st_size);
   if(db)
@@ -135,6 +144,10 @@ audioDB::~audioDB(){
     close(infid);
   if(dbH)
     delete dbH;
+}
+
+audioDB::~audioDB(){
+  cleanup();
 }
 
 int audioDB::processArgs(const unsigned argc, char* const argv[]){
