@@ -1,5 +1,13 @@
 #include "audioDB.h"
 
+void sigterm_action(int signal, siginfo_t *info, void *context) {
+  exit(128+signal);
+}
+
+void sighup_action(int signal, siginfo_t *info, void *context) {
+  // FIXME: reread any configuration files
+}
+
 #define O2_DEBUG
 
 void audioDB::error(const char* a, const char* b, const char *sysFunc) {
@@ -196,6 +204,13 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     if(port<100 || port > 100000)
       error("port out of range");
     isServer=1;
+    struct sigaction sa;
+    sa.sa_sigaction = sigterm_action;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
+    sigaction(SIGTERM, &sa, NULL);
+    sa.sa_sigaction = sighup_action;
+    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
+    sigaction(SIGHUP, &sa, NULL);
     return 0;
   }
 
@@ -2610,3 +2625,4 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
 int main(const unsigned argc, char* const argv[]){
   audioDB(argc, argv);
 }
+

@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <float.h>
+#include <signal.h>
 
 // includes for web services
 #include "soapH.h"
