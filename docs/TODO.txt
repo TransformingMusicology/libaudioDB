@@ -1,5 +1,11 @@
 * development of functionality
 
+** exposure of all non-write functions over Web Services
+
+At present, the radius / counting query type isn't supported over
+SOAP.  Supporting it involves changing the adb__query() exported
+function, so we need to be careful.
+
 ** matrix of possible queries
 
 At the moment, there are four content-based query types, each of which
