@@ -1,5 +1,7 @@
 # no shebang line: this file should be sourced by run-test.sh files
 
+set -E
+
 trap "exit 1" ERR
 
 if [ -z ${AUDIODB} ]; then
@@ -53,6 +55,7 @@ start_server() {
   $1 -s $2 &
   # HACK: deal with race on process creation
   sleep 1
+  trap 'kill $!; exit 1' ERR
 }
 
 stop_server() {
