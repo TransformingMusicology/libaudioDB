@@ -85,19 +85,23 @@
 
 using namespace std;
 
-// 64 byte header
 typedef struct dbTableHeader{
   unsigned magic;
   unsigned version;
   unsigned numFiles;
   unsigned dim;
   unsigned flags;
-  size_t length;
-  size_t fileTableOffset;
-  size_t trackTableOffset;
-  size_t dataOffset;
-  size_t l2normTableOffset;
-  size_t timesTableOffset;
+  // FIXME: these lengths and offsets should be size_t or off_t, but
+  // that causes this header (and hence audioDB files) to be
+  // unportable between 32 and 64-bit architectures.  Making them
+  // unsigned isn't the real answer, but it works around the problem.
+  // -- CSR, 2007-10-05
+  unsigned length;
+  unsigned fileTableOffset;
+  unsigned trackTableOffset;
+  unsigned dataOffset;
+  unsigned l2normTableOffset;
+  unsigned timesTableOffset;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
 
