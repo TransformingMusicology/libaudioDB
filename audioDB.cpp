@@ -440,25 +440,27 @@ void audioDB::drop(){
 
 // initTables - memory map files passed as arguments
 // Precondition: database has already been created
-void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0){
-  if ((dbfid = open (dbName, forWrite ? O_RDWR : O_RDONLY)) < 0)
+void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile = 0) {
+  if ((dbfid = open(dbName, forWrite ? O_RDWR : O_RDONLY)) < 0) {
     error("Can't open database file", dbName, "open");
+  }
   get_lock(dbfid, forWrite);
 
   // open the input file
-  if (inFile && (infid = open (inFile, O_RDONLY)) < 0)
+  if (inFile && (infid = open(inFile, O_RDONLY)) < 0) {
     error("can't open input file for reading", inFile, "open");
-
+  }
   // find size of input file
-  if (inFile && fstat (infid,&statbuf) < 0)
-    error("fstat error finding size of input", "", "fstat");
-  
+  if (inFile && fstat(infid, &statbuf) < 0) {
+    error("fstat error finding size of input", inFile, "fstat");
+  }
   // Get the database header info
   dbH = new dbTableHeaderT();
   assert(dbH);
   
-  if(read(dbfid,(char*)dbH,sizeof(dbTableHeaderT))!=sizeof(dbTableHeaderT))
-    error("error reading db header");
+  if(read(dbfid, (char *) dbH, O2_HEADERSIZE) != O2_HEADERSIZE) {
+    error("error reading db header", dbName, "read");
+  }
 
   fileTableOffset = O2_HEADERSIZE;
   trackTableOffset = fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES;
@@ -466,19 +468,20 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0
   l2normTableOffset = O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
   timesTableOffset = l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
 
-  if(dbH->magic!=O2_MAGIC){
-    cerr << "expected: " << O2_MAGIC << ", got:" << dbH->magic << endl;
+  if(dbH->magic != O2_MAGIC) {
+    cerr << "expected: " << O2_MAGIC << ", got: " << dbH->magic << endl;
     error("database file has incorrect header",dbName);
   }
 
   if(inFile)
-    if(dbH->dim==0 && dbH->length==0) // empty database
-      read(infid,&dbH->dim,sizeof(unsigned)); // initialize with input dimensionality
+    if(dbH->dim == 0 && dbH->length == 0) // empty database
+      // initialize with input dimensionality
+      read(infid, &dbH->dim, sizeof(unsigned)); 
     else {
       unsigned test;
-      read(infid,&test,sizeof(unsigned));
-      if(dbH->dim!=test){      
-	cerr << "error: expected dimension: " << dbH->dim << ", got :" << test <<endl;
+      read(infid, &test, sizeof(unsigned));
+      if(dbH->dim != test) {      
+	cerr << "error: expected dimension: " << dbH->dim << ", got : " << test <<endl;
 	error("feature dimensions do not match database table dimensions");
       }
     }
@@ -486,7 +489,7 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0
   // mmap the input file 
   if (inFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
       == (caddr_t) -1)
-    error("mmap error for input", "", "mmap");
+    error("mmap error for input", inFile, "mmap");
 
   // mmap the database file
   if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
@@ -499,7 +502,6 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile=0
   dataBuf  = (double*)(db+dataoffset);
   l2normTable = (double*)(db+l2normTableOffset);
   timesTable = (double*)(db+timesTableOffset);
-
 }
 
 void audioDB::insert(const char* dbName, const char* inFile){
