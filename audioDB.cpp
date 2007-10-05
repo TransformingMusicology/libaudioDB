@@ -420,11 +420,17 @@ void audioDB::create(const char* dbName){
   assert(dbH);
 
   // Initialize header
-  dbH->magic=O2_MAGIC;
-  dbH->numFiles=0;
-  dbH->length=0;
-  dbH->dim=0;
-  dbH->flags=0; //O2_FLAG_L2NORM;
+  dbH->magic = O2_MAGIC;
+  dbH->version = O2_FORMAT_VERSION;
+  dbH->numFiles = 0;
+  dbH->dim = 0;
+  dbH->flags = 0;
+  dbH->length = 0;
+  dbH->fileTableOffset = ALIGN_UP(O2_HEADERSIZE, 8);
+  dbH->trackTableOffset = ALIGN_UP(dbH->fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES, 8);
+  dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES, 8);
+  dbH->l2normTableOffset = ALIGN_DOWN(O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
 
   memcpy (db, dbH, O2_HEADERSIZE);
   if(verbosity) {
@@ -434,8 +440,7 @@ void audioDB::create(const char* dbName){
 
 
 void audioDB::drop(){
-    
-    
+  // FIXME: drop something?  Should we even allow this?
 }
 
 // initTables - memory map files passed as arguments
@@ -462,15 +467,19 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile =
     error("error reading db header", dbName, "read");
   }
 
-  fileTableOffset = O2_HEADERSIZE;
-  trackTableOffset = fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES;
-  dataoffset = trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES;
-  l2normTableOffset = O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
-  timesTableOffset = l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
+  if(dbH->magic == O2_OLD_MAGIC) {
+    // FIXME: if anyone ever complains, write the program to convert
+    // from the old audioDB format to the new...
+    error("database file has old O2 header", dbName);
+  }
 
   if(dbH->magic != O2_MAGIC) {
     cerr << "expected: " << O2_MAGIC << ", got: " << dbH->magic << endl;
-    error("database file has incorrect header",dbName);
+    error("database file has incorrect header", dbName);
+  }
+
+  if(dbH->version != O2_FORMAT_VERSION) {
+    error("database file has incorect version", dbName);
   }
 
   if(inFile)
@@ -497,11 +506,11 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile =
     error("mmap error for initting tables of database", "", "mmap");
 
   // Make some handy tables with correct types
-  fileTable= (char*)(db+fileTableOffset);
-  trackTable = (unsigned*)(db+trackTableOffset);
-  dataBuf  = (double*)(db+dataoffset);
-  l2normTable = (double*)(db+l2normTableOffset);
-  timesTable = (double*)(db+timesTableOffset);
+  fileTable= (char*)(db+dbH->fileTableOffset);
+  trackTable = (unsigned*)(db+dbH->trackTableOffset);
+  dataBuf  = (double*)(db+dbH->dataOffset);
+  l2normTable = (double*)(db+dbH->l2normTableOffset);
+  timesTable = (double*)(db+dbH->timesTableOffset);
 }
 
 void audioDB::insert(const char* dbName, const char* inFile){
@@ -569,11 +578,11 @@ void audioDB::insert(const char* dbName, const char* inFile){
   memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
 
   // Update the feature database
-  memcpy (db+dataoffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
+  memcpy (db+dbH->dataOffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
   
   // Norm the vectors on input if the database is already L2 normed
   if(dbH->flags & O2_FLAG_L2NORM)
-    unitNormAndInsertL2((double*)(db+dataoffset+insertoffset), dbH->dim, numVectors, 1); // append
+    unitNormAndInsertL2((double*)(db+dbH->dataOffset+insertoffset), dbH->dim, numVectors, 1); // append
 
   // Report status
   status(dbName);
@@ -668,17 +677,10 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
 
-  fileTableOffset = O2_HEADERSIZE;
-  trackTableOffset = fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES;
-  dataoffset = trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES;
-  l2normTableOffset = O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
-  timesTableOffset = l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double);
-
   if(dbH->magic!=O2_MAGIC){
     cerr << "expected:" << O2_MAGIC << ", got:" << dbH->magic << endl;
     error("database file has incorrect header",dbName);
   }
-
   
   unsigned totalVectors=0;
   char *thisKey = new char[MAXSTR];
@@ -711,11 +713,11 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
       error("mmap error for batchinsert into database", "", "mmap");
     
     // Make some handy tables with correct types
-    fileTable= (char*)(db+fileTableOffset);
-    trackTable = (unsigned*)(db+trackTableOffset);
-    dataBuf  = (double*)(db+dataoffset);
-    l2normTable = (double*)(db+l2normTableOffset);
-    timesTable = (double*)(db+timesTableOffset);
+    fileTable= (char*)(db+dbH->fileTableOffset);
+    trackTable = (unsigned*)(db+dbH->trackTableOffset);
+    dataBuf  = (double*)(db+dbH->dataOffset);
+    l2normTable = (double*)(db+dbH->l2normTableOffset);
+    timesTable = (double*)(db+dbH->timesTableOffset);
 
     // Check that there is room for at least 1 more file
     if((char*)timesTable<((char*)dataBuf+(dbH->length+statbuf.st_size-sizeof(int))))
@@ -795,11 +797,11 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
 	memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
 	
 	// Update the feature database
-	memcpy (db+dataoffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
+	memcpy (db+dbH->dataOffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
 	
 	// Norm the vectors on input if the database is already L2 normed
 	if(dbH->flags & O2_FLAG_L2NORM)
-	  unitNormAndInsertL2((double*)(db+dataoffset+insertoffset), dbH->dim, numVectors, 1); // append
+	  unitNormAndInsertL2((double*)(db+dbH->dataOffset+insertoffset), dbH->dim, numVectors, 1); // append
 	
 	totalVectors+=numVectors;
       }
@@ -895,11 +897,11 @@ void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
     cout << "data dim:" << dbH->dim <<endl;
     if(dbH->dim>0){
       cout << "total vectors:" << dbH->length/(sizeof(double)*dbH->dim)<<endl;
-      cout << "vectors available:" << (timesTableOffset-(dataoffset+dbH->length))/(sizeof(double)*dbH->dim) << endl;
+      cout << "vectors available:" << (dbH->timesTableOffset-(dbH->dataOffset+dbH->length))/(sizeof(double)*dbH->dim) << endl;
     }
-    cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(timesTableOffset-dataoffset) << "%)" << endl;
-    cout << "bytes available:" << timesTableOffset-(dataoffset+dbH->length) << " (" <<
-      (100.0*(timesTableOffset-(dataoffset+dbH->length)))/(timesTableOffset-dataoffset) << "%)" << endl;
+    cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << endl;
+    cout << "bytes available:" << dbH->timesTableOffset-(dbH->dataOffset+dbH->length) << " (" <<
+      (100.0*(dbH->timesTableOffset-(dbH->dataOffset+dbH->length)))/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << endl;
     cout << "flags:" << dbH->flags << endl;
     
     cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << endl;    

@@ -44,7 +44,9 @@
 #define COM_KEYLIST "--keyList"
 #define COM_TIMES "--times"
 
-#define O2_MAGIC 1111765583 // 'B'<<24|'D'<<16|'2'<<8|'O' reads O2DB in little endian order
+#define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
+#define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
+#define O2_FORMAT_VERSION (0U)
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
@@ -78,15 +80,24 @@
 // Macros
 #define O2_ACTION(a) (strcmp(command,a)==0)
 
+#define ALIGN_UP(x,w) ((x) + ((1<<w)-1) & ~((1<<w)-1))
+#define ALIGN_DOWN(x,w) ((x) & ~((1<<w)-1))
+
 using namespace std;
 
 // 64 byte header
 typedef struct dbTableHeader{
   unsigned magic;
+  unsigned version;
   unsigned numFiles;
   unsigned dim;
-  unsigned length;
   unsigned flags;
+  size_t length;
+  size_t fileTableOffset;
+  size_t trackTableOffset;
+  size_t dataOffset;
+  size_t l2normTableOffset;
+  size_t timesTableOffset;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
 
@@ -111,11 +122,6 @@ class audioDB{
   char* indata;
   struct stat statbuf;  
   dbTableHeaderPtr dbH;
-  size_t fileTableOffset;
-  size_t trackTableOffset;
-  size_t dataoffset;
-  size_t l2normTableOffset;
-  size_t timesTableOffset;
   
   char *fileTable;
   unsigned* trackTable;
