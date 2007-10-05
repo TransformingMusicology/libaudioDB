@@ -1,5 +1,6 @@
 #include "audioDB.h"
 
+#if defined(O2_DEBUG)
 void sigterm_action(int signal, siginfo_t *info, void *context) {
   exit(128+signal);
 }
@@ -7,8 +8,7 @@ void sigterm_action(int signal, siginfo_t *info, void *context) {
 void sighup_action(int signal, siginfo_t *info, void *context) {
   // FIXME: reread any configuration files
 }
-
-#define O2_DEBUG
+#endif
 
 void audioDB::error(const char* a, const char* b, const char *sysFunc) {
   if(isServer) {
@@ -30,42 +30,6 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
     exit(1);
   }
 }
-
-#define O2_AUDIODB_INITIALIZERS \
-  dim(0), \
-  dbName(0), \
-  inFile(0), \
-  key(0), \
-  trackFileName(0), \
-  trackFile(0), \
-  command(0), \
-  timesFileName(0), \
-  timesFile(0), \
-  dbfid(0), \
-  infid(0), \
-  db(0), \
-  indata(0), \
-  dbH(0), \
-  fileTable(0), \
-  trackTable(0), \
-  dataBuf(0), \
-  l2normTable(0), \
-  qNorm(0), \
-  timesTable(0), \
-  verbosity(1), \
-  queryType(O2_FLAG_POINT_QUERY), \
-  pointNN(O2_DEFAULT_POINTNN), \
-  trackNN(O2_DEFAULT_TRACKNN), \
-  sequenceLength(16), \
-  sequenceHop(1), \
-  queryPoint(0), \
-  usingQueryPoint(0), \
-  usingTimes(0), \
-  isClient(0), \
-  isServer(0), \
-  port(0), \
-  timesTol(0.1), \
-  radius(0)
 
 audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZERS
 {
@@ -204,6 +168,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     if(port<100 || port > 100000)
       error("port out of range");
     isServer=1;
+#if defined(O2_DEBUG)
     struct sigaction sa;
     sa.sa_sigaction = sigterm_action;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
@@ -211,145 +176,142 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     sa.sa_sigaction = sighup_action;
     sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
     sigaction(SIGHUP, &sa, NULL);
+#endif
     return 0;
   }
 
   // No return on client command, find database command
- if(args_info.client_given){
-   command=COM_CLIENT;
-   hostport=args_info.client_arg;
-   isClient=1;
- }
+  if(args_info.client_given){
+    command=COM_CLIENT;
+    hostport=args_info.client_arg;
+    isClient=1;
+  }
 
- if(args_info.NEW_given){
-   command=COM_CREATE;
-   dbName=args_info.database_arg;
-   return 0;
- }
+  if(args_info.NEW_given){
+    command=COM_CREATE;
+    dbName=args_info.database_arg;
+    return 0;
+  }
 
- if(args_info.STATUS_given){
-   command=COM_STATUS;
-   dbName=args_info.database_arg;
-   return 0;
- }
+  if(args_info.STATUS_given){
+    command=COM_STATUS;
+    dbName=args_info.database_arg;
+    return 0;
+  }
 
- if(args_info.DUMP_given){
-   command=COM_DUMP;
-   dbName=args_info.database_arg;
-   return 0;
- }
+  if(args_info.DUMP_given){
+    command=COM_DUMP;
+    dbName=args_info.database_arg;
+    return 0;
+  }
 
- if(args_info.L2NORM_given){
-   command=COM_L2NORM;
-   dbName=args_info.database_arg;
-   return 0;
- }
+  if(args_info.L2NORM_given){
+    command=COM_L2NORM;
+    dbName=args_info.database_arg;
+    return 0;
+  }
        
- if(args_info.INSERT_given){
-   command=COM_INSERT;
-   dbName=args_info.database_arg;
-   inFile=args_info.features_arg;
-   if(args_info.key_given)
-     key=args_info.key_arg;
-   if(args_info.times_given){
-     timesFileName=args_info.times_arg;
-     if(strlen(timesFileName)>0){
-       if(!(timesFile = new ifstream(timesFileName,ios::in)))
-	 error("Could not open times file for reading", timesFileName);
-       usingTimes=1;
-     }
-   }
-   return 0;
- }
- 
- if(args_info.BATCHINSERT_given){
-   command=COM_BATCHINSERT;
-   dbName=args_info.database_arg;
-   inFile=args_info.featureList_arg;
-   if(args_info.keyList_given)
-     key=args_info.keyList_arg; // INCONSISTENT NO CHECK
+  if(args_info.INSERT_given){
+    command=COM_INSERT;
+    dbName=args_info.database_arg;
+    inFile=args_info.features_arg;
+    if(args_info.key_given)
+      key=args_info.key_arg;
+    if(args_info.times_given){
+      timesFileName=args_info.times_arg;
+      if(strlen(timesFileName)>0){
+        if(!(timesFile = new ifstream(timesFileName,ios::in)))
+          error("Could not open times file for reading", timesFileName);
+        usingTimes=1;
+      }
+    }
+    return 0;
+  }
+  
+  if(args_info.BATCHINSERT_given){
+    command=COM_BATCHINSERT;
+    dbName=args_info.database_arg;
+    inFile=args_info.featureList_arg;
+    if(args_info.keyList_given)
+      key=args_info.keyList_arg; // INCONSISTENT NO CHECK
 
-   /* TO DO: REPLACE WITH
+    /* TO DO: REPLACE WITH
       if(args_info.keyList_given){
       trackFileName=args_info.keyList_arg;
       if(strlen(trackFileName)>0 && !(trackFile = new ifstream(trackFileName,ios::in)))
       error("Could not open keyList file for reading",trackFileName);
       }
       AND UPDATE BATCHINSERT()
-   */
-   
-   if(args_info.timesList_given){
-     timesFileName=args_info.timesList_arg;
-     if(strlen(timesFileName)>0){
-       if(!(timesFile = new ifstream(timesFileName,ios::in)))
-	 error("Could not open timesList file for reading", timesFileName);
-       usingTimes=1;
-     }
-   }
-   return 0;
- }
-
- // Query command and arguments
- if(args_info.QUERY_given){
-   command=COM_QUERY;
-   dbName=args_info.database_arg;
-   inFile=args_info.features_arg;
-
-   if(args_info.keyList_given){
-     trackFileName=args_info.keyList_arg;
-     if(strlen(trackFileName)>0 && !(trackFile = new ifstream(trackFileName,ios::in)))
-       error("Could not open keyList file for reading",trackFileName);
-   }
-
-   if(args_info.times_given){
-     timesFileName=args_info.times_arg;
-     if(strlen(timesFileName)>0){
-       if(!(timesFile = new ifstream(timesFileName,ios::in)))
-	 error("Could not open times file for reading", timesFileName);
-       usingTimes=1;
-     }
-   }
-
-   // query type
-   if(strncmp(args_info.QUERY_arg, "track", MAXSTR)==0)
-     queryType=O2_FLAG_TRACK_QUERY;
-   else if(strncmp(args_info.QUERY_arg, "point", MAXSTR)==0)
-     queryType=O2_FLAG_POINT_QUERY;
-   else if(strncmp(args_info.QUERY_arg, "sequence", MAXSTR)==0)
-     queryType=O2_FLAG_SEQUENCE_QUERY;
-   else
-     error("unsupported query type",args_info.QUERY_arg);
-
-   if(!args_info.exhaustive_flag){
-     queryPoint = args_info.qpoint_arg;
-     usingQueryPoint=1;
-     if(queryPoint<0 || queryPoint >10000)
-       error("queryPoint out of range: 0 <= queryPoint <= 10000");
-   }
-
-
-   pointNN=args_info.pointnn_arg;
-   if(pointNN<1 || pointNN >1000)
-     error("pointNN out of range: 1 <= pointNN <= 1000");
-
-   
-
-   trackNN=args_info.resultlength_arg;
-   if(trackNN<1 || trackNN >10000)
-     error("resultlength out of range: 1 <= resultlength <= 1000");
-
-	         
-   sequenceLength=args_info.sequencelength_arg;
-   if(sequenceLength<1 || sequenceLength >1000)
-     error("seqlen out of range: 1 <= seqlen <= 1000");
-
-   sequenceHop=args_info.sequencehop_arg;
-   if(sequenceHop<1 || sequenceHop >1000)
-     error("seqhop out of range: 1 <= seqhop <= 1000");
-
-   return 0;
- }
- return -1; // no command found
+    */
+    
+    if(args_info.timesList_given){
+      timesFileName=args_info.timesList_arg;
+      if(strlen(timesFileName)>0){
+        if(!(timesFile = new ifstream(timesFileName,ios::in)))
+          error("Could not open timesList file for reading", timesFileName);
+        usingTimes=1;
+      }
+    }
+    return 0;
+  }
+  
+  // Query command and arguments
+  if(args_info.QUERY_given){
+    command=COM_QUERY;
+    dbName=args_info.database_arg;
+    inFile=args_info.features_arg;
+    
+    if(args_info.keyList_given){
+      trackFileName=args_info.keyList_arg;
+      if(strlen(trackFileName)>0 && !(trackFile = new ifstream(trackFileName,ios::in)))
+        error("Could not open keyList file for reading",trackFileName);
+    }
+    
+    if(args_info.times_given){
+      timesFileName=args_info.times_arg;
+      if(strlen(timesFileName)>0){
+        if(!(timesFile = new ifstream(timesFileName,ios::in)))
+          error("Could not open times file for reading", timesFileName);
+        usingTimes=1;
+      }
+    }
+    
+    // query type
+    if(strncmp(args_info.QUERY_arg, "track", MAXSTR)==0)
+      queryType=O2_TRACK_QUERY;
+    else if(strncmp(args_info.QUERY_arg, "point", MAXSTR)==0)
+      queryType=O2_POINT_QUERY;
+    else if(strncmp(args_info.QUERY_arg, "sequence", MAXSTR)==0)
+      queryType=O2_SEQUENCE_QUERY;
+    else
+      error("unsupported query type",args_info.QUERY_arg);
+    
+    if(!args_info.exhaustive_flag){
+      queryPoint = args_info.qpoint_arg;
+      usingQueryPoint=1;
+      if(queryPoint<0 || queryPoint >10000)
+        error("queryPoint out of range: 0 <= queryPoint <= 10000");
+    }
+    
+    pointNN = args_info.pointnn_arg;
+    if(pointNN < 1 || pointNN > 1000) {
+      error("pointNN out of range: 1 <= pointNN <= 1000");
+    }
+    trackNN = args_info.resultlength_arg;
+    if(trackNN < 1 || trackNN > 1000) {
+      error("resultlength out of range: 1 <= resultlength <= 1000");
+    }
+    sequenceLength = args_info.sequencelength_arg;
+    if(sequenceLength < 1 || sequenceLength > 1000) {
+      error("seqlen out of range: 1 <= seqlen <= 1000");
+    }
+    sequenceHop = args_info.sequencehop_arg;
+    if(sequenceHop < 1 || sequenceHop > 1000) {
+      error("seqhop out of range: 1 <= seqhop <= 1000");
+    }
+    return 0;
+  }
+  return -1; // no command found
 }
 
 /* Make a new database
@@ -976,16 +938,16 @@ void audioDB::l2norm(const char* dbName){
   
 void audioDB::query(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){  
   switch(queryType){
-  case O2_FLAG_POINT_QUERY:
+  case O2_POINT_QUERY:
     pointQuery(dbName, inFile, adbQueryResult);
     break;
-  case O2_FLAG_SEQUENCE_QUERY:
+  case O2_SEQUENCE_QUERY:
     if(radius==0)
       trackSequenceQueryNN(dbName, inFile, adbQueryResult);
     else
       trackSequenceQueryRad(dbName, inFile, adbQueryResult);
     break;
-  case O2_FLAG_TRACK_QUERY:
+  case O2_TRACK_QUERY:
     trackPointQuery(dbName, inFile, adbQueryResult);
     break;
   default:
@@ -2565,11 +2527,11 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
   char queryType[256];
   for(int k=0; k<256; k++)
     queryType[k]='\0';
-  if(qType == O2_FLAG_POINT_QUERY)
+  if(qType == O2_POINT_QUERY)
     strncpy(queryType, "point", strlen("point"));
-  else if (qType == O2_FLAG_SEQUENCE_QUERY)
+  else if (qType == O2_SEQUENCE_QUERY)
     strncpy(queryType, "sequence", strlen("sequence"));
-  else if(qType == O2_FLAG_TRACK_QUERY)
+  else if(qType == O2_TRACK_QUERY)
     strncpy(queryType,"track", strlen("track"));
   else
     strncpy(queryType, "", strlen(""));

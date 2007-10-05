@@ -65,10 +65,12 @@
 // Flags
 #define O2_FLAG_L2NORM (0x1U)
 #define O2_FLAG_MINMAX (0x2U)
-#define O2_FLAG_POINT_QUERY (0x4U)
-#define O2_FLAG_SEQUENCE_QUERY (0x8U)
-#define O2_FLAG_TRACK_QUERY (0x10U)
 #define O2_FLAG_TIMES (0x20U)
+
+// Query types
+#define O2_POINT_QUERY (0x4U)
+#define O2_SEQUENCE_QUERY (0x8U)
+#define O2_TRACK_QUERY (0x10U)
 
 // Error Codes
 #define O2_ERR_KEYNOTFOUND (0xFFFFFF00)
@@ -182,3 +184,38 @@ class audioDB{
   
 };
 
+#define O2_AUDIODB_INITIALIZERS \
+  dim(0), \
+  dbName(0), \
+  inFile(0), \
+  key(0), \
+  trackFileName(0), \
+  trackFile(0), \
+  command(0), \
+  timesFileName(0), \
+  timesFile(0), \
+  dbfid(0), \
+  infid(0), \
+  db(0), \
+  indata(0), \
+  dbH(0), \
+  fileTable(0), \
+  trackTable(0), \
+  dataBuf(0), \
+  l2normTable(0), \
+  qNorm(0), \
+  timesTable(0), \
+  verbosity(1), \
+  queryType(O2_POINT_QUERY), \
+  pointNN(O2_DEFAULT_POINTNN), \
+  trackNN(O2_DEFAULT_TRACKNN), \
+  sequenceLength(16), \
+  sequenceHop(1), \
+  queryPoint(0), \
+  usingQueryPoint(0), \
+  usingTimes(0), \
+  isClient(0), \
+  isServer(0), \
+  port(0), \
+  timesTol(0.1), \
+  radius(0)
