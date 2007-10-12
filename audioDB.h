@@ -86,22 +86,23 @@
 using namespace std;
 
 typedef struct dbTableHeader{
-  unsigned magic;
-  unsigned version;
-  unsigned numFiles;
-  unsigned dim;
-  unsigned flags;
+  uint32_t magic;
+  uint32_t version;
+  uint32_t numFiles;
+  uint32_t dim;
+  uint32_t flags;
   // FIXME: these lengths and offsets should be size_t or off_t, but
   // that causes this header (and hence audioDB files) to be
   // unportable between 32 and 64-bit architectures.  Making them
-  // unsigned isn't the real answer, but it works around the problem.
-  // -- CSR, 2007-10-05
-  unsigned length;
-  unsigned fileTableOffset;
-  unsigned trackTableOffset;
-  unsigned dataOffset;
-  unsigned l2normTableOffset;
-  unsigned timesTableOffset;
+  // uint32_t isn't the real answer, as it means we won't be able to
+  // scale to really large collections easily but it works around the
+  // problem.  -- CSR, 2007-10-05
+  uint32_t length;
+  uint32_t fileTableOffset;
+  uint32_t trackTableOffset;
+  uint32_t dataOffset;
+  uint32_t l2normTableOffset;
+  uint32_t timesTableOffset;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
 
