@@ -314,48 +314,6 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   return -1; // no command found
 }
 
-/* Make a new database
-
-   The database consists of:
-
-   header
-   ---------------------------------------------------------------------------------
-   | magic 4 bytes| numFiles 4 bytes | dim 4 bytes | length 4 bytes |flags 4 bytes |
-   ---------------------------------------------------------------------------------
-   
-
-   keyTable : list of keys of tracks
-   --------------------------------------------------------------------------
-   | key 256 bytes                                                          |
-   --------------------------------------------------------------------------
-   O2_MAXFILES*O2_FILENAMELENGTH
-
-   trackTable : Maps implicit feature index to a feature vector matrix
-   --------------------------------------------------------------------------
-   | numVectors (4 bytes)                                                   |
-   --------------------------------------------------------------------------
-   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(INT)
-
-   featureTable
-   --------------------------------------------------------------------------
-   | v1 v2 v3 ... vd (double)                                               |
-   --------------------------------------------------------------------------
-   O2_MAXFILES * O2_MEANNUMFEATURES * DIM * sizeof(DOUBLE)
-
-   timesTable
-   --------------------------------------------------------------------------
-   | timestamp (double)                                                     |
-   --------------------------------------------------------------------------
-   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(DOUBLE)
-
-   l2normTable
-   --------------------------------------------------------------------------
-   | nm (double)                                                            |
-   --------------------------------------------------------------------------
-   O2_MAXFILES * O2_MEANNUMFEATURES * sizeof(DOUBLE)
-
-*/
-
 void audioDB::get_lock(int fd, bool exclusive) {
   struct flock lock;
   int status;
@@ -395,6 +353,18 @@ void audioDB::release_lock(int fd) {
     error("fcntl unlock error", "", "fcntl");
 }
 
+/* Make a new database.
+
+   The database consists of:
+
+   * a header (see dbTableHeader struct definition);
+   * keyTable: list of keys of tracks;
+   * trackTable: Maps implicit feature index to a feature vector
+   matrix (sizes of tracks)
+   * featureTable: Lots of doubles;
+   * timesTable: time points for each feature vector;
+   * l2normTable: squared l2norms for each feature vector.
+*/
 void audioDB::create(const char* dbName){
   if ((dbfid = open (dbName, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0)
     error("Can't create database file", dbName, "open");
@@ -443,22 +413,12 @@ void audioDB::drop(){
   // FIXME: drop something?  Should we even allow this?
 }
 
-// initTables - memory map files passed as arguments
-// Precondition: database has already been created
-void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile = 0) {
+void audioDB::initDBHeader(const char* dbName, bool forWrite) {
   if ((dbfid = open(dbName, forWrite ? O_RDWR : O_RDONLY)) < 0) {
     error("Can't open database file", dbName, "open");
   }
-  get_lock(dbfid, forWrite);
 
-  // open the input file
-  if (inFile && (infid = open(inFile, O_RDONLY)) < 0) {
-    error("can't open input file for reading", inFile, "open");
-  }
-  // find size of input file
-  if (inFile && fstat(infid, &statbuf) < 0) {
-    error("fstat error finding size of input", inFile, "fstat");
-  }
+  get_lock(dbfid, forWrite);
   // Get the database header info
   dbH = new dbTableHeaderT();
   assert(dbH);
@@ -482,6 +442,31 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile =
     error("database file has incorect version", dbName);
   }
 
+  // mmap the database file
+  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
+			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
+    error("mmap error for initting tables of database", "", "mmap");
+
+  // Make some handy tables with correct types
+  fileTable = (char *) (db + dbH->fileTableOffset);
+  trackTable = (unsigned *) (db + dbH->trackTableOffset);
+  dataBuf = (double *) (db + dbH->dataOffset);
+  l2normTable = (double *) (db + dbH->l2normTableOffset);
+  timesTable = (double *) (db + dbH->timesTableOffset);
+}
+
+void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile = 0) {
+  
+  initDBHeader(dbName, forWrite);
+
+  // open the input file
+  if (inFile && (infid = open(inFile, O_RDONLY)) < 0) {
+    error("can't open input file for reading", inFile, "open");
+  }
+  // find size of input file
+  if (inFile && fstat(infid, &statbuf) < 0) {
+    error("fstat error finding size of input", inFile, "fstat");
+  }
   if(inFile)
     if(dbH->dim == 0 && dbH->length == 0) // empty database
       // initialize with input dimensionality
@@ -499,18 +484,6 @@ void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile =
   if (inFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
       == (caddr_t) -1)
     error("mmap error for input", inFile, "mmap");
-
-  // mmap the database file
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
-			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for initting tables of database", "", "mmap");
-
-  // Make some handy tables with correct types
-  fileTable= (char*)(db+dbH->fileTableOffset);
-  trackTable = (unsigned*)(db+dbH->trackTableOffset);
-  dataBuf  = (double*)(db+dbH->dataOffset);
-  l2normTable = (double*)(db+dbH->l2normTableOffset);
-  timesTable = (double*)(db+dbH->timesTableOffset);
 }
 
 void audioDB::insert(const char* dbName, const char* inFile){
@@ -649,11 +622,9 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
  }
 }
 
-void audioDB::batchinsert(const char* dbName, const char* inFile){
+void audioDB::batchinsert(const char* dbName, const char* inFile) {
 
-  if ((dbfid = open (dbName, O_RDWR)) < 0)
-    error("Can't open database file", dbName, "open");
-  get_lock(dbfid, 1);
+  initDBHeader(dbName, true);
 
   if(!key)
     key=inFile;
@@ -667,26 +638,14 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     if(!(keysIn = new ifstream(key)))
       error("Could not open batch key file",key);
   
-  // Get the database header info
-  dbH = new dbTableHeaderT();
-  assert(dbH);
-  
-  if(read(dbfid,(char*)dbH,sizeof(dbTableHeaderT))!=sizeof(dbTableHeaderT))
-    error("error reading db header");
-
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
 
-  if(dbH->magic!=O2_MAGIC){
-    cerr << "expected:" << O2_MAGIC << ", got:" << dbH->magic << endl;
-    error("database file has incorrect header",dbName);
-  }
-  
   unsigned totalVectors=0;
   char *thisKey = new char[MAXSTR];
   char *thisFile = new char[MAXSTR];
   char *thisTimesFileName = new char[MAXSTR];
-    
+  
   do{
     filesIn->getline(thisFile,MAXSTR);
     if(key && key!=inFile)
@@ -706,18 +665,6 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     // find size of input file
     if (thisFile && fstat (infid,&statbuf) < 0)
       error("fstat error finding size of input", "", "fstat");
-
-    // mmap the database file
-    if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
-			   MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-      error("mmap error for batchinsert into database", "", "mmap");
-    
-    // Make some handy tables with correct types
-    fileTable= (char*)(db+dbH->fileTableOffset);
-    trackTable = (unsigned*)(db+dbH->trackTableOffset);
-    dataBuf  = (double*)(db+dbH->dataOffset);
-    l2normTable = (double*)(db+dbH->l2normTableOffset);
-    timesTable = (double*)(db+dbH->timesTableOffset);
 
     // Check that there is room for at least 1 more file
     if((char*)timesTable<((char*)dataBuf+(dbH->length+statbuf.st_size-sizeof(int))))
@@ -809,14 +756,8 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
     // CLEAN UP
     munmap(indata,statbuf.st_size);
     close(infid);
-    munmap(db,O2_DEFAULTDBSIZE);
   }while(!filesIn->eof());
 
-  // mmap the database file
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
-			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database", "", "mmap");
-  
   if(verbosity) {
     cerr << COM_BATCHINSERT << " " << dbName << " " << totalVectors << " vectors " 
 	 << totalVectors*dbH->dim*sizeof(double) << " bytes." << endl;
@@ -824,8 +765,6 @@ void audioDB::batchinsert(const char* dbName, const char* inFile){
   
   // Report status
   status(dbName);
-  
-  munmap(db,O2_DEFAULTDBSIZE);
 }
 
 // FIXME: this can't propagate the sequence length argument (used for
