@@ -106,6 +106,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResult *adb
 }
 
 void audioDB::cleanup() {
+  cmdline_parser_free(&args_info);
   if(indata)
     munmap(indata,statbuf.st_size);
   if(db)
