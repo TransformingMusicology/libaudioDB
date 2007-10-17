@@ -1830,8 +1830,12 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     delete[] trackOffsetTable;
   if(queryCopy)
     delete[] queryCopy;
-  //if(qNorm)
-  //delete qNorm;
+  if(qNorm)
+    delete[] qNorm;
+  if(sNorm)
+    delete[] sNorm;
+  if(sMeanL2)
+    delete[] sMeanL2;
   if(D)
     delete[] D;
   if(DD)
@@ -2300,14 +2304,17 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     }
   }
 
-
   // Clean up
   if(trackOffsetTable)
     delete[] trackOffsetTable;
   if(queryCopy)
     delete[] queryCopy;
-  //if(qNorm)
-  //delete qNorm;
+  if(qNorm)
+    delete[] qNorm;
+  if(sNorm)
+    delete[] sNorm;
+  if(sMeanL2)
+    delete[] sMeanL2;
   if(D)
     delete[] D;
   if(DD)
