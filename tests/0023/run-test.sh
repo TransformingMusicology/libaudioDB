@@ -37,11 +37,11 @@ cmp testoutput test-expected-output
 echo "query point (0.5,0.0)"
 
 ${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -p 1 > testoutput
-echo testfeature10 0 0 0 > test-expected-output
-echo testfeature01 2 0 0 >> test-expected-output
+echo testfeature10 0 1 0 > test-expected-output
+echo testfeature01 2 1 0 >> test-expected-output
 cmp testoutput test-expected-output
 ${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -r 1 -p 1 > testoutput
-echo testfeature10 0 0 0 > test-expected-output
+echo testfeature10 0 1 0 > test-expected-output
 cmp testoutput test-expected-output
 
 exit 104

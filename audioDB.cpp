@@ -1393,6 +1393,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
   // Copy the L2 norm values to core to avoid disk random access later on
   memcpy(sNorm, l2normTable, dbVectors*sizeof(double));
+  double* qnPtr = qNorm;
   double* snPtr = sNorm;
   for(i=0; i<dbH->numFiles; i++){
     if(trackTable[i]>=sequenceLength){
@@ -1452,10 +1453,10 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   }
   w=sequenceLength-1;
   i=1;
-  tmp1=*qNorm;
+  tmp1=*qnPtr;
   while(w--)
-    *qNorm+=qNorm[i++];
-  ps = qNorm+1;
+    *qnPtr+=qnPtr[i++];
+  ps = qnPtr+1;
   w=numVectors-sequenceLength; // +1 -1
   while(w--){
     tmp2=*ps;
@@ -1463,7 +1464,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     tmp1=tmp2;
     ps++;
   }
-  ps = qNorm;
+  ps = qnPtr;
   qMeanL2 = 0;
   w=numVectors-sequenceLength+1;
   while(w--){
@@ -1554,7 +1555,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
       }
       query=query+queryPoint*dbH->dim;
-      qNorm=qNorm+queryPoint;
+      qnPtr=qnPtr+queryPoint;
       numVectors=wL;
     }
   
@@ -1684,9 +1685,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	// Search for minimum distance by shingles (concatenated vectors)
 	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
-	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
+	    thisDist=2-(2/(qnPtr[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
 	    if(verbosity>10) {
-	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
+	      cerr << thisDist << " " << qnPtr[j] << " " << sNorm[trackIndexOffset+k] << endl;
             }
 	    // Gather chi^2 statistics
 	    if(thisDist<minSample)
@@ -1699,13 +1700,13 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	      logSampleSum+=log(thisDist);
 	    }
 
-	    // diffL2 = fabs(qNorm[j] - sNorm[trackIndexOffset+k]);
+	    // diffL2 = fabs(qnPtr[j] - sNorm[trackIndexOffset+k]);
 	    // Power test
 	    if(!USE_THRESH || 
 	       // Threshold on mean L2 of Q and S sequences
-	       (USE_THRESH && qNorm[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
+	       (USE_THRESH && qnPtr[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
 		// Are both query and target windows above mean energy?
-		(qNorm[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
+		(qnPtr[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
 	      thisDist=thisDist; // Computed above
 	    else
 	      thisDist=1000000.0;
@@ -1897,6 +1898,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   // Copy the L2 norm values to core to avoid disk random access later on
   memcpy(sNorm, l2normTable, dbVectors*sizeof(double));
   double* snPtr = sNorm;
+  double* qnPtr = qNorm;
   for(i=0; i<dbH->numFiles; i++){
     if(trackTable[i]>=sequenceLength){
       tmp1=*snPtr;
@@ -1955,10 +1957,10 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   }
   w=sequenceLength-1;
   i=1;
-  tmp1=*qNorm;
+  tmp1=*qnPtr;
   while(w--)
-    *qNorm+=qNorm[i++];
-  ps = qNorm+1;
+    *qnPtr+=qnPtr[i++];
+  ps = qnPtr+1;
   w=numVectors-sequenceLength; // +1 -1
   while(w--){
     tmp2=*ps;
@@ -1966,7 +1968,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     tmp1=tmp2;
     ps++;
   }
-  ps = qNorm;
+  ps = qnPtr;
   qMeanL2 = 0;
   w=numVectors-sequenceLength+1;
   while(w--){
@@ -2057,7 +2059,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
       }
       query=query+queryPoint*dbH->dim;
-      qNorm=qNorm+queryPoint;
+      qnPtr=qnPtr+queryPoint;
       numVectors=wL;
     }
   
@@ -2187,9 +2189,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	// Search for minimum distance by shingles (concatenated vectors)
 	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
-	    thisDist=2-(2/(qNorm[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
+	    thisDist=2-(2/(qnPtr[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
 	    if(verbosity>10) {
-	      cerr << thisDist << " " << qNorm[j] << " " << sNorm[trackIndexOffset+k] << endl;
+	      cerr << thisDist << " " << qnPtr[j] << " " << sNorm[trackIndexOffset+k] << endl;
             }
 	    // Gather chi^2 statistics
 	    if(thisDist<minSample)
@@ -2202,13 +2204,13 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	      logSampleSum+=log(thisDist);
 	    }
 
-	    // diffL2 = fabs(qNorm[j] - sNorm[trackIndexOffset+k]);
+	    // diffL2 = fabs(qnPtr[j] - sNorm[trackIndexOffset+k]);
 	    // Power test
 	    if(!USE_THRESH || 
 	       // Threshold on mean L2 of Q and S sequences
-	       (USE_THRESH && qNorm[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
+	       (USE_THRESH && qnPtr[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
 		// Are both query and target windows above mean energy?
-		(qNorm[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
+		(qnPtr[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
 	      thisDist=thisDist; // Computed above
 	    else
 	      thisDist=1000000.0;
