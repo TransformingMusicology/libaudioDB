@@ -210,6 +210,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   if(args_info.DUMP_given){
     command=COM_DUMP;
     dbName=args_info.database_arg;
+    output = args_info.output_arg;
     return 0;
   }
 
@@ -869,14 +870,117 @@ void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
 }
 
 void audioDB::dump(const char* dbName){
-  if(!dbH)
+  if(!dbH) {
     initTables(dbName, 0, 0);
-  
-  for(unsigned k=0, j=0; k<dbH->numFiles; k++){
-    cout << fileTable+k*O2_FILETABLESIZE << " " << trackTable[k] << endl;
-    j+=trackTable[k];
   }
 
+  if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
+    error("error making output directory", output, "mkdir");
+  }
+
+  char *cwd = new char[PATH_MAX];
+
+  if ((getcwd(cwd, PATH_MAX)) == 0) {
+    error("error getting working directory", "", "getcwd");
+  }
+
+  if((chdir(output)) < 0) {
+    error("error changing working directory", output, "chdir");
+  }
+
+  int fLfd, tLfd = 0, kLfd;
+  FILE *fLFile, *tLFile = 0, *kLFile;
+
+  if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+    error("error creating featureList file", "featureList.txt", "open");
+  }
+  int times = dbH->flags & O2_FLAG_TIMES;
+  if (times) {
+    if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+      error("error creating timesList file", "timesList.txt", "open");
+    }
+  }
+  if ((kLfd = open("keyList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+    error("error creating keyList file", "keyList.txt", "open");
+  }
+  
+  /* can these fail?  I sincerely hope not. */
+  fLFile = fdopen(fLfd, "w");
+  if (times) {
+    tLFile = fdopen(tLfd, "w");
+  }
+  kLFile = fdopen(kLfd, "w");
+
+  char *fName = new char[256];
+  int ffd;
+  FILE *tFile;
+  unsigned pos = 0;
+  for(unsigned k = 0; k < dbH->numFiles; k++) {
+    fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLESIZE);
+    snprintf(fName, 256, "%05d.features", k);
+    if ((ffd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+      error("error creating feature file", fName, "open");
+    }
+    if ((write(ffd, &dbH->dim, sizeof(uint32_t))) < 0) {
+      error("error writing dimensions", fName, "write");
+    }
+      
+    if ((write(ffd, dataBuf + pos * dbH->dim, trackTable[k] * dbH->dim * sizeof(double))) < 0) {
+      error("error writing data", fName, "write");
+    }
+    fprintf(fLFile, "%s\n", fName);
+    close(ffd);
+
+    if(times) {
+      snprintf(fName, 256, "%05d.times", k);
+      tFile = fopen(fName, "w");
+      for(unsigned i = 0; i < trackTable[k]; i++) {
+        // KLUDGE: specifying 16 digits of precision after the decimal
+        // point is (but check this!) sufficient to uniquely identify
+        // doubles; however, that will cause ugliness, as that's
+        // vastly too many for most values of interest.  Moving to %a
+        // here and scanf() in the timesFile reading might fix this.
+        // -- CSR, 2007-10-19
+        fprintf(tFile, "%.16e\n", *(timesTable + pos + i));
+      }
+      fprintf(tLFile, "%s\n", fName);
+    }
+
+    pos += trackTable[k];
+    cout << fileTable+k*O2_FILETABLESIZE << " " << trackTable[k] << endl;
+  }
+
+  FILE *scriptFile;
+  scriptFile = fopen("restore.sh", "w");
+  fprintf(scriptFile, "\
+#! /bin/sh\n\
+#\n\
+# usage: AUDIODB=/path/to/audioDB sh ./restore.sh <newdb>\n\
+\n\
+if [ -z \"${AUDIODB}\" ]; then echo set AUDIODB variable; exit 1; fi\n\
+if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
+\"${AUDIODB}\" -d \"$1\" -N --size=%d\n", dbH->dbSize / 1000000);
+  if(dbH->flags & O2_FLAG_L2NORM) {
+    fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
+  }
+  fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -B -F featureList.txt -K keyList.txt");
+  if(times) {
+    fprintf(scriptFile, " -T timesList.txt");
+  }
+  fprintf(scriptFile, "\n");
+  fclose(scriptFile);
+
+  if((chdir(cwd)) < 0) {
+    error("error changing working directory", cwd, "chdir");
+  }
+
+  fclose(fLFile);
+  if(times) {
+    fclose(tLFile);
+  }
+  fclose(kLFile);
+  delete[] fName;
+    
   status(dbName);
 }
 

@@ -120,6 +120,7 @@ class audioDB{
   const char* trackFileName;
   ifstream *trackFile;
   const char *command;
+  const char *output;
   const char *timesFileName;
   ifstream *timesFile;
 
@@ -207,6 +208,7 @@ class audioDB{
   trackFileName(0), \
   trackFile(0), \
   command(0), \
+  output(0), \
   timesFileName(0), \
   timesFile(0), \
   dbfid(0), \
