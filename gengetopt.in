@@ -1,37 +1,3 @@
-# POSIX-COMPLIANT COMMAND LINE ARGUMENTS:
-#
-#     -v --verbosity
-#
-#     -d --database dbName
-#     -N --NEW
-#     -S --STATUS
-#     -D --DUMP
-#     -L --L2NORM
-#
-#     -f --features features.bin 
-#     -k --key key
-#     -t --timePoints.txt
-#     -I --INSERT 
-#     -U --UPDATE
-#
-#     -F --featureList featureList.txt 
-#     -K --keyList keyList.txt
-#     -T --timePointsList.txt
-#     -B --BATCHINSERT dbName
-#
-#     -Q --QUERY {point|track|sequence} 
-#     -p --qpoint - ordinal position of query vector in feature input file
-#     -n --pointnn n  - number of nearest neigbour points per track
-#     -r --resultlength n - number of tracks (nearest neighbours) to return
-#     -l --seqlen len - length of sequence
-#     -h --seqhop hop - hop size of sequence
-#     -R --radius - radius-based search, return all points/tracks/sequences < radius (0...Inf)
-#     -x --x - time expand (compress) factor (ratio of result length to query length (and visa-versa)) [1..Inf]
-#     -o --rotate - rotate the query feature vectors on search
-#
-#     -s --SERVER port
-#     -c --client host:port
-
 package "audioDB"
 version "version 1.0"
 purpose "A feature vector database management system for content-based retrieval."
@@ -43,9 +9,11 @@ section "Database Setup" sectiondesc="All database operations require a database
 
 option "database" d "database file required by Database commands." string typestr="filename" optional
 option "NEW"    N "make a new (initially empty) database." dependon="database" optional
+option "size"   - "size of database file (in MB)" int dependon="NEW" default="2000" optional
 option "STATUS" S "output database information to stdout." dependon="database" optional
 option "DUMP"   D "output all entries: index key size." dependon="database" optional
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
+
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
 option "INSERT"      I "add feature vectors to an existing database." dependon="features" optional
 option "UPDATE"      U "replace inserted vectors associated with key with new input vectors." dependon="features" dependon="key" dependon="database" optional hidden

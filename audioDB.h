@@ -141,6 +141,7 @@ class audioDB{
 
   // Flags and parameters
   unsigned verbosity;   // how much do we want to know?
+  unsigned size; // given size (for creation)
   unsigned queryType; // point queries default
   unsigned pointNN;   // how many point NNs ?
   unsigned trackNN;   // how many track NNs ?
@@ -220,6 +221,7 @@ class audioDB{
   qNorm(0), \
   timesTable(0), \
   verbosity(1), \
+  size(O2_DEFAULTDBSIZE), \
   queryType(O2_POINT_QUERY), \
   pointNN(O2_DEFAULT_POINTNN), \
   trackNN(O2_DEFAULT_TRACKNN), \

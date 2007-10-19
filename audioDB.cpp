@@ -152,6 +152,13 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
   }
 
+  if(args_info.size_given) {
+    if (args_info.size_arg < 250 || args_info.size_arg > 4000) {
+      error("Size out of range", "");
+    }
+    size = args_info.size_arg * 1000000;
+  }
+
   if(args_info.radius_given){
     radius=args_info.radius_arg;
     if(radius<=0 || radius>1000000000){
@@ -372,7 +379,7 @@ void audioDB::create(const char* dbName){
   get_lock(dbfid, 1);
 
   // go to the location corresponding to the last byte
-  if (lseek (dbfid, O2_DEFAULTDBSIZE - 1, SEEK_SET) == -1)
+  if (lseek (dbfid, size - 1, SEEK_SET) == -1)
     error("lseek error in db file", "", "lseek");
 
   // write a dummy byte at the last location
@@ -383,7 +390,7 @@ void audioDB::create(const char* dbName){
   if(verbosity) {
     cerr << "header size:" << O2_HEADERSIZE << endl;
   }
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | PROT_WRITE,
+  if ((db = (char*) mmap(0, size, PROT_READ | PROT_WRITE,
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
     error("mmap error for creating database", "", "mmap");
   
@@ -400,9 +407,9 @@ void audioDB::create(const char* dbName){
   dbH->fileTableOffset = ALIGN_UP(O2_HEADERSIZE, 8);
   dbH->trackTableOffset = ALIGN_UP(dbH->fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES, 8);
   dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES, 8);
-  dbH->l2normTableOffset = ALIGN_DOWN(O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->l2normTableOffset = ALIGN_DOWN(size - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
   dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
-  dbH->dbSize = O2_DEFAULTDBSIZE;
+  dbH->dbSize = size;
 
   memcpy (db, dbH, O2_HEADERSIZE);
   if(verbosity) {
