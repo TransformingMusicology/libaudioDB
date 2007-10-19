@@ -110,7 +110,7 @@ void audioDB::cleanup() {
   if(indata)
     munmap(indata,statbuf.st_size);
   if(db)
-    munmap(db,O2_DEFAULTDBSIZE);
+    munmap(db,dbH->dbSize);
   if(dbfid>0)
     close(dbfid);
   if(infid>0)
@@ -402,6 +402,7 @@ void audioDB::create(const char* dbName){
   dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES, 8);
   dbH->l2normTableOffset = ALIGN_DOWN(O2_DEFAULTDBSIZE - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
   dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->dbSize = O2_DEFAULTDBSIZE;
 
   memcpy (db, dbH, O2_HEADERSIZE);
   if(verbosity) {
@@ -443,8 +444,13 @@ void audioDB::initDBHeader(const char* dbName, bool forWrite) {
     error("database file has incorect version", dbName);
   }
 
+  // FIXME: when changing file format version, remove this workaround.
+  if(dbH->dbSize == 0) {
+    dbH->dbSize = O2_DEFAULTDBSIZE;
+  }
+
   // mmap the database file
-  if ((db = (char*) mmap(0, O2_DEFAULTDBSIZE, PROT_READ | (forWrite ? PROT_WRITE : 0),
+  if ((db = (char*) mmap(0, dbH->dbSize, PROT_READ | (forWrite ? PROT_WRITE : 0),
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
     error("mmap error for initting tables of database", "", "mmap");
 
@@ -523,7 +529,7 @@ void audioDB::insert(const char* dbName, const char* inFile){
     }
     // CLEAN UP
     munmap(indata,statbuf.st_size);
-    munmap(db,O2_DEFAULTDBSIZE);
+    munmap(db,dbH->dbSize);
     close(infid);
     return;
   }
@@ -583,7 +589,7 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
    if(!timesFile->is_open()){
      if(dbH->flags & O2_FLAG_TIMES){
        munmap(indata,statbuf.st_size);
-       munmap(db,O2_DEFAULTDBSIZE);
+       munmap(db,dbH->dbSize);
        error("problem opening times file on timestamped database",timesFileName);
      }
      else{
@@ -611,7 +617,7 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
      }
      if(numtimes<numVectors || numtimes>numVectors+2){
        munmap(indata,statbuf.st_size);
-       munmap(db,O2_DEFAULTDBSIZE);
+       munmap(db,dbH->dbSize);
        close(infid);
        cerr << "expected " << numVectors << " found " << numtimes << endl;
        error("Times file is incorrect length for features file",inFile);

@@ -96,13 +96,15 @@ typedef struct dbTableHeader{
   // unportable between 32 and 64-bit architectures.  Making them
   // uint32_t isn't the real answer, as it means we won't be able to
   // scale to really large collections easily but it works around the
-  // problem.  -- CSR, 2007-10-05
+  // problem.  Expanding to 64 bits will of course need a change in
+  // file format version.  -- CSR, 2007-10-05
   uint32_t length;
   uint32_t fileTableOffset;
   uint32_t trackTableOffset;
   uint32_t dataOffset;
   uint32_t l2normTableOffset;
   uint32_t timesTableOffset;
+  uint32_t dbSize;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
 
