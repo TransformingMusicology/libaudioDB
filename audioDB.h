@@ -163,10 +163,10 @@ class audioDB{
     
   // private methods
   void error(const char* a, const char* b = "", const char *sysFunc = 0);
-  void pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
+  void pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
 
   void initDBHeader(const char *dbName, bool forWrite);
   void initTables(const char* dbName, bool forWrite, const char* inFile);
@@ -177,8 +177,8 @@ class audioDB{
  public:
 
   audioDB(const unsigned argc, char* const argv[]);
-  audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult);
-  audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult);
+  audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse);
+  audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse);
   void cleanup();
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
@@ -188,8 +188,8 @@ class audioDB{
   void drop();
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
-  void query(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult=0);
-  void status(const char* dbName, adb__statusResult *adbStatusResult=0);
+  void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);

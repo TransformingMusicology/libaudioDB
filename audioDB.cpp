@@ -79,26 +79,26 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     error("Unrecognized command",command);
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResult *adbQueryResult): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     processArgs(argc, argv);
     isServer = 1; // FIXME: Hack
     assert(O2_ACTION(COM_QUERY));
-    query(dbName, inFile, adbQueryResult);
+    query(dbName, inFile, adbQueryResponse);
   } catch(char *err) {
     cleanup();
     throw(err);
   }
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResult *adbStatusResult): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     processArgs(argc, argv);
     isServer = 1; // FIXME: Hack
     assert(O2_ACTION(COM_STATUS));
-    status(dbName, adbStatusResult);
+    status(dbName, adbStatusResponse);
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -787,17 +787,17 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 // this.  -- CSR, 2007-10-01
 void audioDB::ws_status(const char*dbName, char* hostport){
   struct soap soap;
-  adb__statusResult adbStatusResult;  
+  adb__statusResponse adbStatusResponse;  
   
   // Query an existing adb database
   soap_init(&soap);
-  if(soap_call_adb__status(&soap,hostport,NULL,(char*)dbName,adbStatusResult)==SOAP_OK) {
-    cout << "numFiles = " << adbStatusResult.numFiles << endl;
-    cout << "dim = " << adbStatusResult.dim << endl;
-    cout << "length = " << adbStatusResult.length << endl;
-    cout << "dudCount = " << adbStatusResult.dudCount << endl;
-    cout << "nullCount = " << adbStatusResult.nullCount << endl;
-    cout << "flags = " << adbStatusResult.flags << endl;
+  if(soap_call_adb__status(&soap,hostport,NULL,(char*)dbName,adbStatusResponse)==SOAP_OK) {
+    cout << "numFiles = " << adbStatusResponse.result.numFiles << endl;
+    cout << "dim = " << adbStatusResponse.result.dim << endl;
+    cout << "length = " << adbStatusResponse.result.length << endl;
+    cout << "dudCount = " << adbStatusResponse.result.dudCount << endl;
+    cout << "nullCount = " << adbStatusResponse.result.nullCount << endl;
+    cout << "flags = " << adbStatusResponse.result.flags << endl;
   } else {
     soap_print_fault(&soap,stderr);
   }
@@ -809,16 +809,16 @@ void audioDB::ws_status(const char*dbName, char* hostport){
 
 void audioDB::ws_query(const char*dbName, const char *trackKey, const char* hostport){
   struct soap soap;
-  adb__queryResult adbQueryResult;  
+  adb__queryResponse adbQueryResponse;  
 
   soap_init(&soap);  
   if(soap_call_adb__query(&soap,hostport,NULL,
 			  (char*)dbName,(char*)trackKey,(char*)trackFileName,(char*)timesFileName,
-			  queryType, queryPoint, pointNN, trackNN, sequenceLength, adbQueryResult)==SOAP_OK){
-    //std::cerr << "result list length:" << adbQueryResult.__sizeRlist << std::endl;
-    for(int i=0; i<adbQueryResult.__sizeRlist; i++)
-      std::cout << adbQueryResult.Rlist[i] << " " << adbQueryResult.Dist[i] 
-		<< " " << adbQueryResult.Qpos[i] << " " << adbQueryResult.Spos[i] << std::endl;
+			  queryType, queryPoint, pointNN, trackNN, sequenceLength, adbQueryResponse)==SOAP_OK){
+    //std::cerr << "result list length:" << adbQueryResponse.result.__sizeRlist << std::endl;
+    for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++)
+      std::cout << adbQueryResponse.result.Rlist[i] << " " << adbQueryResponse.result.Dist[i] 
+		<< " " << adbQueryResponse.result.Qpos[i] << " " << adbQueryResponse.result.Spos[i] << std::endl;
   }
   else
     soap_print_fault(&soap,stderr);
@@ -830,7 +830,7 @@ void audioDB::ws_query(const char*dbName, const char *trackKey, const char* host
 }
 
 
-void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
+void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse){
   if(!dbH)
     initTables(dbName, 0, 0);
 
@@ -844,7 +844,7 @@ void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
     }
   }
   
-  if(adbStatusResult == 0) {
+  if(adbStatusResponse == 0) {
 
     // Update Header information
     cout << "num files:" << dbH->numFiles << endl;
@@ -860,12 +860,12 @@ void audioDB::status(const char* dbName, adb__statusResult *adbStatusResult){
     
     cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << endl;    
   } else {
-    adbStatusResult->numFiles = dbH->numFiles;
-    adbStatusResult->dim = dbH->dim;
-    adbStatusResult->length = dbH->length;
-    adbStatusResult->dudCount = dudCount;
-    adbStatusResult->nullCount = nullCount;
-    adbStatusResult->flags = dbH->flags;
+    adbStatusResponse->result.numFiles = dbH->numFiles;
+    adbStatusResponse->result.dim = dbH->dim;
+    adbStatusResponse->result.length = dbH->length;
+    adbStatusResponse->result.dudCount = dudCount;
+    adbStatusResponse->result.nullCount = nullCount;
+    adbStatusResponse->result.flags = dbH->flags;
   }
 }
 
@@ -997,19 +997,19 @@ void audioDB::l2norm(const char* dbName){
   
 
   
-void audioDB::query(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){  
+void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){  
   switch(queryType){
   case O2_POINT_QUERY:
-    pointQuery(dbName, inFile, adbQueryResult);
+    pointQuery(dbName, inFile, adbQueryResponse);
     break;
   case O2_SEQUENCE_QUERY:
     if(radius==0)
-      trackSequenceQueryNN(dbName, inFile, adbQueryResult);
+      trackSequenceQueryNN(dbName, inFile, adbQueryResponse);
     else
-      trackSequenceQueryRad(dbName, inFile, adbQueryResult);
+      trackSequenceQueryRad(dbName, inFile, adbQueryResponse);
     break;
   case O2_TRACK_QUERY:
-    trackPointQuery(dbName, inFile, adbQueryResult);
+    trackPointQuery(dbName, inFile, adbQueryResponse);
     break;
   default:
     error("unrecognized queryType in query()");
@@ -1027,7 +1027,7 @@ unsigned audioDB::getKeyPos(char* key){
 }
 
 // Basic point query engine
-void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
+void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
   
   initTables(dbName, 0, inFile);
   
@@ -1148,7 +1148,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     cerr << endl << " elapsed time:" << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
   }
 
-  if(adbQueryResult==0){
+  if(adbQueryResponse==0){
     // Output answer
     // Loop over nearest neighbours    
     for(k=0; k < pointNN; k++){
@@ -1172,27 +1172,27 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
     }
     listLen = k;
 
-    adbQueryResult->__sizeRlist=listLen;
-    adbQueryResult->__sizeDist=listLen;
-    adbQueryResult->__sizeQpos=listLen;
-    adbQueryResult->__sizeSpos=listLen;
-    adbQueryResult->Rlist= new char*[listLen];
-    adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new unsigned int[listLen];
-    adbQueryResult->Spos = new unsigned int[listLen];
-    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
-      adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
-      adbQueryResult->Dist[k]=distances[k];
-      adbQueryResult->Qpos[k]=qIndexes[k];
+    adbQueryResponse->result.__sizeRlist=listLen;
+    adbQueryResponse->result.__sizeDist=listLen;
+    adbQueryResponse->result.__sizeQpos=listLen;
+    adbQueryResponse->result.__sizeSpos=listLen;
+    adbQueryResponse->result.Rlist= new char*[listLen];
+    adbQueryResponse->result.Dist = new double[listLen];
+    adbQueryResponse->result.Qpos = new unsigned int[listLen];
+    adbQueryResponse->result.Spos = new unsigned int[listLen];
+    for(k=0; k<(unsigned)adbQueryResponse->result.__sizeRlist; k++){
+      adbQueryResponse->result.Rlist[k]=new char[O2_MAXFILESTR];
+      adbQueryResponse->result.Dist[k]=distances[k];
+      adbQueryResponse->result.Qpos[k]=qIndexes[k];
       unsigned cumTrack=0;
       for(l=0 ; l<dbH->numFiles; l++){
 	cumTrack+=trackTable[l];
 	if(sIndexes[k]<cumTrack){
-	  sprintf(adbQueryResult->Rlist[k], "%s", fileTable+l*O2_FILETABLESIZE);
+	  sprintf(adbQueryResponse->result.Rlist[k], "%s", fileTable+l*O2_FILETABLESIZE);
 	  break;
 	}
       }
-      adbQueryResult->Spos[k]=sIndexes[k]+trackTable[l]-cumTrack;
+      adbQueryResponse->result.Spos[k]=sIndexes[k]+trackTable[l]-cumTrack;
     }
   }
   
@@ -1210,7 +1210,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResul
 // trackPointQuery  
 // return the trackNN closest tracks to the query track
 // uses average of pointNN points per track 
-void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){  
+void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){  
   initTables(dbName, 0, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
@@ -1415,7 +1415,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
 	 << " elapsed time:" << ( tv2.tv_sec*1000 + tv2.tv_usec/1000 ) - ( tv1.tv_sec*1000+tv1.tv_usec/1000 ) << " msec" << endl;
   }
 
-  if(adbQueryResult==0){
+  if(adbQueryResponse==0){
     if(verbosity>1) {
       cerr<<endl;
     }
@@ -1427,20 +1427,20 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   }
   else{ // Process Web Services Query
     int listLen = min(trackNN, processedTracks);
-    adbQueryResult->__sizeRlist=listLen;
-    adbQueryResult->__sizeDist=listLen;
-    adbQueryResult->__sizeQpos=listLen;
-    adbQueryResult->__sizeSpos=listLen;
-    adbQueryResult->Rlist= new char*[listLen];
-    adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new unsigned int[listLen];
-    adbQueryResult->Spos = new unsigned int[listLen];
-    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
-      adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
-      adbQueryResult->Dist[k]=trackDistances[k];
-      adbQueryResult->Qpos[k]=trackQIndexes[k];
-      adbQueryResult->Spos[k]=trackSIndexes[k];
-      sprintf(adbQueryResult->Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
+    adbQueryResponse->result.__sizeRlist=listLen;
+    adbQueryResponse->result.__sizeDist=listLen;
+    adbQueryResponse->result.__sizeQpos=listLen;
+    adbQueryResponse->result.__sizeSpos=listLen;
+    adbQueryResponse->result.Rlist= new char*[listLen];
+    adbQueryResponse->result.Dist = new double[listLen];
+    adbQueryResponse->result.Qpos = new unsigned int[listLen];
+    adbQueryResponse->result.Spos = new unsigned int[listLen];
+    for(k=0; k<(unsigned)adbQueryResponse->result.__sizeRlist; k++){
+      adbQueryResponse->result.Rlist[k]=new char[O2_MAXFILESTR];
+      adbQueryResponse->result.Dist[k]=trackDistances[k];
+      adbQueryResponse->result.Qpos[k]=trackQIndexes[k];
+      adbQueryResponse->result.Spos[k]=trackSIndexes[k];
+      sprintf(adbQueryResponse->result.Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
     }
   }
     
@@ -1464,7 +1464,7 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
 // efficient implementation based on matched filter
 // assumes normed shingles
 // outputs distances of retrieved shingles, max retreived = pointNN shingles per per track
-void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
+void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
   
   initTables(dbName, 0, inFile);
   
@@ -1914,7 +1914,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     cerr << "sampleCount: " << sampleCount << " sampleSum: " << sampleSum << " logSampleSum: " << logSampleSum 
 	 << " minSample: " << minSample << " maxSample: " << maxSample << endl;
   }  
-  if(adbQueryResult==0){
+  if(adbQueryResponse==0){
     if(verbosity>1) {
       cerr<<endl;
     }
@@ -1926,20 +1926,20 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   }
   else{ // Process Web Services Query
     int listLen = min(trackNN, processedTracks);
-    adbQueryResult->__sizeRlist=listLen;
-    adbQueryResult->__sizeDist=listLen;
-    adbQueryResult->__sizeQpos=listLen;
-    adbQueryResult->__sizeSpos=listLen;
-    adbQueryResult->Rlist= new char*[listLen];
-    adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new unsigned int[listLen];
-    adbQueryResult->Spos = new unsigned int[listLen];
-    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
-      adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
-      adbQueryResult->Dist[k]=trackDistances[k];
-      adbQueryResult->Qpos[k]=trackQIndexes[k];
-      adbQueryResult->Spos[k]=trackSIndexes[k];
-      sprintf(adbQueryResult->Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
+    adbQueryResponse->result.__sizeRlist=listLen;
+    adbQueryResponse->result.__sizeDist=listLen;
+    adbQueryResponse->result.__sizeQpos=listLen;
+    adbQueryResponse->result.__sizeSpos=listLen;
+    adbQueryResponse->result.Rlist= new char*[listLen];
+    adbQueryResponse->result.Dist = new double[listLen];
+    adbQueryResponse->result.Qpos = new unsigned int[listLen];
+    adbQueryResponse->result.Spos = new unsigned int[listLen];
+    for(k=0; k<(unsigned)adbQueryResponse->result.__sizeRlist; k++){
+      adbQueryResponse->result.Rlist[k]=new char[O2_MAXFILESTR];
+      adbQueryResponse->result.Dist[k]=trackDistances[k];
+      adbQueryResponse->result.Qpos[k]=trackQIndexes[k];
+      adbQueryResponse->result.Spos[k]=trackSIndexes[k];
+      sprintf(adbQueryResponse->result.Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
     }
   }
 
@@ -1971,7 +1971,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 // efficient implementation based on matched filter
 // assumes normed shingles
 // outputs count of retrieved shingles, max retreived = one shingle per query shingle per track
-void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResult *adbQueryResult){
+void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
   
   initTables(dbName, 0, inFile);
   
@@ -2396,7 +2396,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	 << " minSample: " << minSample << " maxSample: " << maxSample << endl;
   }
   
-  if(adbQueryResult==0){
+  if(adbQueryResponse==0){
     if(verbosity>1) {
       cerr<<endl;
     }
@@ -2407,20 +2407,20 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   }
   else{ // Process Web Services Query
     int listLen = min(trackNN, processedTracks);
-    adbQueryResult->__sizeRlist=listLen;
-    adbQueryResult->__sizeDist=listLen;
-    adbQueryResult->__sizeQpos=listLen;
-    adbQueryResult->__sizeSpos=listLen;
-    adbQueryResult->Rlist= new char*[listLen];
-    adbQueryResult->Dist = new double[listLen];
-    adbQueryResult->Qpos = new unsigned int[listLen];
-    adbQueryResult->Spos = new unsigned int[listLen];
-    for(k=0; k<(unsigned)adbQueryResult->__sizeRlist; k++){
-      adbQueryResult->Rlist[k]=new char[O2_MAXFILESTR];
-      adbQueryResult->Dist[k]=trackDistances[k];
-      adbQueryResult->Qpos[k]=trackQIndexes[k];
-      adbQueryResult->Spos[k]=trackSIndexes[k];
-      sprintf(adbQueryResult->Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
+    adbQueryResponse->result.__sizeRlist=listLen;
+    adbQueryResponse->result.__sizeDist=listLen;
+    adbQueryResponse->result.__sizeQpos=listLen;
+    adbQueryResponse->result.__sizeSpos=listLen;
+    adbQueryResponse->result.Rlist= new char*[listLen];
+    adbQueryResponse->result.Dist = new double[listLen];
+    adbQueryResponse->result.Qpos = new unsigned int[listLen];
+    adbQueryResponse->result.Spos = new unsigned int[listLen];
+    for(k=0; k<(unsigned)adbQueryResponse->result.__sizeRlist; k++){
+      adbQueryResponse->result.Rlist[k]=new char[O2_MAXFILESTR];
+      adbQueryResponse->result.Dist[k]=trackDistances[k];
+      adbQueryResponse->result.Qpos[k]=trackQIndexes[k];
+      adbQueryResponse->result.Spos[k]=trackSIndexes[k];
+      sprintf(adbQueryResponse->result.Rlist[k], "%s", fileTable+trackIDs[k]*O2_FILETABLESIZE);
     }
   }
 
@@ -2579,11 +2579,11 @@ void audioDB::startServer(){
 // web services
 
 // SERVER SIDE
-int adb__status(struct soap* soap, xsd__string dbName, adb__statusResult &adbStatusResult){
+int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbStatusResponse){
   char* const argv[]={"audioDB",COM_STATUS,"-d",dbName};
   const unsigned argc = 4;
   try {
-    audioDB(argc, argv, &adbStatusResult);
+    audioDB(argc, argv, &adbStatusResponse);
     return SOAP_OK;
   } catch(char *err) {
     soap_receiver_fault(soap, err, "");
@@ -2593,7 +2593,7 @@ int adb__status(struct soap* soap, xsd__string dbName, adb__statusResult &adbSta
 
 // Literal translation of command line to web service
 
-int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int trackNN, xsd__int seqLen, adb__queryResult &adbQueryResult){
+int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int trackNN, xsd__int seqLen, adb__queryResponse &adbQueryResponse){
   char queryType[256];
   for(int k=0; k<256; k++)
     queryType[k]='\0';
@@ -2646,7 +2646,7 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
 
   const unsigned argc = 19;
   try {
-    audioDB(argc, (char* const*)argv, &adbQueryResult);
+    audioDB(argc, (char* const*)argv, &adbQueryResponse);
     return SOAP_OK;
   } catch (char *err) {
     soap_receiver_fault(soap, err, "");

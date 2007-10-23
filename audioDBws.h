@@ -12,7 +12,7 @@ typedef double xsd__double;
 typedef char* xsd__string;
 
 // Supports result lists of arbitrary length
-class adb__queryResult{
+struct adb__queryResult{
   int __sizeRlist;
   char **Rlist; // Maximum size of result list
   int __sizeDist;  
@@ -23,7 +23,7 @@ class adb__queryResult{
   unsigned int *Spos;
 };
 
-class adb__statusResult {
+struct adb__statusResult {
   unsigned numFiles;
   unsigned dim;
   unsigned length;
@@ -31,9 +31,17 @@ class adb__statusResult {
   unsigned nullCount;
   unsigned flags;
 };
-    
+
+struct adb__statusResponse {
+  struct adb__statusResult result;
+};
+
+struct adb__queryResponse {
+  struct adb__queryResult result;
+};
+
 // Print the status of an existing adb database
-int adb__status(xsd__string dbName, adb__statusResult &adbStatusResult);
+int adb__status(xsd__string dbName, struct adb__statusResponse &adbStatusResponse);
 
 // Query an existing adb database
-int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, adb__queryResult &adbQueryResult);
+int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, struct adb__queryResponse &adbQueryResponse);
