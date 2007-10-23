@@ -10,8 +10,8 @@ all: ${EXECUTABLE}
 ${EXECUTABLE}.1: ${EXECUTABLE}
 	help2man ./${EXECUTABLE} > ${EXECUTABLE}.1
 
-README.txt: ${EXECUTABLE}
-	./${EXECUTABLE} --help > README.txt
+HELP.txt: ${EXECUTABLE}
+	./${EXECUTABLE} --help > HELP.txt
 
 cmdline.c cmdline.h: gengetopt.in
 	gengetopt <gengetopt.in
