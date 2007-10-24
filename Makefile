@@ -1,13 +1,12 @@
 HELP2MAN=help2man
 GENGETOPT=gengetopt
 SOAPCPP2=soapcpp2
+GSOAP_CPP=-lgsoap++
+GSOAP_INCLUDE=
 
 CFLAGS=-O3 -g
 
-GSOAP_CPP=-lgsoap++
-
 EXECUTABLE=audioDB
-
 
 .PHONY: all clean test
 
@@ -26,8 +25,8 @@ soapServer.cpp soapClient.cpp soapC.cpp: audioDBws.h
 	${SOAPCPP2} audioDBws.h
 
 ${EXECUTABLE}: audioDB.cpp audioDB.h soapServer.cpp soapClient.cpp soapC.cpp cmdline.c cmdline.h
-	g++ -c ${CFLAGS} -Wall -Werror audioDB.cpp
-	g++ -o ${EXECUTABLE} ${CFLAGS} audioDB.o soapServer.cpp soapClient.cpp soapC.cpp cmdline.c ${GSOAP_CPP}
+	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} -Wall -Werror audioDB.cpp
+	g++ -o ${EXECUTABLE} ${CFLAGS} ${GSOAP_INCLUDE} audioDB.o soapServer.cpp soapClient.cpp soapC.cpp cmdline.c ${GSOAP_CPP}
 
 clean:
 	-rm cmdline.c cmdline.h

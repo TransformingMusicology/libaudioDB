@@ -14,6 +14,14 @@ help2man: a spartan manual page is automatically generated from the
 
 Use the following Makefiles to compile audioDB on your system:
 
-Linux:    Makefile
-Mac OS X: Makefile.osx
-Win32:    Makefile.win32
+Linux:         make
+(Debian-derived systems, with the right versions of gengetopt, gsoap
+and help2man installed)
+
+OS X or Win32: make \
+  GENGETOPT=/path/to/bin/gengetopt \
+  SOAPCPP2=/path/to/bin/soapcpp2 \
+  GSOAP_CPP=/path/to/gsoap/stdsoap2.cpp \
+  GSOAP_INCLUDE="-I /path/to/gsoap"
+(where the path in GSOAP_INCLUDE should name the directory in which
+stdsoap.h resides)
