@@ -153,7 +153,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   }
 
   if(args_info.size_given) {
-    if (args_info.size_arg < 250 || args_info.size_arg > 4000) {
+    if (args_info.size_arg < 50 || args_info.size_arg > 4000) {
       error("Size out of range", "");
     }
     size = args_info.size_arg * 1000000;
@@ -398,6 +398,8 @@ void audioDB::create(const char* dbName){
   dbH = new dbTableHeaderT();
   assert(dbH);
 
+  unsigned int maxfiles = (unsigned int) rint((double) O2_MAXFILES * (double) size / (double) O2_DEFAULTDBSIZE);
+
   // Initialize header
   dbH->magic = O2_MAGIC;
   dbH->version = O2_FORMAT_VERSION;
@@ -406,10 +408,10 @@ void audioDB::create(const char* dbName){
   dbH->flags = 0;
   dbH->length = 0;
   dbH->fileTableOffset = ALIGN_UP(O2_HEADERSIZE, 8);
-  dbH->trackTableOffset = ALIGN_UP(dbH->fileTableOffset + O2_FILETABLESIZE*O2_MAXFILES, 8);
-  dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*O2_MAXFILES, 8);
-  dbH->l2normTableOffset = ALIGN_DOWN(size - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
-  dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - O2_MAXFILES*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->trackTableOffset = ALIGN_UP(dbH->fileTableOffset + O2_FILETABLESIZE*maxfiles, 8);
+  dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles, 8);
+  dbH->l2normTableOffset = ALIGN_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
   dbH->dbSize = size;
 
   memcpy (db, dbH, O2_HEADERSIZE);
