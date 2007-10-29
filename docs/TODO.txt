@@ -64,6 +64,13 @@ monstrous file.
 
 * architectural issues
 
+** more safety
+
+A couple of areas are not yet safe against runtime faults.  The simple
+case is zero-length features, which will lead to division by zero
+errors; more pressingly, large databases might well end up writing off
+the end of the various tables (e.g. track, l2norm).
+
 ** API vs command-line
 
 While having a command line interface is nice, having the only way to
