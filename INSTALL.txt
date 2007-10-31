@@ -24,4 +24,4 @@ OS X or Win32: make \
   GSOAP_CPP=/path/to/gsoap/stdsoap2.cpp \
   GSOAP_INCLUDE="-I /path/to/gsoap"
 (where the path in GSOAP_INCLUDE should name the directory in which
-stdsoap.h resides)
+stdsoap2.h resides)
