@@ -42,7 +42,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     printf("%s\n", gengetopt_args_info_help[1]);
     printf("%s\n", gengetopt_args_info_help[2]);
     printf("%s\n", gengetopt_args_info_help[0]);
-    exit(1);
+    error("No command found");
   }
 
   if(O2_ACTION(COM_SERVER))
@@ -82,8 +82,8 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
-    processArgs(argc, argv);
     isServer = 1; // FIXME: Hack
+    processArgs(argc, argv);
     assert(O2_ACTION(COM_QUERY));
     query(dbName, inFile, adbQueryResponse);
   } catch(char *err) {
@@ -95,8 +95,8 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
-    processArgs(argc, argv);
     isServer = 1; // FIXME: Hack
+    processArgs(argc, argv);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
   } catch(char *err) {
@@ -137,7 +137,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   }
 
   if (cmdline_parser (argc, argv, &args_info) != 0)
-    exit(1) ;       
+    error("Error parsing command line");
 
   if(args_info.help_given){
     cmdline_parser_print_help();
@@ -175,7 +175,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     port=args_info.SERVER_arg;
     if(port<100 || port > 100000)
       error("port out of range");
-    isServer=1;
+    isServer = 1;
 #if defined(O2_DEBUG)
     struct sigaction sa;
     sa.sa_sigaction = sigterm_action;
