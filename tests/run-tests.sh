@@ -10,7 +10,13 @@ else
   exit 1
 fi
 
-for file in [0-9][0-9][0-9][0-9]*; do
+if [ "$1" = "--full" ]; then
+  pattern="[0-9][0-9][0-9][0-9]*"
+else
+  pattern="[0-8][0-9][0-9][0-9]*"
+fi
+
+for file in ${pattern}; do
   if [ -d ${file} ]; then
     if [ -f ${file}/run-test.sh ]; then
       echo -n Running test ${file}
