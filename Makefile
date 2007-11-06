@@ -19,7 +19,7 @@ HELP.txt: ${EXECUTABLE}
 	./${EXECUTABLE} --help > HELP.txt
 
 cmdline.c cmdline.h: gengetopt.in
-	${GENGETOPT} <gengetopt.in
+	${GENGETOPT} -e <gengetopt.in
 
 soapServer.cpp soapClient.cpp soapC.cpp: audioDBws.h
 	${SOAPCPP2} audioDBws.h
