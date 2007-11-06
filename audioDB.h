@@ -83,6 +83,8 @@
 #define ALIGN_UP(x,w) ((x) + ((1<<w)-1) & ~((1<<w)-1))
 #define ALIGN_DOWN(x,w) ((x) & ~((1<<w)-1))
 
+#define ENSURE_STRING(x) ((x) ? (x) : "")
+
 using namespace std;
 
 typedef struct dbTableHeader{
