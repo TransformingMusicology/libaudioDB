@@ -4,7 +4,10 @@
 
 At present, the radius / counting query type isn't supported over
 SOAP.  Supporting it involves changing the adb__query() exported
-function, so we need to be careful.
+function, so we need to be careful; or at least defining a new
+exported interface, at which point perhaps it should be designed
+rather than accreted... (probably this will come naturally after the
+following TODO item)
 
 ** matrix of possible queries
 
