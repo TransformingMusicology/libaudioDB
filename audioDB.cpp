@@ -472,35 +472,48 @@ void audioDB::initDBHeader(const char* dbName, bool forWrite) {
   timesTable = (double *) (db + dbH->timesTableOffset);
 }
 
+void audioDB::initInputFile (const char *inFile) {
+  if (inFile) {
+    if ((infid = open(inFile, O_RDONLY)) < 0) {
+      error("can't open input file for reading", inFile, "open");
+    }
+
+    if (fstat(infid, &statbuf) < 0) {
+      error("fstat error finding size of input", inFile, "fstat");
+    }
+
+    if(dbH->dim == 0 && dbH->length == 0) { // empty database
+      // initialize with input dimensionality
+      if(read(infid, &dbH->dim, sizeof(unsigned)) != sizeof(unsigned)) {
+        error("short read of input file", inFile);
+      }
+      if(dbH->dim == 0) {
+        error("dimensionality of zero in input file", inFile);
+      }
+    } else {
+      unsigned test;
+      if(read(infid, &test, sizeof(unsigned)) != sizeof(unsigned)) {
+        error("short read of input file", inFile);
+      }
+      if(dbH->dim == 0) {
+        error("dimensionality of zero in input file", inFile);
+      }
+      if(dbH->dim != test) {      
+	cerr << "error: expected dimension: " << dbH->dim << ", got : " << test <<endl;
+	error("feature dimensions do not match database table dimensions", inFile);
+      }
+    }
+    
+    if ((indata = (char *) mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0)) == (caddr_t) -1) {
+      error("mmap error for input", inFile, "mmap");
+    }
+  }
+}
+
 void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile = 0) {
   
   initDBHeader(dbName, forWrite);
-
-  // open the input file
-  if (inFile && (infid = open(inFile, O_RDONLY)) < 0) {
-    error("can't open input file for reading", inFile, "open");
-  }
-  // find size of input file
-  if (inFile && fstat(infid, &statbuf) < 0) {
-    error("fstat error finding size of input", inFile, "fstat");
-  }
-  if(inFile)
-    if(dbH->dim == 0 && dbH->length == 0) // empty database
-      // initialize with input dimensionality
-      read(infid, &dbH->dim, sizeof(unsigned)); 
-    else {
-      unsigned test;
-      read(infid, &test, sizeof(unsigned));
-      if(dbH->dim != test) {      
-	cerr << "error: expected dimension: " << dbH->dim << ", got : " << test <<endl;
-	error("feature dimensions do not match database table dimensions");
-      }
-    }
-  
-  // mmap the input file 
-  if (inFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
-      == (caddr_t) -1)
-    error("mmap error for input", inFile, "mmap");
+  initInputFile(inFile);
 }
 
 void audioDB::insert(const char* dbName, const char* inFile){
@@ -512,7 +525,7 @@ void audioDB::insert(const char* dbName, const char* inFile){
 
   // Check that there is room for at least 1 more file
   if((char*)timesTable<((char*)dataBuf+dbH->length+statbuf.st_size-sizeof(int)))
-    error("No more room in database","insert failed: reason database is full.");
+    error("Insert failed: no more room in database", inFile);
   
   if(!key)
     key=inFile;
@@ -675,36 +688,12 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
     if(filesIn->eof())
       break;
 
-    // open the input file
-    if (thisFile && (infid = open (thisFile, O_RDONLY)) < 0)
-      error("can't open feature file for reading", thisFile, "open");
-  
-    // find size of input file
-    if (thisFile && fstat (infid,&statbuf) < 0)
-      error("fstat error finding size of input", "", "fstat");
+    initInputFile(thisFile);
 
     // Check that there is room for at least 1 more file
     if((char*)timesTable<((char*)dataBuf+(dbH->length+statbuf.st_size-sizeof(int))))
-      error("No more room in database","insert failed: reason database is full.");
+      error("batchinsert failed: no more room in database", thisFile);
     
-    if(thisFile)
-      if(dbH->dim==0 && dbH->length==0) // empty database
-	read(infid,&dbH->dim,sizeof(unsigned)); // initialize with input dimensionality
-      else {
-	unsigned test;
-	read(infid,&test,sizeof(unsigned));
-	if(dbH->dim!=test){      
-	  cerr << "error: expected dimension: " << dbH->dim << ", got :" << test <<endl;
-	  error("feature dimensions do not match database table dimensions");
-	}
-      }
-  
-    // mmap the input file 
-    if (thisFile && (indata = (char*)mmap (0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0))
-	== (caddr_t) -1)
-      error("mmap error for input", "", "mmap");
-  
-  
     // Linear scan of filenames check for pre-existing feature
     unsigned alreadyInserted=0;
   
