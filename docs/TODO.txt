@@ -69,10 +69,15 @@ monstrous file.
 
 ** more safety
 
-A couple of areas are not yet safe against runtime faults.  The simple
-case is zero-length features, which will lead to division by zero
-errors; more pressingly, large databases might well end up writing off
-the end of the various tables (e.g. track, l2norm).
+A couple of areas are not yet safe against runtime faults.  
+
+*** Large databases might well end up writing off the end of the
+    various tables (e.g. track, l2norm).
+
+*** transactionality is important; the last thing that should be
+    updated on insert are the free pointers (dbH->length,
+    dbH->numFiles, maybe others), so that if something goes wrong in
+    the meantime the database is not in an inconsistent state.
 
 ** API vs command-line
 
