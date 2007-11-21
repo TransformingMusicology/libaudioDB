@@ -503,11 +503,6 @@ void audioDB::initDBHeader(const char* dbName, bool forWrite) {
     error("database file has incorect version", dbName);
   }
 
-  // FIXME: when changing file format version, remove this workaround.
-  if(dbH->dbSize == 0) {
-    dbH->dbSize = O2_DEFAULTDBSIZE;
-  }
-
   // mmap the database file
   if ((db = (char*) mmap(0, dbH->dbSize, PROT_READ | (forWrite ? PROT_WRITE : 0),
 			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
