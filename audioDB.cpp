@@ -72,6 +72,9 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
   else if(O2_ACTION(COM_L2NORM))
     l2norm(dbName);
   
+  else if(O2_ACTION(COM_POWER))
+    power_flag(dbName);
+
   else if(O2_ACTION(COM_DUMP))
     dump(dbName);
   
@@ -220,6 +223,12 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     return 0;
   }
        
+  if(args_info.POWER_given){
+    command=COM_POWER;
+    dbName=args_info.database_arg;
+    return 0;
+  }
+       
   if(args_info.INSERT_given){
     command=COM_INSERT;
     dbName=args_info.database_arg;
@@ -234,6 +243,15 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
         usingTimes=1;
       }
     }
+    if (args_info.power_given) {
+      powerFileName = args_info.power_arg;
+      if (strlen(powerFileName) > 0) {
+        if (!(powerfd = open(powerFileName, O_RDONLY))) {
+          error("Could not open power file for reading", powerFileName, "open");
+        }
+        usingPower = 1;
+      }
+    }    
     return 0;
   }
   
@@ -261,6 +279,14 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
         usingTimes=1;
       }
     }
+    if(args_info.powerList_given){
+      powerFileName=args_info.powerList_arg;
+      if(strlen(powerFileName)>0){
+        if(!(powerFile = new ifstream(powerFileName,ios::in)))
+          error("Could not open powerList file for reading", powerFileName);
+        usingPower=1;
+      }
+    }
     return 0;
   }
   
@@ -282,6 +308,16 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
         if(!(timesFile = new ifstream(timesFileName,ios::in)))
           error("Could not open times file for reading", timesFileName);
         usingTimes=1;
+      }
+    }
+
+    if(args_info.power_given){
+      powerFileName=args_info.power_arg;
+      if(strlen(powerFileName)>0){
+        if (!(powerfd = open(powerFileName, O_RDONLY))) {
+          error("Could not open power file for reading", powerFileName, "open");
+        }
+        usingPower = 1;
       }
     }
     
@@ -317,6 +353,18 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     sequenceHop = args_info.sequencehop_arg;
     if(sequenceHop < 1 || sequenceHop > 1000) {
       error("seqhop out of range: 1 <= seqhop <= 1000");
+    }
+
+    if (args_info.absolute_threshold_given) {
+      if (args_info.absolute_threshold_arg >= 0) {
+	error("absolute threshold out of range: should be negative");
+      }
+      use_absolute_threshold = true;
+      absolute_threshold = args_info.absolute_threshold_arg;
+    }
+    if (args_info.relative_threshold_given) {
+      use_relative_threshold = true;
+      relative_threshold = args_info.relative_threshold_arg;
     }
     return 0;
   }
@@ -412,6 +460,7 @@ void audioDB::create(const char* dbName){
   dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles, 8);
   dbH->l2normTableOffset = ALIGN_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
   dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->powerTableOffset = ALIGN_DOWN(dbH->timesTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
   dbH->dbSize = size;
 
   memcpy (db, dbH, O2_HEADERSIZE);
@@ -470,6 +519,7 @@ void audioDB::initDBHeader(const char* dbName, bool forWrite) {
   dataBuf = (double *) (db + dbH->dataOffset);
   l2normTable = (double *) (db + dbH->l2normTableOffset);
   timesTable = (double *) (db + dbH->timesTableOffset);
+  powerTable = (double *) (db + dbH->powerTableOffset);
 }
 
 void audioDB::initInputFile (const char *inFile) {
@@ -523,6 +573,9 @@ void audioDB::insert(const char* dbName, const char* inFile){
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
 
+  if(!usingPower && (dbH->flags & O2_FLAG_POWER))
+    error("Must use power with power-enabled database", dbName);
+
   // Check that there is room for at least 1 more file
   if((char*)timesTable<((char*)dataBuf+dbH->length+statbuf.st_size-sizeof(int)))
     error("Insert failed: no more room in database", inFile);
@@ -566,6 +619,9 @@ void audioDB::insert(const char* dbName, const char* inFile){
   double* timesdata=timesTable+timesoffset;
   assert(timesdata+numVectors<l2normTable);
   insertTimeStamps(numVectors, timesFile, timesdata);
+
+  double *powerdata = powerTable + timesoffset;
+  insertPowerData(numVectors, powerfd, powerdata);
 
   // Increment file count
   dbH->numFiles++;
@@ -652,6 +708,32 @@ void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double*
  }
 }
 
+void audioDB::insertPowerData(unsigned numVectors, int powerfd, double *powerdata) {
+  if (usingPower) {
+    if (!(dbH->flags & O2_FLAG_POWER)) {
+      error("Cannot insert power data on non-power DB", dbName);
+    }
+
+    int one;
+    unsigned int count;
+
+    count = read(powerfd, &one, sizeof(unsigned int));
+    if (count != sizeof(unsigned int)) {
+      error("powerfd read failed", "int", "read");
+    }
+    if (one != 1) {
+      error("dimensionality of power file not 1", powerFileName);
+    }
+
+    // FIXME: should check that the powerfile is the right size for
+    // this.  -- CSR, 2007-10-30
+    count = read(powerfd, powerdata, numVectors * sizeof(double));
+    if (count != numVectors * sizeof(double)) {
+      error("powerfd read failed", "double", "read");
+    }
+  }
+}
+
 void audioDB::batchinsert(const char* dbName, const char* inFile) {
 
   initDBHeader(dbName, true);
@@ -661,6 +743,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   ifstream *filesIn = 0;
   ifstream *keysIn = 0;
   ifstream* thisTimesFile = 0;
+  int thispowerfd = 0;
 
   if(!(filesIn = new ifstream(inFile)))
     error("Could not open batch in file", inFile);
@@ -671,10 +754,14 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
 
+  if(!usingPower && (dbH->flags & O2_FLAG_POWER))
+    error("Must use power with power-enabled database", dbName);
+
   unsigned totalVectors=0;
   char *thisKey = new char[MAXSTR];
   char *thisFile = new char[MAXSTR];
   char *thisTimesFileName = new char[MAXSTR];
+  char *thisPowerFileName = new char[MAXSTR];
   
   do{
     filesIn->getline(thisFile,MAXSTR);
@@ -684,6 +771,8 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
       thisKey = thisFile;
     if(usingTimes)
       timesFile->getline(thisTimesFileName,MAXSTR);	  
+    if(usingPower)
+      powerFile->getline(thisPowerFileName, MAXSTR);
     
     if(filesIn->eof())
       break;
@@ -717,7 +806,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 	  cerr << "Warning: ignoring zero-length feature vector file:" << thisKey << endl;
         }
       }
-      else{	
+      else{
 	if(usingTimes){
 	  if(timesFile->eof())
 	    error("not enough timestamp files in timesList");
@@ -732,7 +821,23 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 	  if(thisTimesFile)
 	    delete thisTimesFile;
 	}
-	  
+        
+        if (usingPower) {
+          if(powerFile->eof()) {
+            error("not enough power files in powerList", powerFileName);
+          }
+          thispowerfd = open(thisPowerFileName, O_RDONLY);
+          if (thispowerfd < 0) {
+            error("failed to open power file", thisPowerFileName);
+          }
+          unsigned insertoffset = dbH->length;
+          unsigned poweroffset = insertoffset / (dbH->dim * sizeof(double));
+          double *powerdata = powerTable + poweroffset;
+          insertPowerData(numVectors, thispowerfd, powerdata);
+          if (0 < thispowerfd) {
+            close(thispowerfd);
+          }
+        }
 	strncpy(fileTable + dbH->numFiles*O2_FILETABLESIZE, thisKey, strlen(thisKey));
   
 	unsigned insertoffset = dbH->length;// Store current state
@@ -879,18 +984,27 @@ void audioDB::dump(const char* dbName){
     error("error changing working directory", output, "chdir");
   }
 
-  int fLfd, tLfd = 0, kLfd;
-  FILE *fLFile, *tLFile = 0, *kLFile;
+  int fLfd, tLfd = 0, pLfd = 0, kLfd;
+  FILE *fLFile, *tLFile = 0, *pLFile = 0, *kLFile;
 
   if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
     error("error creating featureList file", "featureList.txt", "open");
   }
+
   int times = dbH->flags & O2_FLAG_TIMES;
   if (times) {
     if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
       error("error creating timesList file", "timesList.txt", "open");
     }
   }
+
+  int power = dbH->flags & O2_FLAG_POWER;
+  if (power) {
+    if ((pLfd = open("powerList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+      error("error creating powerList file", "powerList.txt", "open");
+    }
+  }
+
   if ((kLfd = open("keyList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
     error("error creating keyList file", "keyList.txt", "open");
   }
@@ -900,10 +1014,13 @@ void audioDB::dump(const char* dbName){
   if (times) {
     tLFile = fdopen(tLfd, "w");
   }
+  if (power) {
+    pLFile = fdopen(pLfd, "w");
+  }
   kLFile = fdopen(kLfd, "w");
 
   char *fName = new char[256];
-  int ffd;
+  int ffd, pfd;
   FILE *tFile;
   unsigned pos = 0;
   for(unsigned k = 0; k < dbH->numFiles; k++) {
@@ -937,6 +1054,22 @@ void audioDB::dump(const char* dbName){
       fprintf(tLFile, "%s\n", fName);
     }
 
+    if (power) {
+      uint32_t one = 1;
+      snprintf(fName, 256, "%05d.power", k);
+      if ((pfd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+	error("error creating power file", fName, "open");
+      }
+      if ((write(pfd, &one, sizeof(uint32_t))) < 0) {
+	error("error writing one", fName, "write");
+      }
+      if ((write(pfd, powerTable + pos, trackTable[k] * sizeof(double))) < 0) {
+	error("error writing data", fName, "write");
+      }
+      fprintf(pLFile, "%s\n", fName);
+      close(pfd);
+    } 
+
     pos += trackTable[k];
     cout << fileTable+k*O2_FILETABLESIZE << " " << trackTable[k] << endl;
   }
@@ -954,9 +1087,15 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
   if(dbH->flags & O2_FLAG_L2NORM) {
     fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
   }
+  if(power) {
+    fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -P\n");
+  }
   fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -B -F featureList.txt -K keyList.txt");
   if(times) {
     fprintf(scriptFile, " -T timesList.txt");
+  }
+  if(power) {
+    fprintf(scriptFile, " -W powerList.txt");
   }
   fprintf(scriptFile, "\n");
   fclose(scriptFile);
@@ -968,6 +1107,9 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
   fclose(fLFile);
   if(times) {
     fclose(tLFile);
+  }
+  if(power) {
+    fclose(pLFile);
   }
   fclose(kLFile);
   delete[] fName;
@@ -985,7 +1127,29 @@ void audioDB::l2norm(const char* dbName){
   dbH->flags = dbH->flags|O2_FLAG_L2NORM;
   memcpy (db, dbH, O2_HEADERSIZE);
 }
-  
+
+void audioDB::power_flag(const char *dbName) {
+  initTables(dbName, true, 0);
+  if (dbH->length > 0) {
+    error("cannot turn on power storage for non-empty database", dbName);
+  }
+  dbH->flags |= O2_FLAG_POWER;
+  memcpy(db, dbH, O2_HEADERSIZE);
+}
+
+bool audioDB::powers_acceptable(double p1, double p2) {
+  if (use_absolute_threshold) {
+    if ((p1 < absolute_threshold) || (p2 < absolute_threshold)) {
+      return false;
+    }
+  }
+  if (use_relative_threshold) {
+    if (fabs(p1-p2) > fabs(relative_threshold)) {
+      return false;
+    }
+  }
+  return true;
+}
 
   
 void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){  
@@ -1450,6 +1614,46 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
 
 }
 
+// This is a common pattern in sequence queries: what we are doing is
+// taking a window of length seqlen over a buffer of length length,
+// and placing the sum of the elements in that window in the first
+// element of the window: thus replacing all but the last seqlen
+// elements in the buffer the corresponding windowed sum.
+void audioDB::sequence_sum(double *buffer, int length, int seqlen) {
+  double tmp1, tmp2, *ps;
+  int j, w;
+
+  tmp1 = *buffer;
+  j = 1;
+  w = seqlen - 1;
+  while(w--) {
+    *buffer += buffer[j++];
+  }
+  ps = buffer + 1;
+  w = length - seqlen; // +1 - 1
+  while(w--) {
+    tmp2 = *ps;
+    *ps = *(ps - 1) - tmp1 + *(ps + seqlen - 1);
+    tmp1 = tmp2;
+    ps++;
+  }
+}
+
+void audioDB::sequence_sqrt(double *buffer, int length, int seqlen) {
+  int w = length - seqlen + 1;
+  while(w--) {
+    *buffer = sqrt(*buffer);
+    buffer++;
+  }
+}
+
+void audioDB::sequence_average(double *buffer, int length, int seqlen) {
+  int w = length - seqlen + 1;
+  while(w--) {
+    *buffer /= seqlen;
+    buffer++;
+  }
+}
 
 // k nearest-neighbor (k-NN) search between query and target tracks
 // efficient implementation based on matched filter
@@ -1464,13 +1668,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
   double* query = (double*)(indata+sizeof(int));
   double* queryCopy = 0;
-
-  double qMeanL2;
-  double* sMeanL2;
-
-  unsigned USE_THRESH=0;
-  double SILENCE_THRESH=0;
-  double DIFF_THRESH=0;
 
   if(!(dbH->flags & O2_FLAG_L2NORM) )
     error("Database must be L2 normed for sequence query","use -L2NORM");
@@ -1488,98 +1685,67 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   memcpy(queryCopy, query, numVectors*dbH->dim*sizeof(double));
   qNorm = new double[numVectors];
   sNorm = new double[dbVectors];
-  sMeanL2=new double[dbH->numFiles];
-  assert(qNorm&&sNorm&&queryCopy&&sMeanL2&&sequenceLength);    
+  assert(qNorm&&sNorm&&queryCopy&&sequenceLength);    
   unitNorm(queryCopy, dbH->dim, numVectors, qNorm);
   query = queryCopy;
 
   // Make norm measurements relative to sequenceLength
   unsigned w = sequenceLength-1;
   unsigned i,j;
-  double* ps;
-  double tmp1,tmp2;
 
   // Copy the L2 norm values to core to avoid disk random access later on
   memcpy(sNorm, l2normTable, dbVectors*sizeof(double));
   double* qnPtr = qNorm;
   double* snPtr = sNorm;
+
+  double *sPower = 0, *qPower = 0;
+  double *spPtr = 0, *qpPtr = 0;
+
+  if (usingPower) {
+    if (!(dbH->flags & O2_FLAG_POWER)) {
+      error("database not power-enabled", dbName);
+    }
+    sPower = new double[dbVectors];
+    spPtr = sPower;
+    memcpy(sPower, powerTable, dbVectors * sizeof(double));
+  }
+
   for(i=0; i<dbH->numFiles; i++){
-    if(trackTable[i]>=sequenceLength){
-      tmp1=*snPtr;
-      j=1;
-      w=sequenceLength-1;
-      while(w--)
-	*snPtr+=snPtr[j++];
-      ps = snPtr+1;
-      w=trackTable[i]-sequenceLength; // +1 - 1
-      while(w--){
-	tmp2=*ps;
-	*ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
-	tmp1=tmp2;
-	ps++;
-      }
-      ps = snPtr;
-      w=trackTable[i]-sequenceLength+1;
-      while(w--){
-	*ps=sqrt(*ps);
-	ps++;
+    if(trackTable[i]>=sequenceLength) {
+      sequence_sum(snPtr, trackTable[i], sequenceLength);
+      sequence_sqrt(snPtr, trackTable[i], sequenceLength);
+
+      if (usingPower) {
+	sequence_sum(spPtr, trackTable[i], sequenceLength);
+        sequence_average(spPtr, trackTable[i], sequenceLength);
       }
     }
-    snPtr+=trackTable[i];
+    snPtr += trackTable[i];
+    if (usingPower) {
+      spPtr += trackTable[i];
+    }
   }
   
-  double* pn = sMeanL2;
-  w=dbH->numFiles;
-  while(w--)
-    *pn++=0.0;
-  ps=sNorm;
-  unsigned processedTracks=0;
-  for(i=0; i<dbH->numFiles; i++){
-    if(trackTable[i]>sequenceLength-1){
-      w = trackTable[i]-sequenceLength+1;
-      pn = sMeanL2+i;
-      *pn=0;
-      while(w--)
-	if(*ps>0)
-	  *pn+=*ps++;
-      *pn/=trackTable[i]-sequenceLength+1;
-      SILENCE_THRESH+=*pn;
-      processedTracks++;
+  sequence_sum(qnPtr, numVectors, sequenceLength);
+  sequence_sqrt(qnPtr, numVectors, sequenceLength);
+
+  if (usingPower) {
+    qPower = new double[numVectors];
+    qpPtr = qPower;
+    if (lseek(powerfd, sizeof(int), SEEK_SET) == (off_t) -1) {
+      error("error seeking to data", powerFileName, "lseek");
     }
-    ps = sNorm + trackTable[i];
+    int count = read(powerfd, qPower, numVectors * sizeof(double));
+    if (count == -1) {
+      error("error reading data", powerFileName, "read");
+    }
+    if ((unsigned) count != numVectors * sizeof(double)) {
+      error("short read", powerFileName);
+    }
+
+    sequence_sum(qpPtr, numVectors, sequenceLength);
+    sequence_average(qpPtr, numVectors, sequenceLength);
   }
-  if(verbosity>1) {
-    cerr << "processedTracks: " << processedTracks << endl;
-  }
-    
-  SILENCE_THRESH/=processedTracks;
-  USE_THRESH=1; // Turn thresholding on
-  DIFF_THRESH=SILENCE_THRESH; //  mean shingle power
-  SILENCE_THRESH/=5; // 20% of the mean shingle power is SILENCE
-  if(verbosity>4) {
-    cerr << "silence thresh: " << SILENCE_THRESH;
-  }
-  w=sequenceLength-1;
-  i=1;
-  tmp1=*qnPtr;
-  while(w--)
-    *qnPtr+=qnPtr[i++];
-  ps = qnPtr+1;
-  w=numVectors-sequenceLength; // +1 -1
-  while(w--){
-    tmp2=*ps;
-    *ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
-    tmp1=tmp2;
-    ps++;
-  }
-  ps = qnPtr;
-  qMeanL2 = 0;
-  w=numVectors-sequenceLength+1;
-  while(w--){
-    *ps=sqrt(*ps);
-    qMeanL2+=*ps++;
-  }
-  qMeanL2 /= numVectors-sequenceLength+1;
 
   if(verbosity>1) {
     cerr << "done." << endl;
@@ -1662,8 +1828,11 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
       if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
       }
-      query=query+queryPoint*dbH->dim;
-      qnPtr=qnPtr+queryPoint;
+      query = query + queryPoint * dbH->dim;
+      qnPtr = qnPtr + queryPoint;
+      if (usingPower) {
+        qpPtr = qpPtr + queryPoint;
+      }
       numVectors=wL;
     }
   
@@ -1676,7 +1845,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   assert(DD);
 
   gettimeofday(&tv1, NULL); 
-  processedTracks=0;
+  unsigned processedTracks = 0;
   unsigned successfulTracks=0;
 
   double* qp;
@@ -1794,7 +1963,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qnPtr[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
-	    if(verbosity>10) {
+	    if(verbosity>9) {
 	      cerr << thisDist << " " << qnPtr[j] << " " << sNorm[trackIndexOffset+k] << endl;
             }
 	    // Gather chi^2 statistics
@@ -1810,14 +1979,11 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
 	    // diffL2 = fabs(qnPtr[j] - sNorm[trackIndexOffset+k]);
 	    // Power test
-	    if(!USE_THRESH || 
-	       // Threshold on mean L2 of Q and S sequences
-	       (USE_THRESH && qnPtr[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
-		// Are both query and target windows above mean energy?
-		(qnPtr[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
-	      thisDist=thisDist; // Computed above
-	    else
-	      thisDist=1000000.0;
+	    if (usingPower) {
+	      if (!(powers_acceptable(qpPtr[j], sPower[trackIndexOffset + k]))) {
+		thisDist = 1000000.0;
+	      }
+	    }
 
 	    // k-NN match algorithm
 	    m=pointNN;
@@ -1934,7 +2100,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     }
   }
 
-
   // Clean up
   if(trackOffsetTable)
     delete[] trackOffsetTable;
@@ -1944,8 +2109,10 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     delete[] qNorm;
   if(sNorm)
     delete[] sNorm;
-  if(sMeanL2)
-    delete[] sMeanL2;
+  if(qPower)
+    delete[] qPower;
+  if(sPower) 
+    delete[] sPower;
   if(D)
     delete[] D;
   if(DD)
@@ -1954,8 +2121,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     delete[] timesdata;
   if(meanDBdur)
     delete[] meanDBdur;
-
-
 }
 
 // Radius search between query and target tracks
@@ -1972,13 +2137,6 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   double* query = (double*)(indata+sizeof(int));
   double* queryCopy = 0;
 
-  double qMeanL2;
-  double* sMeanL2;
-
-  unsigned USE_THRESH=0;
-  double SILENCE_THRESH=0;
-  double DIFF_THRESH=0;
-
   if(!(dbH->flags & O2_FLAG_L2NORM) )
     error("Database must be L2 normed for sequence query","use -l2norm");
   
@@ -1992,98 +2150,66 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   memcpy(queryCopy, query, numVectors*dbH->dim*sizeof(double));
   qNorm = new double[numVectors];
   sNorm = new double[dbVectors];
-  sMeanL2=new double[dbH->numFiles];
-  assert(qNorm&&sNorm&&queryCopy&&sMeanL2&&sequenceLength);    
+  assert(qNorm&&sNorm&&queryCopy&&sequenceLength);    
   unitNorm(queryCopy, dbH->dim, numVectors, qNorm);
   query = queryCopy;
 
   // Make norm measurements relative to sequenceLength
   unsigned w = sequenceLength-1;
   unsigned i,j;
-  double* ps;
-  double tmp1,tmp2;
 
   // Copy the L2 norm values to core to avoid disk random access later on
   memcpy(sNorm, l2normTable, dbVectors*sizeof(double));
   double* snPtr = sNorm;
   double* qnPtr = qNorm;
+
+  double *sPower = 0, *qPower = 0;
+  double *spPtr = 0, *qpPtr = 0;
+
+  if (usingPower) {
+    if(!(dbH->flags & O2_FLAG_POWER)) {
+      error("database not power-enabled", dbName);
+    }
+    sPower = new double[dbVectors];
+    spPtr = sPower;
+    memcpy(sPower, powerTable, dbVectors * sizeof(double));
+  }
+
   for(i=0; i<dbH->numFiles; i++){
-    if(trackTable[i]>=sequenceLength){
-      tmp1=*snPtr;
-      j=1;
-      w=sequenceLength-1;
-      while(w--)
-	*snPtr+=snPtr[j++];
-      ps = snPtr+1;
-      w=trackTable[i]-sequenceLength; // +1 - 1
-      while(w--){
-	tmp2=*ps;
-	*ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
-	tmp1=tmp2;
-	ps++;
-      }
-      ps = snPtr;
-      w=trackTable[i]-sequenceLength+1;
-      while(w--){
-	*ps=sqrt(*ps);
-	ps++;
+    if(trackTable[i]>=sequenceLength) {
+      sequence_sum(snPtr, trackTable[i], sequenceLength);
+      sequence_sqrt(snPtr, trackTable[i], sequenceLength);
+      if (usingPower) {
+        sequence_sum(spPtr, trackTable[i], sequenceLength);
+        sequence_average(spPtr, trackTable[i], sequenceLength);
       }
     }
-    snPtr+=trackTable[i];
+    snPtr += trackTable[i];
+    if (usingPower) {
+      spPtr += trackTable[i];
+    }
   }
   
-  double* pn = sMeanL2;
-  w=dbH->numFiles;
-  while(w--)
-    *pn++=0.0;
-  ps=sNorm;
-  unsigned processedTracks=0;
-  for(i=0; i<dbH->numFiles; i++){
-    if(trackTable[i]>sequenceLength-1){
-      w = trackTable[i]-sequenceLength+1;
-      pn = sMeanL2+i;
-      *pn=0;
-      while(w--)
-	if(*ps>0)
-	  *pn+=*ps++;
-      *pn/=trackTable[i]-sequenceLength+1;
-      SILENCE_THRESH+=*pn;
-      processedTracks++;
+  sequence_sum(qnPtr, numVectors, sequenceLength);
+  sequence_sqrt(qnPtr, numVectors, sequenceLength);
+
+  if (usingPower) {
+    qPower = new double[numVectors];
+    qpPtr = qPower;
+    if (lseek(powerfd, sizeof(int), SEEK_SET) == (off_t) -1) {
+      error("error seeking to data", powerFileName, "lseek");
     }
-    ps = sNorm + trackTable[i];
+    int count = read(powerfd, qPower, numVectors * sizeof(double));
+    if (count == -1) {
+      error("error reading data", powerFileName, "read");
+    }
+    if ((unsigned) count != numVectors * sizeof(double)) {
+      error("short read", powerFileName);
+    }
+
+    sequence_sum(qpPtr, numVectors, sequenceLength);
+    sequence_average(qpPtr, numVectors, sequenceLength);
   }
-  if(verbosity>1) {
-    cerr << "processedTracks: " << processedTracks << endl;
-  }
-    
-  SILENCE_THRESH/=processedTracks;
-  USE_THRESH=1; // Turn thresholding on
-  DIFF_THRESH=SILENCE_THRESH; //  mean shingle power
-  SILENCE_THRESH/=5; // 20% of the mean shingle power is SILENCE
-  if(verbosity>4) {
-    cerr << "silence thresh: " << SILENCE_THRESH;
-  }
-  w=sequenceLength-1;
-  i=1;
-  tmp1=*qnPtr;
-  while(w--)
-    *qnPtr+=qnPtr[i++];
-  ps = qnPtr+1;
-  w=numVectors-sequenceLength; // +1 -1
-  while(w--){
-    tmp2=*ps;
-    *ps=*(ps-1)-tmp1+*(ps+sequenceLength-1);
-    tmp1=tmp2;
-    ps++;
-  }
-  ps = qnPtr;
-  qMeanL2 = 0;
-  w=numVectors-sequenceLength+1;
-  while(w--){
-    *ps=sqrt(*ps);
-    qMeanL2+=*ps++;
-  }
-  qMeanL2 /= numVectors-sequenceLength+1;
 
   if(verbosity>1) {
     cerr << "done." << endl;    
@@ -2166,8 +2292,11 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
       if(verbosity>1) {
 	cerr << "query point: " << queryPoint << endl; cerr.flush();
       }
-      query=query+queryPoint*dbH->dim;
-      qnPtr=qnPtr+queryPoint;
+      query = query + queryPoint*dbH->dim;
+      qnPtr = qnPtr + queryPoint;
+      if (usingPower) {
+        qpPtr = qpPtr + queryPoint;
+      }
       numVectors=wL;
     }
   
@@ -2180,7 +2309,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   assert(DD);
 
   gettimeofday(&tv1, NULL); 
-  processedTracks=0;
+  unsigned processedTracks = 0;
   unsigned successfulTracks=0;
 
   double* qp;
@@ -2298,7 +2427,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	for(j=0;j<=numVectors-wL;j+=HOP_SIZE)
 	  for(k=0;k<=trackTable[track]-wL;k+=HOP_SIZE){
 	    thisDist=2-(2/(qnPtr[j]*sNorm[trackIndexOffset+k]))*DD[j][k];
-	    if(verbosity>10) {
+	    if(verbosity>9) {
 	      cerr << thisDist << " " << qnPtr[j] << " " << sNorm[trackIndexOffset+k] << endl;
             }
 	    // Gather chi^2 statistics
@@ -2314,14 +2443,12 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 
 	    // diffL2 = fabs(qnPtr[j] - sNorm[trackIndexOffset+k]);
 	    // Power test
-	    if(!USE_THRESH || 
-	       // Threshold on mean L2 of Q and S sequences
-	       (USE_THRESH && qnPtr[j]>SILENCE_THRESH && sNorm[trackIndexOffset+k]>SILENCE_THRESH && 
-		// Are both query and target windows above mean energy?
-		(qnPtr[j]>qMeanL2*.25 && sNorm[trackIndexOffset+k]>sMeanL2[track]*.25))) // &&  diffL2 < DIFF_THRESH )))
-	      thisDist=thisDist; // Computed above
-	    else
-	      thisDist=1000000.0;
+            if (usingPower) {
+              if (!(powers_acceptable(qpPtr[j], sPower[trackIndexOffset + k]))) {
+                thisDist = 1000000.0;
+              }
+            }
+
 	    if(thisDist>=0 && thisDist<=radius){
 	      distances[0]++; // increment count
 	      break; // only need one track point per query point
@@ -2424,8 +2551,10 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     delete[] qNorm;
   if(sNorm)
     delete[] sNorm;
-  if(sMeanL2)
-    delete[] sMeanL2;
+  if(qPower)
+    delete[] qPower;
+  if(sPower) 
+    delete[] sPower;
   if(D)
     delete[] D;
   if(DD)
@@ -2434,8 +2563,6 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     delete[] timesdata;
   if(meanDBdur)
     delete[] meanDBdur;
-
-
 }
 
 // Unit norm block of features
@@ -2645,7 +2772,73 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
   }
 }
 
+int adb__sequenceQuery(struct soap* soap, xsd__string dbName, xsd__string qKey,
+		       adb__sequenceQueryParms *parms,
+		       adb__queryResponse &adbQueryResponse) {
+
+  char qPosStr[256];
+  char pointNNStr[256];
+  char trackNNStr[256];
+  char seqLenStr[256];
+  char relative_thresholdStr[256];
+  char absolute_thresholdStr[256];
+
+  /* When the branch is merged, move this to a header and use it
+     elsewhere */
+#define INTSTRINGIFY(val, str) \
+  snprintf(str, 256, "%d", val);
+#define DOUBLESTRINGIFY(val, str) \
+  snprintf(str, 256, "%f", val);
+
+  INTSTRINGIFY(parms->qPos, qPosStr);
+  INTSTRINGIFY(parms->pointNN, pointNNStr);
+  INTSTRINGIFY(parms->segNN, trackNNStr);
+  /* FIXME: decide which of segLen and seqLen should live */
+  INTSTRINGIFY(parms->segLen, seqLenStr);
+
+  DOUBLESTRINGIFY(parms->relative_threshold, relative_thresholdStr);
+  DOUBLESTRINGIFY(parms->absolute_threshold, absolute_thresholdStr);
+  
+  const char *argv[] = {
+    "./audioDB",
+    COM_QUERY,
+    "sequence",
+    COM_DATABASE,
+    dbName, 
+    COM_FEATURES,
+    qKey,
+    COM_KEYLIST,
+    /* FIXME: when this branch is merged, use ENSURE_STRING */
+    parms->keyList==0?"":parms->keyList,
+    COM_TIMES,
+    parms->timesFileName==0?"":parms->timesFileName,
+    COM_QUERYPOWER,
+    parms->powerFileName==0?"":parms->powerFileName,
+    COM_QPOINT, 
+    qPosStr,
+    COM_POINTNN,
+    pointNNStr,
+    COM_TRACKNN,
+    trackNNStr,
+    COM_SEQLEN,
+    seqLenStr,
+    COM_RELATIVE_THRESH,
+    relative_thresholdStr,
+    COM_ABSOLUTE_THRESH,
+    absolute_thresholdStr
+  };
+
+  const unsigned argc = 25;
+
+  try {
+    audioDB(argc, (char* const*)argv, &adbQueryResponse);
+    return SOAP_OK;
+  } catch (char *err) {
+    soap_receiver_fault(soap, err, "");
+    return SOAP_FAULT;
+  }
+}
+
 int main(const unsigned argc, char* const argv[]){
   audioDB(argc, argv);
 }
-

@@ -14,17 +14,20 @@ option "STATUS" S "output database information to stdout." dependon="database" o
 option "DUMP"   D "output all entries: index key size." dependon="database" optional
 option "output" - "output directory" string dependon="DUMP" default="audioDB.dump" optional
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
+option "POWER"  P "turn on power flag for database." dependon="database" optional
 
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
 option "INSERT"      I "add feature vectors to an existing database." dependon="features" optional
 option "UPDATE"      U "replace inserted vectors associated with key with new input vectors." dependon="features" dependon="key" dependon="database" optional hidden
 option "features" f "binary series of vectors file {int sz:ieee double[][sz]:eof}." string typestr="filename" dependon="database" optional
 option "times"    t "list of time points (ascii) for feature vectors." string typestr="filename" dependon="features" optional
+option "power"    w "binary power feature file." string typestr="filename" dependon="database" optional
 option "key"      k "unique identifier associated with features." string typestr="identifier" dependon="features" optional
 text ""
 option "BATCHINSERT" B "add feature vectors named in a --featureList file (with optional keys in a --keyList file) to the named database." dependon="featureList" optional
 option "featureList" F "text file containing list of binary feature vector files to process, one per track" string typestr="filename" dependon="database" optional
 option "timesList"   T "text file containing list of ascii --times for each --features file in --featureList." string typestr="filename" dependon="featureList" optional
+option "powerList"   W "text file containing list of binary power feature file." string typestr="filename" dependon="database" optional
 option "keyList"     K "text file containing list of unique identifiers associated with --features." string typestr="filename" optional
 
 
@@ -40,6 +43,8 @@ option "rotate"       o "rotate query vectors for rotationally invariant search.
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional
 option "sequencelength" l "length of sequences for sequence search." int typestr="length" default="16" dependon="QUERY" optional
 option "sequencehop"  h "hop size of sequence window for sequence search." int typestr="hop" default="1" dependon="QUERY" optional
+option "absolute-threshold" - "absolute power threshold for consideration of query or target sequence (in Bels)" double dependon="QUERY" optional
+option "relative-threshold" - "relative power threshold between query and target sequence (in Bels)" double dependon="QUERY" optional
 
 section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
 option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
@@ -47,5 +52,3 @@ option "client" c "run as a client using named host service." string typestr="ho
 
 
 text "\nCopyright (C) 2007 Michael Casey, Goldsmiths, University of London\n"
-
-

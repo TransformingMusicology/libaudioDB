@@ -27,6 +27,7 @@
 #define COM_QUERY "--QUERY"
 #define COM_STATUS "--STATUS"
 #define COM_L2NORM "--L2NORM"
+#define COM_POWER "--POWER"
 #define COM_DUMP "--DUMP"
 #define COM_SERVER "--SERVER"
 
@@ -43,10 +44,13 @@
 #define COM_QUERYKEY "--key"
 #define COM_KEYLIST "--keyList"
 #define COM_TIMES "--times"
+#define COM_QUERYPOWER "--power"
+#define COM_RELATIVE_THRESH "--relative-threshold"
+#define COM_ABSOLUTE_THRESH "--absolute-threshold"
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
-#define O2_FORMAT_VERSION (0U)
+#define O2_FORMAT_VERSION (1U)
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
@@ -67,6 +71,7 @@
 // Flags
 #define O2_FLAG_L2NORM (0x1U)
 #define O2_FLAG_MINMAX (0x2U)
+#define O2_FLAG_POWER (0x4U)
 #define O2_FLAG_TIMES (0x20U)
 
 // Query types
@@ -106,6 +111,7 @@ typedef struct dbTableHeader{
   uint32_t dataOffset;
   uint32_t l2normTableOffset;
   uint32_t timesTableOffset;
+  uint32_t powerTableOffset;
   uint32_t dbSize;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
@@ -125,6 +131,9 @@ class audioDB{
   const char *output;
   const char *timesFileName;
   ifstream *timesFile;
+  const char *powerFileName;
+  ifstream *powerFile;
+  int powerfd;
 
   int dbfid;
   int infid;
@@ -141,6 +150,7 @@ class audioDB{
   double* qNorm;
   double* sNorm;
   double* timesTable;  
+  double* powerTable;
 
   // Flags and parameters
   unsigned verbosity;   // how much do we want to know?
@@ -153,11 +163,18 @@ class audioDB{
   unsigned queryPoint;
   unsigned usingQueryPoint;
   unsigned usingTimes;
+  unsigned usingPower;
   unsigned isClient;
   unsigned isServer;
   unsigned port;
   double timesTol;
   double radius;
+
+  bool use_absolute_threshold;
+  double absolute_threshold;
+  bool use_relative_threshold;
+  double relative_threshold;
+
   
   // Timers
   struct timeval tv1;
@@ -167,6 +184,10 @@ class audioDB{
   void error(const char* a, const char* b = "", const char *sysFunc = 0);
   void pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void sequence_sum(double *buffer, int length, int seqlen);
+  void sequence_sqrt(double *buffer, int length, int seqlen);
+  void sequence_average(double *buffer, int length, int seqlen);
+
   void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
 
@@ -176,6 +197,7 @@ class audioDB{
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
   void insertTimeStamps(unsigned n, ifstream* timesFile, double* timesdata);
+  void insertPowerData(unsigned n, int powerfd, double *powerdata);
   unsigned getKeyPos(char* key);
  public:
 
@@ -196,6 +218,8 @@ class audioDB{
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
+  void power_flag(const char *dbName);
+  bool powers_acceptable(double p1, double p2);
   void dump(const char* dbName);
 
   // web services
@@ -214,6 +238,9 @@ class audioDB{
   output(0), \
   timesFileName(0), \
   timesFile(0), \
+  powerFileName(0), \
+  powerFile(0), \
+  powerfd(0), \
   dbfid(0), \
   infid(0), \
   db(0), \
@@ -235,8 +262,13 @@ class audioDB{
   queryPoint(0), \
   usingQueryPoint(0), \
   usingTimes(0), \
+  usingPower(0), \
   isClient(0), \
   isServer(0), \
   port(0), \
   timesTol(0.1), \
-  radius(0)
+  radius(0), \
+  use_absolute_threshold(false), \
+  absolute_threshold(0.0), \
+  use_relative_threshold(false), \
+  relative_threshold(0.0)
