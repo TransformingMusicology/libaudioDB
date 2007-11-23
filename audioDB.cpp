@@ -395,7 +395,7 @@ void audioDB::get_lock(int fd, bool exclusive) {
   do {
     status = fcntl(fd, F_SETLKW, &lock);
   } while (status != 0 && errno == EINTR);
-
+  
   if (status) {
     if (errno == EAGAIN) {
       sleep(1);
@@ -430,7 +430,8 @@ void audioDB::release_lock(int fd) {
    * trackTable: Maps implicit feature index to a feature vector
    matrix (sizes of tracks)
    * featureTable: Lots of doubles;
-   * timesTable: time points for each feature vector;
+   * timesTable: (start,end) time points for each feature vector;
+   * powerTable: associated power for each feature vector;
    * l2normTable: squared l2norms for each feature vector.
 */
 void audioDB::create(const char* dbName){
@@ -459,7 +460,7 @@ void audioDB::create(const char* dbName){
   dbH->dataOffset = ALIGN_PAGE_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles);
   dbH->l2normTableOffset = ALIGN_PAGE_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
   dbH->powerTableOffset = ALIGN_PAGE_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
-  dbH->timesTableOffset = ALIGN_PAGE_DOWN(dbH->powerTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
+  dbH->timesTableOffset = ALIGN_PAGE_DOWN(dbH->powerTableOffset - 2*maxfiles*O2_MEANNUMVECTORS*sizeof(double));
   dbH->dbSize = size;
 
   write(dbfid, dbH, O2_HEADERSIZE);
@@ -533,7 +534,7 @@ void audioDB::initDBHeader(const char* dbName) {
       fileTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLESIZE);
       trackTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_TRACKTABLESIZE);
       dataBufLength = ALIGN_PAGE_UP(dbH->length);
-      timesTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+      timesTableLength = ALIGN_PAGE_UP(2*(dbH->length / dbH->dim));
       powerTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
       l2normTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
     }
@@ -656,16 +657,18 @@ void audioDB::insert(const char* dbName, const char* inFile) {
   off_t insertoffset = dbH->length;// Store current state
 
   // Check times status and insert times from file
-  unsigned timesoffset=insertoffset/(dbH->dim*sizeof(double));
-  double* timesdata=timesTable+timesoffset;
+  unsigned indexoffset = insertoffset/(dbH->dim*sizeof(double));
+  double *timesdata = timesTable + 2*indexoffset;
 
-  if(timesoffset + numVectors > timesTableLength) {
+  if(2*(indexoffset + numVectors) > timesTableLength) {
     error("out of space for times", key);
   }
-    
-  insertTimeStamps(numVectors, timesFile, timesdata);
+  
+  if (usingTimes) {
+    insertTimeStamps(numVectors, timesFile, timesdata);
+  }
 
-  double *powerdata = powerTable + timesoffset;
+  double *powerdata = powerTable + indexoffset;
   insertPowerData(numVectors, powerfd, powerdata);
 
   // Increment file count
@@ -675,7 +678,7 @@ void audioDB::insert(const char* dbName, const char* inFile) {
   dbH->length+=(statbuf.st_size-sizeof(int));
 
   // Update track to file index map
-  memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
+  memcpy(trackTable + dbH->numFiles - 1, &numVectors, sizeof(unsigned));  
 
   insert_data_vectors(insertoffset, indata + sizeof(int), statbuf.st_size - sizeof(int));
   
@@ -698,57 +701,46 @@ void audioDB::insert(const char* dbName, const char* inFile) {
   close(infid);
 }
 
-void audioDB::insertTimeStamps(unsigned numVectors, ifstream* timesFile, double* timesdata){
-  unsigned numtimes=0;
- if(usingTimes){
-   if(!(dbH->flags & O2_FLAG_TIMES) && !dbH->numFiles)
-     dbH->flags=dbH->flags|O2_FLAG_TIMES;
-   else if(!(dbH->flags&O2_FLAG_TIMES)){
-     cerr << "Warning: timestamp file used with non time-stamped database: ignoring timestamps" << endl;
-     usingTimes=0;
-   }
-   
-   if(!timesFile->is_open()){
-     if(dbH->flags & O2_FLAG_TIMES){
-       munmap(indata,statbuf.st_size);
-       munmap(db,dbH->dbSize);
-       error("problem opening times file on timestamped database",timesFileName);
-     }
-     else{
-       cerr << "Warning: problem opening times file. But non-timestamped database, so ignoring times file." << endl;
-       usingTimes=0;
-     }      
-   }
+void audioDB::insertTimeStamps(unsigned numVectors, ifstream *timesFile, double *timesdata) {
+  assert(usingTimes);
 
-    // Process time file
-   if(usingTimes){
-     do{
-       *timesFile>>*timesdata++;
-       if(timesFile->eof())
-	 break;
-       numtimes++;
-     }while(!timesFile->eof() && numtimes<numVectors);
-     if(!timesFile->eof()){
-	double dummy;
-	do{
-	  *timesFile>>dummy;
-	  if(timesFile->eof())
-	    break;
-	  numtimes++;
-	}while(!timesFile->eof());
-     }
-     if(numtimes<numVectors || numtimes>numVectors+2){
-       munmap(indata,statbuf.st_size);
-       munmap(db,dbH->dbSize);
-       close(infid);
-       cerr << "expected " << numVectors << " found " << numtimes << endl;
-       error("Times file is incorrect length for features file",inFile);
-     }
-     if(verbosity>2) {
-       cerr << "numtimes: " << numtimes << endl;
-     }
-   }
- }
+  unsigned numtimes = 0;
+
+  if(!(dbH->flags & O2_FLAG_TIMES) && !dbH->numFiles) {
+    dbH->flags=dbH->flags|O2_FLAG_TIMES;
+  } else if(!(dbH->flags & O2_FLAG_TIMES)) {
+    error("Timestamp file used with non-timestamped database", timesFileName);
+  }
+   
+  if(!timesFile->is_open()) {
+    error("problem opening times file on timestamped database", timesFileName);
+  }
+
+  double timepoint, next;
+  *timesFile >> timepoint;
+  if (timesFile->eof()) {
+    error("no entries in times file", timesFileName);
+  }
+  numtimes++;
+  do {
+    *timesFile >> next;
+    if (timesFile->eof()) {
+      break;
+    }
+    numtimes++;
+    timesdata[0] = timepoint;
+    timepoint = (timesdata[1] = next);
+    timesdata += 2;
+  } while (numtimes < numVectors + 1);
+
+  if (numtimes < numVectors + 1) {
+    error("too few timepoints in times file", timesFileName);
+  }
+
+  *timesFile >> next;
+  if (!timesFile->eof()) {
+    error("too many timepoints in times file", timesFileName);
+  }
 }
 
 void audioDB::insertPowerData(unsigned numVectors, int powerfd, double *powerdata) {
@@ -852,18 +844,20 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
       }
       else{
 	if(usingTimes){
-	  if(timesFile->eof())
-	    error("not enough timestamp files in timesList");
-	  thisTimesFile=new ifstream(thisTimesFileName,ios::in);
-	  if(!thisTimesFile->is_open())
-	    error("Cannot open timestamp file",thisTimesFileName);
-	  off_t insertoffset=dbH->length;
-	  unsigned timesoffset=insertoffset/(dbH->dim*sizeof(double));
-	  double* timesdata=timesTable+timesoffset;
-          if(timesoffset + numVectors > timesTableLength) {
+	  if(timesFile->eof()) {
+	    error("not enough timestamp files in timesList", timesFileName);
+	  }
+	  thisTimesFile = new ifstream(thisTimesFileName,ios::in);
+	  if(!thisTimesFile->is_open()) {
+	    error("Cannot open timestamp file", thisTimesFileName);
+	  }
+	  off_t insertoffset = dbH->length;
+	  unsigned indexoffset = insertoffset / (dbH->dim*sizeof(double));
+	  double *timesdata = timesTable + 2*indexoffset;
+          if(2*(indexoffset + numVectors) > timesTableLength) {
             error("out of space for times", key);
           }
-	  insertTimeStamps(numVectors,thisTimesFile,timesdata);
+	  insertTimeStamps(numVectors, thisTimesFile, timesdata);
 	  if(thisTimesFile)
 	    delete thisTimesFile;
 	}
@@ -1106,7 +1100,7 @@ void audioDB::dump(const char* dbName){
     fprintf(fLFile, "%s\n", fName);
     close(ffd);
 
-    if(times) {
+    if (times) {
       snprintf(fName, 256, "%05d.times", k);
       tFile = fopen(fName, "w");
       for(unsigned i = 0; i < trackTable[k]; i++) {
@@ -1116,8 +1110,10 @@ void audioDB::dump(const char* dbName){
         // vastly too many for most values of interest.  Moving to %a
         // here and scanf() in the timesFile reading might fix this.
         // -- CSR, 2007-10-19
-        fprintf(tFile, "%.16e\n", *(timesTable + pos + i));
+        fprintf(tFile, "%.16e\n", *(timesTable + 2*pos + 2*i));
       }
+      fprintf(tFile, "%.16e\n", *(timesTable + 2*pos + 2*trackTable[k]-1));
+
       fprintf(tLFile, "%s\n", fName);
     }
 
@@ -1292,8 +1288,9 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryRespo
 
   unsigned totalVecs=dbH->length/(dbH->dim*sizeof(double));
   double meanQdur = 0;
-  double* timesdata = 0;
-  double* dbdurs = 0;
+  double *timesdata = 0;
+  double *querydurs = 0;
+  double *dbdurs = 0;
 
   if(usingTimes && !(dbH->flags & O2_FLAG_TIMES)){
     cerr << "warning: ignoring query timestamps for non-timestamped database" << endl;
@@ -1304,19 +1301,20 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryRespo
     cerr << "warning: no timestamps given for query. Ignoring database timestamps." << endl;
   
   else if(usingTimes && (dbH->flags & O2_FLAG_TIMES)){
-    timesdata = new double[numVectors];
+    timesdata = new double[2*numVectors];
+    querydurs = new double[numVectors];
     insertTimeStamps(numVectors, timesFile, timesdata);
     // Calculate durations of points
     for(k=0; k<numVectors-1; k++){
-      timesdata[k]=timesdata[k+1]-timesdata[k];
-      meanQdur+=timesdata[k];
+      querydurs[k]=timesdata[2*k+1]-timesdata[2*k];
+      meanQdur+=querydurs[k];
     }
     meanQdur/=k;
     // Individual exhaustive timepoint durations
     dbdurs = new double[totalVecs];
-    for(k=0; k<totalVecs-1; k++)
-      dbdurs[k]=timesTable[k+1]-timesTable[k];
-    j--; // decrement vector counter by one
+    for(k=0; k<totalVecs-1; k++) {
+      dbdurs[k]=timesTable[2*k+1]-timesTable[2*k];
+    }
   }
 
   if(usingQueryPoint)
@@ -1343,7 +1341,7 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryRespo
 	thisDist+=*q++**data++;
       if(!usingTimes || 
 	 (usingTimes 
-	  && fabs(dbdurs[totalVecs-k-1]-timesdata[numVectors-j-1])<timesdata[numVectors-j-1]*timesTol)){
+	  && fabs(dbdurs[totalVecs-k-1]-querydurs[numVectors-j-1])<querydurs[numVectors-j-1]*timesTol)){
 	n=pointNN;
 	while(n--){
 	  if(thisDist>=distances[n]){
@@ -1428,7 +1426,9 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryRespo
   if(qNorm)
     delete qNorm;
   if(timesdata)
-    delete timesdata;
+    delete[] timesdata;
+  if(querydurs)
+    delete[] querydurs;
   if(dbdurs)
     delete dbdurs;
 }
@@ -1486,8 +1486,9 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   }
 
   double meanQdur = 0;
-  double* timesdata = 0;
-  double* meanDBdur = 0;
+  double *timesdata = 0;
+  double *querydurs = 0;
+  double *meanDBdur = 0;
   
   if(usingTimes && !(dbH->flags & O2_FLAG_TIMES)){
     cerr << "warning: ignoring query timestamps for non-timestamped database" << endl;
@@ -1498,19 +1499,21 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     cerr << "warning: no timestamps given for query. Ignoring database timestamps." << endl;
   
   else if(usingTimes && (dbH->flags & O2_FLAG_TIMES)){
-    timesdata = new double[numVectors];
+    timesdata = new double[2*numVectors];
+    querydurs = new double[numVectors];
     insertTimeStamps(numVectors, timesFile, timesdata);
     // Calculate durations of points
-    for(k=0; k<numVectors-1; k++){
-      timesdata[k]=timesdata[k+1]-timesdata[k];
-      meanQdur+=timesdata[k];
+    for(k=0; k<numVectors-1; k++) {
+      querydurs[k] = timesdata[2*k+1] - timesdata[2*k];
+      meanQdur += querydurs[k];
     }
     meanQdur/=k;
     meanDBdur = new double[dbH->numFiles];
     for(k=0; k<dbH->numFiles; k++){
       meanDBdur[k]=0.0;
-      for(j=0; j<trackTable[k]-1 ; j++)
-	meanDBdur[k]+=timesTable[j+1]-timesTable[j];
+      for(j=0; j<trackTable[k]-1 ; j++) {
+	meanDBdur[k]+=timesTable[2*j+1]-timesTable[2*j];
+      }
       meanDBdur[k]/=j;
     }
   }
@@ -1701,7 +1704,6 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     }
   }
     
-
   // Clean up
   if(trackOffsetTable)
     delete trackOffsetTable;
@@ -1710,10 +1712,11 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   if(qNorm)
     delete qNorm;
   if(timesdata)
-    delete timesdata;
+    delete[] timesdata;
+  if(querydurs)
+    delete[] querydurs;
   if(meanDBdur)
     delete meanDBdur;
-
 }
 
 // This is a common pattern in sequence queries: what we are doing is
@@ -1889,8 +1892,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
   // Timestamp and durations processing
   double meanQdur = 0;
-  double* timesdata = 0;
-  double* meanDBdur = 0;
+  double *timesdata = 0;
+  double *querydurs = 0;
+  double *meanDBdur = 0;
   
   if(usingTimes && !(dbH->flags & O2_FLAG_TIMES)){
     cerr << "warning: ignoring query timestamps for non-timestamped database" << endl;
@@ -1901,13 +1905,14 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     cerr << "warning: no timestamps given for query. Ignoring database timestamps." << endl;
   
   else if(usingTimes && (dbH->flags & O2_FLAG_TIMES)){
-    timesdata = new double[numVectors];
-    assert(timesdata);
+    timesdata = new double[2*numVectors];
+    querydurs = new double[numVectors];
+
     insertTimeStamps(numVectors, timesFile, timesdata);
     // Calculate durations of points
-    for(k=0; k<numVectors-1; k++){
-      timesdata[k]=timesdata[k+1]-timesdata[k];
-      meanQdur+=timesdata[k];
+    for(k=0; k<numVectors-1; k++) {
+      querydurs[k] = timesdata[2*k+1] - timesdata[2*k];
+      meanQdur += querydurs[k];
     }
     meanQdur/=k;
     if(verbosity>1) {
@@ -1917,8 +1922,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     assert(meanDBdur);
     for(k=0; k<dbH->numFiles; k++){
       meanDBdur[k]=0.0;
-      for(j=0; j<trackTable[k]-1 ; j++)
-	meanDBdur[k]+=timesTable[j+1]-timesTable[j];
+      for(j=0; j<trackTable[k]-1 ; j++) {
+	meanDBdur[k]+=timesTable[2*j+1]-timesTable[2*j];
+      }
       meanDBdur[k]/=j;
     }
   }
@@ -2246,6 +2252,8 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     delete[] DD;
   if(timesdata)
     delete[] timesdata;
+  if(querydurs)
+    delete[] querydurs;
   if(meanDBdur)
     delete[] meanDBdur;
 }
@@ -2378,8 +2386,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 
   // Timestamp and durations processing
   double meanQdur = 0;
-  double* timesdata = 0;
-  double* meanDBdur = 0;
+  double *timesdata = 0;
+  double *querydurs = 0;
+  double *meanDBdur = 0;
   
   if(usingTimes && !(dbH->flags & O2_FLAG_TIMES)){
     cerr << "warning: ignoring query timestamps for non-timestamped database" << endl;
@@ -2390,13 +2399,14 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     cerr << "warning: no timestamps given for query. Ignoring database timestamps." << endl;
   
   else if(usingTimes && (dbH->flags & O2_FLAG_TIMES)){
-    timesdata = new double[numVectors];
-    assert(timesdata);
+    timesdata = new double[2*numVectors];
+    querydurs = new double[numVectors];
+
     insertTimeStamps(numVectors, timesFile, timesdata);
     // Calculate durations of points
     for(k=0; k<numVectors-1; k++){
-      timesdata[k]=timesdata[k+1]-timesdata[k];
-      meanQdur+=timesdata[k];
+      querydurs[k] = timesdata[2*k+1] - timesdata[2*k];
+      meanQdur += querydurs[k];
     }
     meanQdur/=k;
     if(verbosity>1) {
@@ -2406,8 +2416,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     assert(meanDBdur);
     for(k=0; k<dbH->numFiles; k++){
       meanDBdur[k]=0.0;
-      for(j=0; j<trackTable[k]-1 ; j++)
-	meanDBdur[k]+=timesTable[j+1]-timesTable[j];
+      for(j=0; j<trackTable[k]-1 ; j++) {
+	meanDBdur[k]+=timesTable[2*j+1]-timesTable[2*j];
+      }
       meanDBdur[k]/=j;
     }
   }
@@ -2713,6 +2724,8 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     delete[] DD;
   if(timesdata)
     delete[] timesdata;
+  if(querydurs)
+    delete[] querydurs;
   if(meanDBdur)
     delete[] meanDBdur;
 }

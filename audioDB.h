@@ -50,7 +50,7 @@
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
-#define O2_FORMAT_VERSION (2U)
+#define O2_FORMAT_VERSION (3U)
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
