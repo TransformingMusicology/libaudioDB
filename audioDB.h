@@ -50,7 +50,7 @@
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
-#define O2_FORMAT_VERSION (1U)
+#define O2_FORMAT_VERSION (2U)
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
@@ -88,6 +88,9 @@
 #define ALIGN_UP(x,w) ((x) + ((1<<w)-1) & ~((1<<w)-1))
 #define ALIGN_DOWN(x,w) ((x) & ~((1<<w)-1))
 
+#define ALIGN_PAGE_UP(x) ((x) + (getpagesize()-1) & ~(getpagesize()-1))
+#define ALIGN_PAGE_DOWN(x) ((x) & ~(getpagesize()-1))
+
 #define ENSURE_STRING(x) ((x) ? (x) : "")
 
 using namespace std;
@@ -98,21 +101,14 @@ typedef struct dbTableHeader{
   uint32_t numFiles;
   uint32_t dim;
   uint32_t flags;
-  // FIXME: these lengths and offsets should be size_t or off_t, but
-  // that causes this header (and hence audioDB files) to be
-  // unportable between 32 and 64-bit architectures.  Making them
-  // uint32_t isn't the real answer, as it means we won't be able to
-  // scale to really large collections easily but it works around the
-  // problem.  Expanding to 64 bits will of course need a change in
-  // file format version.  -- CSR, 2007-10-05
-  uint32_t length;
-  uint32_t fileTableOffset;
-  uint32_t trackTableOffset;
-  uint32_t dataOffset;
-  uint32_t l2normTableOffset;
-  uint32_t timesTableOffset;
-  uint32_t powerTableOffset;
-  uint32_t dbSize;
+  off_t length;
+  off_t fileTableOffset;
+  off_t trackTableOffset;
+  off_t dataOffset;
+  off_t l2normTableOffset;
+  off_t timesTableOffset;
+  off_t powerTableOffset;
+  off_t dbSize;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
 
@@ -136,6 +132,7 @@ class audioDB{
   int powerfd;
 
   int dbfid;
+  bool forWrite;
   int infid;
   char* db;
   char* indata;
@@ -149,12 +146,19 @@ class audioDB{
   double* l2normTable;
   double* qNorm;
   double* sNorm;
-  double* timesTable;  
+  double* timesTable;
   double* powerTable;
+
+  size_t fileTableLength;
+  size_t trackTableLength;
+  off_t dataBufLength;
+  size_t timesTableLength;
+  size_t powerTableLength;
+  size_t l2normTableLength;
 
   // Flags and parameters
   unsigned verbosity;   // how much do we want to know?
-  unsigned size; // given size (for creation)
+  off_t size; // given size (for creation)
   unsigned queryType; // point queries default
   unsigned pointNN;   // how many point NNs ?
   unsigned trackNN;   // how many track NNs ?
@@ -191,9 +195,9 @@ class audioDB{
   void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
 
-  void initDBHeader(const char *dbName, bool forWrite);
+  void initDBHeader(const char *dbName);
   void initInputFile(const char *inFile);
-  void initTables(const char* dbName, bool forWrite, const char* inFile);
+  void initTables(const char* dbName, const char* inFile);
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
   void insertTimeStamps(unsigned n, ifstream* timesFile, double* timesdata);
@@ -211,6 +215,8 @@ class audioDB{
   void release_lock(int fd);
   void create(const char* dbName);
   void drop();
+  bool enough_data_space_free(off_t size);
+  void insert_data_vectors(off_t offset, void *buffer, size_t size);
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
@@ -242,6 +248,7 @@ class audioDB{
   powerFile(0), \
   powerfd(0), \
   dbfid(0), \
+  forWrite(false), \
   infid(0), \
   db(0), \
   indata(0), \
@@ -252,6 +259,12 @@ class audioDB{
   l2normTable(0), \
   qNorm(0), \
   timesTable(0), \
+  fileTableLength(0), \
+  trackTableLength(0), \
+  dataBufLength(0), \
+  timesTableLength(0), \
+  powerTableLength(0), \
+  l2normTableLength(0), \
   verbosity(1), \
   size(O2_DEFAULTDBSIZE), \
   queryType(O2_POINT_QUERY), \

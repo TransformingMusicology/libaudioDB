@@ -113,7 +113,18 @@ void audioDB::cleanup() {
   if(indata)
     munmap(indata,statbuf.st_size);
   if(db)
-    munmap(db,dbH->dbSize);
+    munmap(db,getpagesize());
+  if(fileTable)
+    munmap(fileTable, fileTableLength);
+  if(trackTable)
+    munmap(trackTable, trackTableLength);
+  if(dataBuf)
+    munmap(dataBuf, dataBufLength);
+  if(timesTable)
+    munmap(timesTable, timesTableLength);
+  if(l2normTable)
+    munmap(l2normTable, l2normTableLength);
+
   if(dbfid>0)
     close(dbfid);
   if(infid>0)
@@ -156,10 +167,10 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   }
 
   if(args_info.size_given) {
-    if (args_info.size_arg < 50 || args_info.size_arg > 4000) {
+    if (args_info.size_arg < 50 || args_info.size_arg > 32000) {
       error("Size out of range", "");
     }
-    size = args_info.size_arg * 1000000;
+    size = (off_t) args_info.size_arg * 1000000;
   }
 
   if(args_info.radius_given){
@@ -427,21 +438,9 @@ void audioDB::create(const char* dbName){
     error("Can't create database file", dbName, "open");
   get_lock(dbfid, 1);
 
-  // go to the location corresponding to the last byte
-  if (lseek (dbfid, size - 1, SEEK_SET) == -1)
-    error("lseek error in db file", "", "lseek");
-
-  // write a dummy byte at the last location
-  if (write (dbfid, "", 1) != 1)
-    error("write error", "", "write");
-  
-  // mmap the output file
   if(verbosity) {
     cerr << "header size:" << O2_HEADERSIZE << endl;
   }
-  if ((db = (char*) mmap(0, size, PROT_READ | PROT_WRITE,
-			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for creating database", "", "mmap");
   
   dbH = new dbTableHeaderT();
   assert(dbH);
@@ -455,26 +454,34 @@ void audioDB::create(const char* dbName){
   dbH->dim = 0;
   dbH->flags = 0;
   dbH->length = 0;
-  dbH->fileTableOffset = ALIGN_UP(O2_HEADERSIZE, 8);
-  dbH->trackTableOffset = ALIGN_UP(dbH->fileTableOffset + O2_FILETABLESIZE*maxfiles, 8);
-  dbH->dataOffset = ALIGN_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles, 8);
-  dbH->l2normTableOffset = ALIGN_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
-  dbH->timesTableOffset = ALIGN_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
-  dbH->powerTableOffset = ALIGN_DOWN(dbH->timesTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double), 8);
+  dbH->fileTableOffset = ALIGN_PAGE_UP(O2_HEADERSIZE);
+  dbH->trackTableOffset = ALIGN_PAGE_UP(dbH->fileTableOffset + O2_FILETABLESIZE*maxfiles);
+  dbH->dataOffset = ALIGN_PAGE_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles);
+  dbH->l2normTableOffset = ALIGN_PAGE_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
+  dbH->powerTableOffset = ALIGN_PAGE_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
+  dbH->timesTableOffset = ALIGN_PAGE_DOWN(dbH->powerTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
   dbH->dbSize = size;
 
-  memcpy (db, dbH, O2_HEADERSIZE);
+  write(dbfid, dbH, O2_HEADERSIZE);
+
+  // go to the location corresponding to the last byte
+  if (lseek (dbfid, size - 1, SEEK_SET) == -1)
+    error("lseek error in db file", "", "lseek");
+
+  // write a dummy byte at the last location
+  if (write (dbfid, "", 1) != 1)
+    error("write error", "", "write");
+  
   if(verbosity) {
     cerr << COM_CREATE << " " << dbName << endl;
   }
 }
 
-
 void audioDB::drop(){
   // FIXME: drop something?  Should we even allow this?
 }
 
-void audioDB::initDBHeader(const char* dbName, bool forWrite) {
+void audioDB::initDBHeader(const char* dbName) {
   if ((dbfid = open(dbName, forWrite ? O_RDWR : O_RDONLY)) < 0) {
     error("Can't open database file", dbName, "open");
   }
@@ -503,18 +510,49 @@ void audioDB::initDBHeader(const char* dbName, bool forWrite) {
     error("database file has incorect version", dbName);
   }
 
-  // mmap the database file
-  if ((db = (char*) mmap(0, dbH->dbSize, PROT_READ | (forWrite ? PROT_WRITE : 0),
-			 MAP_SHARED, dbfid, 0)) == (caddr_t) -1)
-    error("mmap error for initting tables of database", "", "mmap");
+#define CHECKED_MMAP(type, var, start, length) \
+  { void *tmp = mmap(0, length, (PROT_READ | (forWrite ? PROT_WRITE : 0)), MAP_SHARED, dbfid, (start)); \
+    if(tmp == (void *) -1) { \
+      error("mmap error for db table", #var, "mmap"); \
+    } \
+    var = (type) tmp; \
+  }
+
+  CHECKED_MMAP(char *, db, 0, getpagesize());
 
   // Make some handy tables with correct types
-  fileTable = (char *) (db + dbH->fileTableOffset);
-  trackTable = (unsigned *) (db + dbH->trackTableOffset);
-  dataBuf = (double *) (db + dbH->dataOffset);
-  l2normTable = (double *) (db + dbH->l2normTableOffset);
-  timesTable = (double *) (db + dbH->timesTableOffset);
-  powerTable = (double *) (db + dbH->powerTableOffset);
+  if(forWrite || (dbH->length > 0)) {
+    if(forWrite) {
+      fileTableLength = dbH->trackTableOffset - dbH->fileTableOffset;
+      trackTableLength = dbH->dataOffset - dbH->trackTableOffset;
+      dataBufLength = dbH->timesTableOffset - dbH->dataOffset;
+      timesTableLength = dbH->powerTableOffset - dbH->timesTableOffset;
+      powerTableLength = dbH->l2normTableOffset - dbH->powerTableOffset;
+      l2normTableLength = dbH->dbSize - dbH->l2normTableOffset;
+    } else {
+      fileTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLESIZE);
+      trackTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_TRACKTABLESIZE);
+      dataBufLength = ALIGN_PAGE_UP(dbH->length);
+      timesTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+      powerTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+      l2normTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+    }
+    CHECKED_MMAP(char *, fileTable, dbH->fileTableOffset, fileTableLength);
+    CHECKED_MMAP(unsigned *, trackTable, dbH->trackTableOffset, trackTableLength);
+    /*
+     * No more mmap() for dataBuf
+     *
+     * FIXME: Actually we do do the mmap() in the two cases where it's
+     * still "needed": in pointQuery and in l2norm if dbH->length is
+     * non-zero.  Removing those cases too (and deleting the dataBuf
+     * variable completely) would be cool.  -- CSR, 2007-11-19
+     *
+     * CHECKED_MMAP(double *, dataBuf, dbH->dataOffset, dataBufLength);
+     */
+    CHECKED_MMAP(double *, timesTable, dbH->timesTableOffset, timesTableLength);
+    CHECKED_MMAP(double *, powerTable, dbH->powerTableOffset, powerTableLength);
+    CHECKED_MMAP(double *, l2normTable, dbH->l2normTableOffset, l2normTableLength);
+  }
 }
 
 void audioDB::initInputFile (const char *inFile) {
@@ -555,15 +593,23 @@ void audioDB::initInputFile (const char *inFile) {
   }
 }
 
-void audioDB::initTables(const char* dbName, bool forWrite, const char* inFile = 0) {
-  
-  initDBHeader(dbName, forWrite);
+void audioDB::initTables(const char* dbName, const char* inFile = 0) {
+  initDBHeader(dbName);
   initInputFile(inFile);
 }
 
-void audioDB::insert(const char* dbName, const char* inFile){
+bool audioDB::enough_data_space_free(off_t size) {
+  return(dbH->timesTableOffset > dbH->dataOffset + dbH->length + size);
+}
 
-  initTables(dbName, 1, inFile);
+void audioDB::insert_data_vectors(off_t offset, void *buffer, size_t size) {
+  lseek(dbfid, dbH->dataOffset + offset, SEEK_SET);
+  write(dbfid, buffer, size);
+}
+
+void audioDB::insert(const char* dbName, const char* inFile) {
+  forWrite = true;
+  initTables(dbName, inFile);
 
   if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
     error("Must use timestamps with timestamped database","use --times");
@@ -571,10 +617,10 @@ void audioDB::insert(const char* dbName, const char* inFile){
   if(!usingPower && (dbH->flags & O2_FLAG_POWER))
     error("Must use power with power-enabled database", dbName);
 
-  // Check that there is room for at least 1 more file
-  if((char*)timesTable<((char*)dataBuf+dbH->length+statbuf.st_size-sizeof(int)))
+  if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
     error("Insert failed: no more room in database", inFile);
-  
+  }
+
   if(!key)
     key=inFile;
   // Linear scan of filenames check for pre-existing feature
@@ -607,12 +653,16 @@ void audioDB::insert(const char* dbName, const char* inFile){
 
   strncpy(fileTable + dbH->numFiles*O2_FILETABLESIZE, key, strlen(key));
 
-  unsigned insertoffset = dbH->length;// Store current state
+  off_t insertoffset = dbH->length;// Store current state
 
   // Check times status and insert times from file
   unsigned timesoffset=insertoffset/(dbH->dim*sizeof(double));
   double* timesdata=timesTable+timesoffset;
-  assert(timesdata+numVectors<l2normTable);
+
+  if(timesoffset + numVectors > timesTableLength) {
+    error("out of space for times", key);
+  }
+    
   insertTimeStamps(numVectors, timesFile, timesdata);
 
   double *powerdata = powerTable + timesoffset;
@@ -624,19 +674,14 @@ void audioDB::insert(const char* dbName, const char* inFile){
   // Update Header information
   dbH->length+=(statbuf.st_size-sizeof(int));
 
-  // Copy the header back to the database
-  memcpy (db, dbH, sizeof(dbTableHeaderT));  
-
   // Update track to file index map
-  //memcpy (db+trackTableOffset+(dbH->numFiles-1)*sizeof(unsigned), &numVectors, sizeof(unsigned));  
   memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
 
-  // Update the feature database
-  memcpy (db+dbH->dataOffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
+  insert_data_vectors(insertoffset, indata + sizeof(int), statbuf.st_size - sizeof(int));
   
   // Norm the vectors on input if the database is already L2 normed
   if(dbH->flags & O2_FLAG_L2NORM)
-    unitNormAndInsertL2((double*)(db+dbH->dataOffset+insertoffset), dbH->dim, numVectors, 1); // append
+    unitNormAndInsertL2((double *)(indata + sizeof(int)), dbH->dim, numVectors, 1); // append
 
   // Report status
   status(dbName);
@@ -644,6 +689,9 @@ void audioDB::insert(const char* dbName, const char* inFile){
     cerr << COM_INSERT << " " << dbName << " " << numVectors << " vectors " 
 	 << (statbuf.st_size-sizeof(int)) << " bytes." << endl;
   }
+
+  // Copy the header back to the database
+  memcpy (db, dbH, sizeof(dbTableHeaderT));  
 
   // CLEAN UP
   munmap(indata,statbuf.st_size);
@@ -731,7 +779,8 @@ void audioDB::insertPowerData(unsigned numVectors, int powerfd, double *powerdat
 
 void audioDB::batchinsert(const char* dbName, const char* inFile) {
 
-  initDBHeader(dbName, true);
+  forWrite = true;
+  initDBHeader(dbName);
 
   if(!key)
     key=inFile;
@@ -774,9 +823,9 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 
     initInputFile(thisFile);
 
-    // Check that there is room for at least 1 more file
-    if((char*)timesTable<((char*)dataBuf+(dbH->length+statbuf.st_size-sizeof(int))))
+    if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
       error("batchinsert failed: no more room in database", thisFile);
+    }
     
     // Linear scan of filenames check for pre-existing feature
     unsigned alreadyInserted=0;
@@ -808,10 +857,12 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 	  thisTimesFile=new ifstream(thisTimesFileName,ios::in);
 	  if(!thisTimesFile->is_open())
 	    error("Cannot open timestamp file",thisTimesFileName);
-	  unsigned insertoffset=dbH->length;
+	  off_t insertoffset=dbH->length;
 	  unsigned timesoffset=insertoffset/(dbH->dim*sizeof(double));
 	  double* timesdata=timesTable+timesoffset;
-	  assert(timesdata+numVectors<l2normTable);
+          if(timesoffset + numVectors > timesTableLength) {
+            error("out of space for times", key);
+          }
 	  insertTimeStamps(numVectors,thisTimesFile,timesdata);
 	  if(thisTimesFile)
 	    delete thisTimesFile;
@@ -835,28 +886,27 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
         }
 	strncpy(fileTable + dbH->numFiles*O2_FILETABLESIZE, thisKey, strlen(thisKey));
   
-	unsigned insertoffset = dbH->length;// Store current state
+	off_t insertoffset = dbH->length;// Store current state
 
 	// Increment file count
 	dbH->numFiles++;  
   
 	// Update Header information
 	dbH->length+=(statbuf.st_size-sizeof(int));
-	// Copy the header back to the database
-	memcpy (db, dbH, sizeof(dbTableHeaderT));  
   
 	// Update track to file index map
-	//memcpy (db+trackTableOffset+(dbH->numFiles-1)*sizeof(unsigned), &numVectors, sizeof(unsigned));  
 	memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
 	
-	// Update the feature database
-	memcpy (db+dbH->dataOffset+insertoffset, indata+sizeof(int), statbuf.st_size-sizeof(int));
+	insert_data_vectors(insertoffset, indata + sizeof(int), statbuf.st_size - sizeof(int));
 	
 	// Norm the vectors on input if the database is already L2 normed
 	if(dbH->flags & O2_FLAG_L2NORM)
-	  unitNormAndInsertL2((double*)(db+dbH->dataOffset+insertoffset), dbH->dim, numVectors, 1); // append
+	  unitNormAndInsertL2((double *)(indata + sizeof(int)), dbH->dim, numVectors, 1); // append
 	
 	totalVectors+=numVectors;
+
+	// Copy the header back to the database
+	memcpy (db, dbH, sizeof(dbTableHeaderT));  
       }
     }
     // CLEAN UP
@@ -923,7 +973,7 @@ void audioDB::ws_query(const char*dbName, const char *trackKey, const char* host
 
 void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse){
   if(!dbH)
-    initTables(dbName, 0, 0);
+    initTables(dbName, 0);
 
   unsigned dudCount=0;
   unsigned nullCount=0;
@@ -962,7 +1012,7 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
 
 void audioDB::dump(const char* dbName){
   if(!dbH) {
-    initTables(dbName, 0, 0);
+    initTables(dbName, 0);
   }
 
   if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
@@ -1018,6 +1068,9 @@ void audioDB::dump(const char* dbName){
   int ffd, pfd;
   FILE *tFile;
   unsigned pos = 0;
+  lseek(dbfid, dbH->dataOffset, SEEK_SET);
+  double *data_buffer;
+  size_t data_buffer_size;
   for(unsigned k = 0; k < dbH->numFiles; k++) {
     fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLESIZE);
     snprintf(fName, 256, "%05d.features", k);
@@ -1027,10 +1080,29 @@ void audioDB::dump(const char* dbName){
     if ((write(ffd, &dbH->dim, sizeof(uint32_t))) < 0) {
       error("error writing dimensions", fName, "write");
     }
-      
-    if ((write(ffd, dataBuf + pos * dbH->dim, trackTable[k] * dbH->dim * sizeof(double))) < 0) {
+
+    /* FIXME: this repeated malloc()/free() of data buffers is
+       inefficient. */
+    data_buffer_size = trackTable[k] * dbH->dim * sizeof(double);
+
+    {
+      void *tmp = malloc(data_buffer_size);
+      if (tmp == NULL) {
+	error("error allocating data buffer");
+      }
+      data_buffer = (double *) tmp;
+    }
+
+    if ((read(dbfid, data_buffer, data_buffer_size)) != (ssize_t) data_buffer_size) {
+      error("error reading data", fName, "read");
+    }
+
+    if ((write(ffd, data_buffer, data_buffer_size)) < 0) {
       error("error writing data", fName, "write");
     }
+
+    free(data_buffer);
+
     fprintf(fLFile, "%s\n", fName);
     close(ffd);
 
@@ -1078,7 +1150,7 @@ void audioDB::dump(const char* dbName){
 \n\
 if [ -z \"${AUDIODB}\" ]; then echo set AUDIODB variable; exit 1; fi\n\
 if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
-\"${AUDIODB}\" -d \"$1\" -N --size=%d\n", dbH->dbSize / 1000000);
+\"${AUDIODB}\" -d \"$1\" -N --size=%d\n", (int) (dbH->dbSize / 1000000));
   if(dbH->flags & O2_FLAG_L2NORM) {
     fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
   }
@@ -1112,10 +1184,13 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
   status(dbName);
 }
 
-void audioDB::l2norm(const char* dbName){
-  initTables(dbName, true, 0);
+void audioDB::l2norm(const char* dbName) {
+  forWrite = true;
+  initTables(dbName, 0);
   if(dbH->length>0){
+    /* FIXME: should probably be uint64_t */
     unsigned numVectors = dbH->length/(sizeof(double)*dbH->dim);
+    CHECKED_MMAP(double *, dataBuf, dbH->dataOffset, dataBufLength);
     unitNormAndInsertL2(dataBuf, dbH->dim, numVectors, 0); // No append
   }
   // Update database flags
@@ -1124,7 +1199,8 @@ void audioDB::l2norm(const char* dbName){
 }
 
 void audioDB::power_flag(const char *dbName) {
-  initTables(dbName, true, 0);
+  forWrite = true;
+  initTables(dbName, 0);
   if (dbH->length > 0) {
     error("cannot turn on power storage for non-empty database", dbName);
   }
@@ -1146,7 +1222,6 @@ bool audioDB::powers_acceptable(double p1, double p2) {
   return true;
 }
 
-  
 void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){  
   switch(queryType){
   case O2_POINT_QUERY:
@@ -1177,15 +1252,16 @@ unsigned audioDB::getKeyPos(char* key){
 }
 
 // Basic point query engine
-void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
+void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse) {
   
-  initTables(dbName, 0, inFile);
+  initTables(dbName, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-    
+
   double* query = (double*)(indata+sizeof(int));
+  CHECKED_MMAP(double *, dataBuf, dbH->dataOffset, dataBufLength);
   double* data = dataBuf;
   double* queryCopy = 0;
 
@@ -1360,13 +1436,13 @@ void audioDB::pointQuery(const char* dbName, const char* inFile, adb__queryRespo
 // trackPointQuery  
 // return the trackNN closest tracks to the query track
 // uses average of pointNN points per track 
-void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){  
-  initTables(dbName, 0, inFile);
+void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse) {
+  initTables(dbName, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
   double* query = (double*)(indata+sizeof(int));
-  double* data = dataBuf;
+  double* data;
   double* queryCopy = 0;
 
   if( dbH->flags & O2_FLAG_L2NORM ){
@@ -1451,9 +1527,9 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
     }
   
   // build track offset table
-  unsigned *trackOffsetTable = new unsigned[dbH->numFiles];
+  off_t *trackOffsetTable = new off_t[dbH->numFiles];
   unsigned cumTrack=0;
-  unsigned trackIndexOffset;
+  off_t trackIndexOffset;
   for(k=0; k<dbH->numFiles;k++){
     trackOffsetTable[k]=cumTrack;
     cumTrack+=trackTable[k]*dbH->dim;
@@ -1462,18 +1538,29 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
   char nextKey[MAXSTR];
 
   gettimeofday(&tv1, NULL); 
+
+  size_t data_buffer_size = 0;
+  double *data_buffer = 0;
+  lseek(dbfid, dbH->dataOffset, SEEK_SET);
         
   for(processedTracks=0, track=0 ; processedTracks < dbH->numFiles ; track++, processedTracks++){
-    if(trackFile){
-      if(!trackFile->eof()){
-	trackFile->getline(nextKey,MAXSTR);
-	track=getKeyPos(nextKey);
-      }
-      else
+
+    trackOffset = trackOffsetTable[track];     // numDoubles offset
+
+    // get trackID from file if using a control file
+    if(trackFile) {
+      trackFile->getline(nextKey,MAXSTR);
+      if(!trackFile->eof()) {
+	track = getKeyPos(nextKey);
+        trackOffset = trackOffsetTable[track];
+        lseek(dbfid, dbH->dataOffset + trackOffset * sizeof(double), SEEK_SET);
+      } else {
 	break;
+      }
     }
-    trackOffset=trackOffsetTable[track];     // numDoubles offset
+
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
+
     if(verbosity>7) {
       cerr << track << "." << trackOffset/(dbH->dim) << "." << trackTable[track] << " | ";cerr.flush();
     }
@@ -1486,9 +1573,26 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
       j=1;
     else
       j=numVectors;
+
+    if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
+      if(data_buffer) {
+        free(data_buffer);
+      }
+      { 
+        data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
+        void *tmp = malloc(data_buffer_size);
+        if (tmp == NULL) {
+          error("error allocating data buffer");
+        }
+        data_buffer = (double *) tmp;
+      }
+    }
+
+    read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
+
     while(j--){
       k=trackTable[track];  // number of vectors in track
-      data=dataBuf+trackOffset; // data for track
+      data=data_buffer; // data for track
       while(k--){
 	thisDist=0;
 	l=dbH->dim;
@@ -1558,6 +1662,9 @@ void audioDB::trackPointQuery(const char* dbName, const char* inFile, adb__query
       sIndexes[k]=~0;    
     }
   } // tracks
+
+  free(data_buffer);
+
   gettimeofday(&tv2, NULL); 
 
   if(verbosity>1) {
@@ -1656,7 +1763,7 @@ void audioDB::sequence_average(double *buffer, int length, int seqlen) {
 // outputs distances of retrieved shingles, max retreived = pointNN shingles per per track
 void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
   
-  initTables(dbName, 0, inFile);
+  initTables(dbName, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
@@ -1848,9 +1955,9 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   double* dp;
 
   // build track offset table
-  unsigned *trackOffsetTable = new unsigned[dbH->numFiles];
+  off_t *trackOffsetTable = new off_t[dbH->numFiles];
   unsigned cumTrack=0;
-  unsigned trackIndexOffset;
+  off_t trackIndexOffset;
   for(k=0; k<dbH->numFiles;k++){
     trackOffsetTable[k]=cumTrack;
     cumTrack+=trackTable[k]*dbH->dim;
@@ -1866,19 +1973,26 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
   double maxSample = 0;
 
   // Track loop 
-  for(processedTracks=0, track=0 ; processedTracks < dbH->numFiles ; track++, processedTracks++){
+  size_t data_buffer_size = 0;
+  double *data_buffer = 0;
+  lseek(dbfid, dbH->dataOffset, SEEK_SET);
+
+  for(processedTracks=0, track=0 ; processedTracks < dbH->numFiles ; track++, processedTracks++) {
+
+    trackOffset = trackOffsetTable[track];     // numDoubles offset
 
     // get trackID from file if using a control file
-    if(trackFile){
-      if(!trackFile->eof()){
-	trackFile->getline(nextKey,MAXSTR);
-	track=getKeyPos(nextKey);
-      }
-      else
+    if(trackFile) {
+      trackFile->getline(nextKey,MAXSTR);
+      if(!trackFile->eof()) {
+	track = getKeyPos(nextKey);
+        trackOffset = trackOffsetTable[track];
+        lseek(dbfid, dbH->dataOffset + trackOffset * sizeof(double), SEEK_SET);
+      } else {
 	break;
+      }
     }
 
-    trackOffset=trackOffsetTable[track];     // numDoubles offset
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
     if(sequenceLength<=trackTable[track]){  // test for short sequences
@@ -1900,11 +2014,27 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	assert(DD[j]);
       }
 
+      if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
+	if(data_buffer) {
+	  free(data_buffer);
+	}
+	{ 
+	  data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
+	  void *tmp = malloc(data_buffer_size);
+	  if (tmp == NULL) {
+	    error("error allocating data buffer");
+	  }
+	  data_buffer = (double *) tmp;
+	}
+      }
+
+      read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
+
       // Dot product
       for(j=0; j<numVectors; j++)
 	for(k=0; k<trackTable[track]; k++){
 	  qp=query+j*dbH->dim;
-	  sp=dataBuf+trackOffset+k*dbH->dim;
+	  sp=data_buffer+k*dbH->dim;
 	  DD[j][k]=0.0; // Initialize matched filter array
 	  dp=&D[j][k];  // point to correlation cell j,k
 	  *dp=0.0;      // initialize correlation cell
@@ -2059,6 +2189,8 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
     }
   }
 
+  free(data_buffer);
+
   gettimeofday(&tv2,NULL);
   if(verbosity>1) {
     cerr << endl << "processed tracks :" << processedTracks << " matched tracks: " << successfulTracks << " elapsed time:" 
@@ -2124,7 +2256,7 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 // outputs count of retrieved shingles, max retreived = one shingle per query shingle per track
 void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse){
   
-  initTables(dbName, 0, inFile);
+  initTables(dbName, inFile);
   
   // For each input vector, find the closest pointNN matching output vectors and report
   // we use stdout in this stub version
@@ -2312,9 +2444,9 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   double* dp;
 
   // build track offset table
-  unsigned *trackOffsetTable = new unsigned[dbH->numFiles];
+  off_t *trackOffsetTable = new off_t[dbH->numFiles];
   unsigned cumTrack=0;
-  unsigned trackIndexOffset;
+  off_t trackIndexOffset;
   for(k=0; k<dbH->numFiles;k++){
     trackOffsetTable[k]=cumTrack;
     cumTrack+=trackTable[k]*dbH->dim;
@@ -2330,19 +2462,26 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
   double maxSample = 0;
 
   // Track loop 
+  size_t data_buffer_size = 0;
+  double *data_buffer = 0;
+  lseek(dbfid, dbH->dataOffset, SEEK_SET);
+
   for(processedTracks=0, track=0 ; processedTracks < dbH->numFiles ; track++, processedTracks++){
 
+    trackOffset = trackOffsetTable[track];     // numDoubles offset
+
     // get trackID from file if using a control file
-    if(trackFile){
-      if(!trackFile->eof()){
-	trackFile->getline(nextKey,MAXSTR);
-	track=getKeyPos(nextKey);
-      }
-      else
+    if(trackFile) {
+      trackFile->getline(nextKey,MAXSTR);
+      if(!trackFile->eof()) {
+	track = getKeyPos(nextKey);
+        trackOffset = trackOffsetTable[track];
+        lseek(dbfid, dbH->dataOffset + trackOffset * sizeof(double), SEEK_SET);
+      } else {
 	break;
+      }
     }
 
-    trackOffset=trackOffsetTable[track];     // numDoubles offset
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
     if(sequenceLength<=trackTable[track]){  // test for short sequences
@@ -2364,11 +2503,27 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	assert(DD[j]);
       }
 
+      if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
+	if(data_buffer) {
+	  free(data_buffer);
+	}
+	{ 
+	  data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
+	  void *tmp = malloc(data_buffer_size);
+	  if (tmp == NULL) {
+	    error("error allocating data buffer");
+	  }
+	  data_buffer = (double *) tmp;
+	}
+      }
+
+      read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
+
       // Dot product
       for(j=0; j<numVectors; j++)
 	for(k=0; k<trackTable[track]; k++){
 	  qp=query+j*dbH->dim;
-	  sp=dataBuf+trackOffset+k*dbH->dim;
+	  sp=data_buffer+k*dbH->dim;
 	  DD[j][k]=0.0; // Initialize matched filter array
 	  dp=&D[j][k];  // point to correlation cell j,k
 	  *dp=0.0;      // initialize correlation cell
@@ -2376,7 +2531,7 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	  while(l--)
 	    *dp+=*qp++**sp++;
 	}
-  
+
       // Matched Filter
       // HOP SIZE == 1
       double* spd;
@@ -2501,6 +2656,8 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
     }
   }
 
+  free(data_buffer);
+
   gettimeofday(&tv2,NULL);
   if(verbosity>1) {
     cerr << endl << "processed tracks :" << processedTracks << " matched tracks: " << successfulTracks << " elapsed time:" 
@@ -2621,14 +2778,6 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
       p++;
     }
     l2ptr++;
-    /*
-      oneOverL2 = 1.0/(*l2ptr++);
-      d=dim;
-      while(d--){
-      *X*=oneOverL2;
-      X++;
-      }
-    */
     X+=dim;
   }
   unsigned offset;
