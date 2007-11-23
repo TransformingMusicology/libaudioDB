@@ -4,7 +4,7 @@ set -E
 
 trap "exit 1" ERR
 
-if [ -z ${AUDIODB} ]; then
+if [ -z "${AUDIODB}" ]; then
   AUDIODB=../../audioDB
 fi
 
@@ -63,7 +63,7 @@ start_server() {
 }
 
 stop_server() {
-  grep ${AUDIODB} /proc/$1/cmdline > /dev/null
+  grep "${AUDIODB}" /proc/$1/cmdline > /dev/null
   kill $1
   # HACK: deal with race on process exit
   sleep 1
@@ -71,7 +71,7 @@ stop_server() {
 }
 
 check_server() {
-  grep ${AUDIODB} /proc/$1/cmdline > /dev/null
+  grep "${AUDIODB}" /proc/$1/cmdline > /dev/null
 }
 
 expect_client_failure() {
