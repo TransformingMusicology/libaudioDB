@@ -627,7 +627,7 @@ void audioDB::insert(const char* dbName, const char* inFile) {
   // Linear scan of filenames check for pre-existing feature
   unsigned alreadyInserted=0;
   for(unsigned k=0; k<dbH->numFiles; k++)
-    if(strncmp(fileTable + k*O2_FILETABLESIZE, key, strlen(key))==0){
+    if(strncmp(fileTable + k*O2_FILETABLESIZE, key, strlen(key)+1)==0){
       alreadyInserted=1;
       break;
     }
@@ -823,7 +823,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
     unsigned alreadyInserted=0;
   
     for(unsigned k=0; k<dbH->numFiles; k++)
-      if(strncmp(fileTable + k*O2_FILETABLESIZE, thisKey, strlen(thisKey))==0){
+      if(strncmp(fileTable + k*O2_FILETABLESIZE, thisKey, strlen(thisKey)+1)==0){
 	alreadyInserted=1;
 	break;
       }
