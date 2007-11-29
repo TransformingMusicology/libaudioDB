@@ -50,7 +50,7 @@
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
-#define O2_FORMAT_VERSION (3U)
+#define O2_FORMAT_VERSION (4U)
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
@@ -95,12 +95,13 @@
 
 using namespace std;
 
-typedef struct dbTableHeader{
+typedef struct dbTableHeader {
   uint32_t magic;
   uint32_t version;
   uint32_t numFiles;
   uint32_t dim;
   uint32_t flags;
+  uint32_t headerSize;
   off_t length;
   off_t fileTableOffset;
   off_t trackTableOffset;

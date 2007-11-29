@@ -454,6 +454,7 @@ void audioDB::create(const char* dbName){
   dbH->numFiles = 0;
   dbH->dim = 0;
   dbH->flags = 0;
+  dbH->headerSize = O2_HEADERSIZE;
   dbH->length = 0;
   dbH->fileTableOffset = ALIGN_PAGE_UP(O2_HEADERSIZE);
   dbH->trackTableOffset = ALIGN_PAGE_UP(dbH->fileTableOffset + O2_FILETABLESIZE*maxfiles);
@@ -508,7 +509,11 @@ void audioDB::initDBHeader(const char* dbName) {
   }
 
   if(dbH->version != O2_FORMAT_VERSION) {
-    error("database file has incorect version", dbName);
+    error("database file has incorrect version", dbName);
+  }
+
+  if(dbH->headerSize != O2_HEADERSIZE) {
+    error("sizeof(dbTableHeader) unexpected: platform ABI mismatch?", dbName);
   }
 
 #define CHECKED_MMAP(type, var, start, length) \
