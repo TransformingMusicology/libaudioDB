@@ -2006,6 +2006,22 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
+    if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
+      if(data_buffer) {
+	free(data_buffer);
+      }
+      { 
+	data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
+	void *tmp = malloc(data_buffer_size);
+	if (tmp == NULL) {
+	  error("error allocating data buffer");
+	}
+	data_buffer = (double *) tmp;
+      }
+    }
+    
+    read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
+
     if(sequenceLength<=trackTable[track]){  // test for short sequences
       
       if(verbosity>7) {
@@ -2024,22 +2040,6 @@ void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, adb__
 	DD[j]=new double[trackTable[track]];
 	assert(DD[j]);
       }
-
-      if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
-	if(data_buffer) {
-	  free(data_buffer);
-	}
-	{ 
-	  data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
-	  void *tmp = malloc(data_buffer_size);
-	  if (tmp == NULL) {
-	    error("error allocating data buffer");
-	  }
-	  data_buffer = (double *) tmp;
-	}
-      }
-
-      read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
 
       // Dot product
       for(j=0; j<numVectors; j++)
@@ -2500,6 +2500,22 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
+    if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
+      if(data_buffer) {
+	free(data_buffer);
+      }
+      { 
+	data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
+	void *tmp = malloc(data_buffer_size);
+	if (tmp == NULL) {
+	  error("error allocating data buffer");
+	}
+	data_buffer = (double *) tmp;
+      }
+    }
+    
+    read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
+
     if(sequenceLength<=trackTable[track]){  // test for short sequences
       
       if(verbosity>7) {
@@ -2518,22 +2534,6 @@ void audioDB::trackSequenceQueryRad(const char* dbName, const char* inFile, adb_
 	DD[j]=new double[trackTable[track]];
 	assert(DD[j]);
       }
-
-      if (trackTable[track] * sizeof(double) * dbH->dim > data_buffer_size) {
-	if(data_buffer) {
-	  free(data_buffer);
-	}
-	{ 
-	  data_buffer_size = trackTable[track] * sizeof(double) * dbH->dim;
-	  void *tmp = malloc(data_buffer_size);
-	  if (tmp == NULL) {
-	    error("error allocating data buffer");
-	  }
-	  data_buffer = (double *) tmp;
-	}
-      }
-
-      read(dbfid, data_buffer, trackTable[track] * sizeof(double) * dbH->dim);
 
       // Dot product
       for(j=0; j<numVectors; j++)

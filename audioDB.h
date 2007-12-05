@@ -59,7 +59,7 @@
 //#define O2_DEFAULTDBSIZE (1000000000U) // 1GB table size
 
 //#define O2_MAXFILES (1000000)
-#define O2_MAXFILES (10000U)           // 10,000 files
+#define O2_MAXFILES (20000U)           // 10,000 files
 #define O2_MAXFILESTR (256U)
 #define O2_FILETABLESIZE (O2_MAXFILESTR)
 #define O2_TRACKTABLESIZE (sizeof(unsigned))
