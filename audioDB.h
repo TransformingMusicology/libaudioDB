@@ -205,7 +205,7 @@ class audioDB{
   void read_data(int track, double **data_buffer_p, size_t *data_buffer_size_p);
   void set_up_query(double **qp, double **vqp, double **qnp, double **vqnp, double **qpp, double **vqpp, double *mqdp, unsigned int *nvp);
   void set_up_db(double **snp, double **vsnp, double **spp, double **vspp, double **mddp, unsigned int *dvp);
-  void trackSequenceQueryNN(const char* dbName, const char* inFile, Reporter *reporter);
+  void query_loop(const char* dbName, const char* inFile, Reporter *reporter);
 
   void initDBHeader(const char *dbName);
   void initInputFile(const char *inFile);

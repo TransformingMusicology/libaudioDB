@@ -40,7 +40,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
   default:
     error("unrecognized queryType in query()");
   }  
-  trackSequenceQueryNN(dbName, inFile, r);
+  query_loop(dbName, inFile, r);
   r->report(fileTable, adbQueryResponse);
   delete r;
 }
@@ -327,7 +327,7 @@ void audioDB::set_up_db(double **snp, double **vsnp, double **spp, double **vspp
   *vspp = *spp;
 }
 
-void audioDB::trackSequenceQueryNN(const char* dbName, const char* inFile, Reporter *reporter) {
+void audioDB::query_loop(const char* dbName, const char* inFile, Reporter *reporter) {
   
   unsigned int numVectors;
   double *query, *query_data;
