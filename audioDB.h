@@ -15,7 +15,6 @@
 
 // includes for web services
 #include "soapH.h"
-#include "adb.nsmap"
 #include "cmdline.h"
 
 #define MAXSTR 512
@@ -56,10 +55,8 @@
 #define O2_DEFAULT_TRACKNN  (10U)
 
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
-//#define O2_DEFAULTDBSIZE (1000000000U) // 1GB table size
 
-//#define O2_MAXFILES (1000000)
-#define O2_MAXFILES (20000U)           // 10,000 files
+#define O2_MAXFILES (20000U)
 #define O2_MAXFILESTR (256U)
 #define O2_FILETABLESIZE (O2_MAXFILESTR)
 #define O2_TRACKTABLESIZE (sizeof(unsigned))
@@ -93,7 +90,19 @@
 
 #define ENSURE_STRING(x) ((x) ? (x) : "")
 
-using namespace std;
+#define CHECKED_MMAP(type, var, start, length) \
+  { void *tmp = mmap(0, length, (PROT_READ | (forWrite ? PROT_WRITE : 0)), MAP_SHARED, dbfid, (start)); \
+    if(tmp == (void *) -1) { \
+      error("mmap error for db table", #var, "mmap"); \
+    } \
+    var = (type) tmp; \
+  }
+
+#define VERB_LOG(vv, ...) \
+  if(verbosity > vv) { \
+    fprintf(stderr, __VA_ARGS__); \
+    fflush(stderr); \
+  }
 
 typedef struct dbTableHeader {
   uint32_t magic;
@@ -112,6 +121,7 @@ typedef struct dbTableHeader {
   off_t dbSize;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
+class Reporter;
 
 class audioDB{
   
@@ -123,13 +133,13 @@ class audioDB{
   const char *hostport;
   const char *key;
   const char* trackFileName;
-  ifstream *trackFile;
+  std::ifstream *trackFile;
   const char *command;
   const char *output;
   const char *timesFileName;
-  ifstream *timesFile;
+  std::ifstream *timesFile;
   const char *powerFileName;
-  ifstream *powerFile;
+  std::ifstream *powerFile;
   int powerfd;
 
   int dbfid;
@@ -145,8 +155,6 @@ class audioDB{
   double* dataBuf;
   double* inBuf;
   double* l2normTable;
-  double* qNorm;
-  double* sNorm;
   double* timesTable;
   double* powerTable;
 
@@ -165,6 +173,7 @@ class audioDB{
   unsigned trackNN;   // how many track NNs ?
   unsigned sequenceLength;
   unsigned sequenceHop;
+  bool normalizedDistance;
   unsigned queryPoint;
   unsigned usingQueryPoint;
   unsigned usingTimes;
@@ -187,21 +196,23 @@ class audioDB{
     
   // private methods
   void error(const char* a, const char* b = "", const char *sysFunc = 0);
-  void pointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
-  void trackPointQuery(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void sequence_sum(double *buffer, int length, int seqlen);
   void sequence_sqrt(double *buffer, int length, int seqlen);
   void sequence_average(double *buffer, int length, int seqlen);
 
-  void trackSequenceQueryNN(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
-  void trackSequenceQueryRad(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void initialize_arrays(int track, unsigned int numVectors, double *query, double *data_buffer, double **D, double **DD);
+  void delete_arrays(int track, unsigned int numVectors, double **D, double **DD);
+  void read_data(int track, double **data_buffer_p, size_t *data_buffer_size_p);
+  void set_up_query(double **qp, double **vqp, double **qnp, double **vqnp, double **qpp, double **vqpp, double *mqdp, unsigned int *nvp);
+  void set_up_db(double **snp, double **vsnp, double **spp, double **vspp, double **mddp, unsigned int *dvp);
+  void trackSequenceQueryNN(const char* dbName, const char* inFile, Reporter *reporter);
 
   void initDBHeader(const char *dbName);
   void initInputFile(const char *inFile);
   void initTables(const char* dbName, const char* inFile);
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
   void unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned append);
-  void insertTimeStamps(unsigned n, ifstream* timesFile, double* timesdata);
+  void insertTimeStamps(unsigned n, std::ifstream* timesFile, double* timesdata);
   void insertPowerData(unsigned n, int powerfd, double *powerdata);
   unsigned getKeyPos(char* key);
  public:
@@ -258,7 +269,6 @@ class audioDB{
   trackTable(0), \
   dataBuf(0), \
   l2normTable(0), \
-  qNorm(0), \
   timesTable(0), \
   fileTableLength(0), \
   trackTableLength(0), \
@@ -273,6 +283,7 @@ class audioDB{
   trackNN(O2_DEFAULT_TRACKNN), \
   sequenceLength(16), \
   sequenceHop(1), \
+  normalizedDistance(true), \
   queryPoint(0), \
   usingQueryPoint(0), \
   usingTimes(0), \

@@ -6,6 +6,8 @@ if [ -f testdb ]; then rm -f testdb; fi
 
 ${AUDIODB} -d testdb -N
 
+${AUDIODB} -d testdb -L
+
 intstring 2 > testfeature
 floatstring 0 1 >> testfeature
 floatstring 1 0 >> testfeature

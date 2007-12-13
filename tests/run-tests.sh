@@ -26,8 +26,10 @@ for file in ${pattern}; do
       echo -n :
       (cd ${file} && sh ./run-test.sh > test.out 2> test.err)
       EXIT_STATUS=$?
-      if [ ${EXIT_STATUS} -ne 104 ]; then
-        echo " failed (exit status ${EXIT_STATUS})".
+      if [ ${EXIT_STATUS} -eq 14 ]; then
+        echo " n/a."
+      elif [ ${EXIT_STATUS} -ne 104 ]; then
+        echo " failed (exit status ${EXIT_STATUS})."
         FAILED=true
       else
         echo " success."

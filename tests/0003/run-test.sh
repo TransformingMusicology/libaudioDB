@@ -6,6 +6,9 @@ if [ -f testdb ]; then rm -f testdb; fi
 
 ${AUDIODB} -d testdb -N
 
+# point query now implemented as sequence search
+${AUDIODB} -d testdb -L
+
 # We could contemplate putting the test feature (and the expected
 # query output) under svn control if we trust its binary file
 # handling.
