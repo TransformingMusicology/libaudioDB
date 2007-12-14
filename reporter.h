@@ -61,14 +61,16 @@ template <class T> pointQueryReporter<T>::~pointQueryReporter() {
 }
 
 template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
-  NNresult r;
-  r.trackID = trackID;
-  r.qpos = qpos;
-  r.spos = spos;
-  r.dist = dist;
-  queue->push(r);
-  if(queue->size() > pointNN) {
-    queue->pop();
+  if (!isnan(dist)) {
+    NNresult r;
+    r.trackID = trackID;
+    r.qpos = qpos;
+    r.spos = spos;
+    r.dist = dist;
+    queue->push(r);
+    if(queue->size() > pointNN) {
+      queue->pop();
+    }
   }
 }
 
@@ -133,14 +135,16 @@ template <class T> trackAveragingReporter<T>::~trackAveragingReporter() {
 }
 
 template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
-  NNresult r;
-  r.trackID = trackID;
-  r.qpos = qpos;
-  r.spos = spos;
-  r.dist = dist;
-  queues[trackID].push(r);
-  if(queues[trackID].size() > pointNN) {
-    queues[trackID].pop();
+  if (!isnan(dist)) {
+    NNresult r;
+    r.trackID = trackID;
+    r.qpos = qpos;
+    r.spos = spos;
+    r.dist = dist;
+    queues[trackID].push(r);
+    if(queues[trackID].size() > pointNN) {
+      queues[trackID].pop();
+    }
   }
 }
 
