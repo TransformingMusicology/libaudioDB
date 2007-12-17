@@ -1,5 +1,5 @@
 package "audioDB"
-version "version 1.0"
+version "version 0.8.preview"
 purpose "A feature vector database management system for content-based retrieval."
 option "help" H "print help on audioDB usage and exit." optional
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional
@@ -51,4 +51,6 @@ option "SERVER" s "run as standalone web service on named port." int typestr="po
 option "client" c "run as a client using named host service." string typestr="hostname:port" optional
 
 
-text "\nCopyright (C) 2007 Michael Casey, Goldsmiths, University of London\n"
+text "
+Copyright (c) 2007 Michael Casey, Christophe Rhodes
+                   Goldsmiths, University of London"
