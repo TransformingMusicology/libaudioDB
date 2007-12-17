@@ -5,8 +5,15 @@ GSOAP_CPP=-lgsoap++
 GSOAP_INCLUDE=
 
 override CFLAGS+=-O3 -g
+
 ifeq ($(shell uname),Linux)
 override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+endif
+
+ifeq ($(shell uname),Darwin)
+ifeq ($(shell sysctl -n hw.optional.x86_64),1)
+override CFLAGS+=-arch x86_64
+endif
 endif
 
 EXECUTABLE=audioDB
