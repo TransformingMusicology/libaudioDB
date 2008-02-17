@@ -285,3 +285,114 @@ void trackSequenceQueryRadReporter::report(char *fileTable, adb__queryResponse *
     // FIXME
   }
 }
+
+
+template <class T> class trackSequenceQueryNNReporter : public Reporter {
+ public:
+  trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
+  ~trackSequenceQueryNNReporter();
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
+  void report(char *fileTable, adb__queryResponse *adbQueryResponse);
+ private:
+  unsigned int pointNN;
+  unsigned int trackNN;
+  unsigned int numFiles;
+  std::priority_queue< NNresult, std::vector< NNresult>, T > *queues;  
+};
+
+template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles) 
+  : pointNN(pointNN), trackNN(trackNN), numFiles(numFiles) {
+  queues = new std::priority_queue< NNresult, std::vector< NNresult>, T >[numFiles];
+}
+
+template <class T> trackSequenceQueryNNReporter<T>::~trackSequenceQueryNNReporter() {
+  delete [] queues;
+}
+
+template <class T> void trackSequenceQueryNNReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+  if (!isnan(dist)) {
+    NNresult r;
+    r.trackID = trackID;
+    r.qpos = qpos;
+    r.spos = spos;
+    r.dist = dist;
+    queues[trackID].push(r);
+    if(queues[trackID].size() > pointNN) {
+      queues[trackID].pop();
+    }
+  }
+}
+
+template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
+  std::priority_queue < NNresult, std::vector< NNresult>, T> result;
+  std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > *point_queues = new std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> >[numFiles];
+
+  for (int i = numFiles-1; i >= 0; i--) {
+    unsigned int size = queues[i].size();
+    if (size > 0) {
+      NNresult r;
+      double dist = 0;
+      NNresult oldr = queues[i].top();
+      for (unsigned int j = 0; j < size; j++) {
+        r = queues[i].top();
+        dist += r.dist;
+	point_queues[i].push(r);
+        queues[i].pop();
+        if (r.dist == oldr.dist) {
+          r.qpos = oldr.qpos;
+          r.spos = oldr.spos;
+        } else {
+          oldr = r;
+        }
+      }
+      dist /= size;
+      r.dist = dist; // trackID, qpos and spos are magically right already.
+      result.push(r);
+      if (result.size() > trackNN) {
+        result.pop();
+      }
+    }
+  }
+
+  NNresult r;
+  std::vector<NNresult> v;
+  unsigned int size = result.size();
+  for(unsigned int k = 0; k < size; k++) {
+    r = result.top();
+    v.push_back(r);
+    result.pop();
+  }
+  std::vector<NNresult>::reverse_iterator rit;
+      
+  if(adbQueryResponse==0) {
+    for(rit = v.rbegin(); rit < v.rend(); rit++) {
+      r = *rit;
+      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << std::endl;
+      for(int k=0; k < (int)pointNN; k++){
+	NNresult rk = point_queues[r.trackID].top();
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	point_queues[r.trackID].pop();
+      }
+    }
+  } else {
+    adbQueryResponse->result.__sizeRlist=size;
+    adbQueryResponse->result.__sizeDist=size;
+    adbQueryResponse->result.__sizeQpos=size;
+    adbQueryResponse->result.__sizeSpos=size;
+    adbQueryResponse->result.Rlist= new char*[size];
+    adbQueryResponse->result.Dist = new double[size];
+    adbQueryResponse->result.Qpos = new unsigned int[size];
+    adbQueryResponse->result.Spos = new unsigned int[size];
+    unsigned int k = 0;
+    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
+      r = *rit;
+      adbQueryResponse->result.Rlist[k] = new char[O2_MAXFILESTR];
+      adbQueryResponse->result.Dist[k] = r.dist;
+      adbQueryResponse->result.Qpos[k] = r.qpos;
+      adbQueryResponse->result.Spos[k] = r.spos;
+      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLESIZE);
+    }
+  }
+  // clean up
+  delete[] point_queues;
+}

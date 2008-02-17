@@ -306,6 +306,8 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
       queryType=O2_POINT_QUERY;
     else if(strncmp(args_info.QUERY_arg, "sequence", MAXSTR)==0)
       queryType=O2_SEQUENCE_QUERY;
+    else if(strncmp(args_info.QUERY_arg, "nsequence", MAXSTR)==0)
+      queryType=O2_N_SEQUENCE_QUERY;
     else
       error("unsupported query type",args_info.QUERY_arg);
     

@@ -54,6 +54,7 @@
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
 
+//#define O2_DEFAULTDBSIZE (4000000000) // 4GB table size
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 
 #define O2_MAXFILES (20000U)
@@ -75,6 +76,8 @@
 #define O2_POINT_QUERY (0x4U)
 #define O2_SEQUENCE_QUERY (0x8U)
 #define O2_TRACK_QUERY (0x10U)
+#define O2_N_SEQUENCE_QUERY (0x20U)
+
 
 // Error Codes
 #define O2_ERR_KEYNOTFOUND (0xFFFFFF00)

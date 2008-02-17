@@ -37,6 +37,13 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
       r = new trackSequenceQueryRadReporter(trackNN, dbH->numFiles);
     }
     break;
+  case O2_N_SEQUENCE_QUERY :
+    if(radius == 0) {
+      r = new trackSequenceQueryNNReporter<std::less < NNresult > >(pointNN, trackNN, dbH->numFiles);
+    } else {
+      r = new trackSequenceQueryRadReporter(trackNN, dbH->numFiles);
+    }
+    break;
   default:
     error("unrecognized queryType in query()");
   }  
