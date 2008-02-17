@@ -118,7 +118,7 @@ template <class T> class trackAveragingReporter : public Reporter {
   ~trackAveragingReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
   void report(char *fileTable, adb__queryResponse *adbQueryResponse);
- private:
+ protected:
   unsigned int pointNN;
   unsigned int trackNN;
   unsigned int numFiles;
@@ -219,7 +219,7 @@ public:
   ~trackSequenceQueryRadReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
   void report(char *fileTable, adb__queryResponse *adbQueryResponse);
-private:
+ protected:
   unsigned int trackNN;
   unsigned int numFiles;
   std::set<std::pair<unsigned int, unsigned int> > *set;
@@ -286,47 +286,25 @@ void trackSequenceQueryRadReporter::report(char *fileTable, adb__queryResponse *
   }
 }
 
-
-template <class T> class trackSequenceQueryNNReporter : public Reporter {
+// Another type of trackAveragingReporter that reports all pointNN nearest neighbours
+template <class T> class trackSequenceQueryNNReporter : public trackAveragingReporter<T> {
+ protected:
+  using trackAveragingReporter<T>::numFiles;
+  using trackAveragingReporter<T>::queues;
+  using trackAveragingReporter<T>::trackNN;
+  using trackAveragingReporter<T>::pointNN;
  public:
   trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
-  ~trackSequenceQueryNNReporter();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
   void report(char *fileTable, adb__queryResponse *adbQueryResponse);
- private:
-  unsigned int pointNN;
-  unsigned int trackNN;
-  unsigned int numFiles;
-  std::priority_queue< NNresult, std::vector< NNresult>, T > *queues;  
 };
 
-template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles) 
-  : pointNN(pointNN), trackNN(trackNN), numFiles(numFiles) {
-  queues = new std::priority_queue< NNresult, std::vector< NNresult>, T >[numFiles];
-}
-
-template <class T> trackSequenceQueryNNReporter<T>::~trackSequenceQueryNNReporter() {
-  delete [] queues;
-}
-
-template <class T> void trackSequenceQueryNNReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
-  if (!isnan(dist)) {
-    NNresult r;
-    r.trackID = trackID;
-    r.qpos = qpos;
-    r.spos = spos;
-    r.dist = dist;
-    queues[trackID].push(r);
-    if(queues[trackID].size() > pointNN) {
-      queues[trackID].pop();
-    }
-  }
-}
+template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles)
+:trackAveragingReporter<T>(pointNN, trackNN, numFiles){}
 
 template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > *point_queues = new std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> >[numFiles];
-
+  
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
     if (size > 0) {
@@ -337,7 +315,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
         r = queues[i].top();
         dist += r.dist;
 	point_queues[i].push(r);
-        queues[i].pop();
+	queues[i].pop();
         if (r.dist == oldr.dist) {
           r.qpos = oldr.qpos;
           r.spos = oldr.spos;
