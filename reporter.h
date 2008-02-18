@@ -213,6 +213,8 @@ template <class T> void trackAveragingReporter<T>::report(char *fileTable, adb__
   }
 }
 
+// track Sequence Query Radius Reporter
+// only return tracks and retrieved point counts
 class trackSequenceQueryRadReporter : public Reporter { 
 public:
   trackSequenceQueryRadReporter(unsigned int trackNN, unsigned int numFiles);
@@ -242,11 +244,11 @@ trackSequenceQueryRadReporter::~trackSequenceQueryRadReporter() {
 
 void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
   std::set<std::pair<unsigned int, unsigned int> >::iterator it;
-  std::pair<unsigned int, unsigned int> pair = std::make_pair(trackID, qpos);
+  std::pair<unsigned int, unsigned int> pair = std::make_pair(trackID, qpos); // only count this once
   it = set->find(pair);
   if (it == set->end()) {
     set->insert(pair);
-    count[trackID]++;
+    count[trackID]++; // only count if <tackID,qpos> pair is unique
   }
 }
 
@@ -303,7 +305,7 @@ template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter
 
 template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
-  std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > *point_queues = new std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> >[numFiles];
+  std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
   
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
@@ -345,7 +347,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << std::endl;
+      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.dist << std::endl;
       for(int k=0; k < (int)pointNN; k++){
 	NNresult rk = point_queues[r.trackID].top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
@@ -373,4 +375,106 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
   }
   // clean up
   delete[] point_queues;
+}
+
+
+// track Sequence Query Radius NN Reporter
+// retrieve tracks ordered by query-point matches (one per track per query point)
+//
+// as well as sorted n-NN points per retrieved track
+class trackSequenceQueryRadNNReporter : public Reporter { 
+public:
+  trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
+  ~trackSequenceQueryRadNNReporter();
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
+  void report(char *fileTable, adb__queryResponse *adbQueryResponse);
+ protected:
+  unsigned int pointNN;
+  unsigned int trackNN;
+  unsigned int numFiles;
+  std::set< NNresult > *set;
+  std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues;
+  unsigned int *count;
+};
+
+trackSequenceQueryRadNNReporter::trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles):
+pointNN(pointNN), trackNN(trackNN), numFiles(numFiles) {
+  // Where to count Radius track matches (one-to-one)
+  set = new std::set< NNresult >; 
+  // Where to insert individual point matches (one-to-many)
+  point_queues = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
+  
+  count = new unsigned int[numFiles];
+  for (unsigned i = 0; i < numFiles; i++) {
+    count[i] = 0;
+  }
+}
+
+trackSequenceQueryRadNNReporter::~trackSequenceQueryRadNNReporter() {
+  delete set;
+  delete [] count;
+}
+
+void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+  std::set< NNresult >::iterator it;
+  NNresult r;
+  r.trackID = trackID;
+  r.qpos = qpos;
+  r.dist = dist;
+  r.spos = spos;
+
+  // Record all matching points (within radius)
+  if (!isnan(dist)) {
+    point_queues[trackID].push(r);
+    if(point_queues[trackID].size() > pointNN)
+      point_queues[trackID].pop();
+  }
+
+  // Record counts of <trackID,qpos> pairs
+  it = set->find(r);
+  if (it == set->end()) {
+    set->insert(r);
+    count[trackID]++;
+  }
+}
+
+void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
+  std::priority_queue < Radresult > result;
+  // KLUDGE: doing this backwards in an attempt to get the same
+  // tiebreak behaviour as before.
+  for (int i = numFiles-1; i >= 0; i--) {
+    Radresult r;
+    r.trackID = i;
+    r.count = count[i];
+    if(r.count > 0) {
+      result.push(r);
+      if (result.size() > trackNN) {
+        result.pop();
+      }
+    }
+  }
+
+  Radresult r;
+  std::vector<Radresult> v;
+  unsigned int size = result.size();
+  for(unsigned int k = 0; k < size; k++) {
+    r = result.top();
+    v.push_back(r);
+    result.pop();
+  }
+  std::vector<Radresult>::reverse_iterator rit;
+      
+  if(adbQueryResponse==0) {
+    for(rit = v.rbegin(); rit < v.rend(); rit++) {
+      r = *rit;
+      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.count << std::endl;
+      for(int k=0; k < (int)pointNN; k++){
+	NNresult rk = point_queues[r.trackID].top();
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	point_queues[r.trackID].pop();
+      }
+    }
+  } else {
+    // FIXME
+  }
 }

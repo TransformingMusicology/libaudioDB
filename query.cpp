@@ -41,7 +41,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
     if(radius == 0) {
       r = new trackSequenceQueryNNReporter<std::less < NNresult > >(pointNN, trackNN, dbH->numFiles);
     } else {
-      r = new trackSequenceQueryRadReporter(trackNN, dbH->numFiles);
+      r = new trackSequenceQueryRadNNReporter(pointNN,trackNN, dbH->numFiles);
     }
     break;
   default:
