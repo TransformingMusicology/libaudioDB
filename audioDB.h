@@ -230,6 +230,7 @@ class audioDB{
   void release_lock(int fd);
   void create(const char* dbName);
   void drop();
+  bool enough_per_file_space_free();
   bool enough_data_space_free(off_t size);
   void insert_data_vectors(off_t offset, void *buffer, size_t size);
   void insert(const char* dbName, const char* inFile);

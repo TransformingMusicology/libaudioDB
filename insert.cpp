@@ -1,5 +1,15 @@
 #include "audioDB.h"
 
+bool audioDB::enough_per_file_space_free() {
+  unsigned int fmaxfiles, tmaxfiles;
+  unsigned int maxfiles;
+
+  fmaxfiles = fileTableLength / O2_FILETABLESIZE;
+  tmaxfiles = trackTableLength / O2_TRACKTABLESIZE;
+  maxfiles = fmaxfiles > tmaxfiles ? tmaxfiles : fmaxfiles;
+  return(dbH->numFiles < maxfiles);
+}
+
 bool audioDB::enough_data_space_free(off_t size) {
   return(dbH->timesTableOffset > dbH->dataOffset + dbH->length + size);
 }
@@ -18,6 +28,10 @@ void audioDB::insert(const char* dbName, const char* inFile) {
 
   if(!usingPower && (dbH->flags & O2_FLAG_POWER))
     error("Must use power with power-enabled database", dbName);
+
+  if(!enough_per_file_space_free()) {
+    error("Insert failed: no more room for metadata", inFile);
+  }
 
   if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
     error("Insert failed: no more room in database", inFile);
@@ -209,6 +223,10 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
       break;
 
     initInputFile(thisFile);
+
+    if(!enough_per_file_space_free()) {
+      error("batchinsert failed: no more room for metadata", thisFile);
+    }
 
     if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
       error("batchinsert failed: no more room in database", thisFile);
