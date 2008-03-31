@@ -1,12 +1,12 @@
-#! /bin/sh
+#! /bin/bash
 
 AUDIODB=../../${EXECUTABLE:-audioDB}
 export AUDIODB
 
-if [ -x ${AUDIODB:3} ]; then 
+if [ -x ${AUDIODB#../} ]; then 
   :
 else 
-  echo Cannot execute audioDB: ${AUDIODB:3}
+  echo Cannot execute audioDB: ${AUDIODB#../}
   exit 1
 fi
 
@@ -24,7 +24,7 @@ for file in ${pattern}; do
         awk '{ printf(" (%s)",$0) }' < ${file}/short-description
       fi
       echo -n :
-      (cd ${file} && sh ./run-test.sh > test.out 2> test.err)
+      (cd ${file} && /bin/bash ./run-test.sh > test.out 2> test.err)
       EXIT_STATUS=$?
       if [ ${EXIT_STATUS} -eq 14 ]; then
         echo " n/a."
