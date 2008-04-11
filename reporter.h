@@ -3,6 +3,8 @@
 #include <set>
 #include <functional>
 
+#define MIN_ARG(a,b) a<b?a:b
+
 typedef struct nnresult {
   unsigned int trackID;
   double dist;
@@ -468,7 +470,7 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.count << std::endl;
-      for(int k=0; k < (int)pointNN; k++){
+      for(int k=0; k < (int)MIN_ARG((unsigned)point_queues[r.trackID].size(),pointNN); k++){
 	NNresult rk = point_queues[r.trackID].top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
 	point_queues[r.trackID].pop();
