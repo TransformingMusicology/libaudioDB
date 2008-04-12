@@ -470,7 +470,8 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.count << std::endl;
-      for(int k=0; k < (int)MIN_ARG((unsigned)point_queues[r.trackID].size(),pointNN); k++){
+      int qsize=point_queues[r.trackID].size();
+      for(int k=0; k < qsize; k++){
 	NNresult rk = point_queues[r.trackID].top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
 	point_queues[r.trackID].pop();
