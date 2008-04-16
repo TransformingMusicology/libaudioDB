@@ -4,8 +4,8 @@ bool audioDB::enough_per_file_space_free() {
   unsigned int fmaxfiles, tmaxfiles;
   unsigned int maxfiles;
 
-  fmaxfiles = fileTableLength / O2_FILETABLESIZE;
-  tmaxfiles = trackTableLength / O2_TRACKTABLESIZE;
+  fmaxfiles = fileTableLength / O2_FILETABLE_ENTRY_SIZE;
+  tmaxfiles = trackTableLength / O2_TRACKTABLE_ENTRY_SIZE;
   maxfiles = fmaxfiles > tmaxfiles ? tmaxfiles : fmaxfiles;
   return(dbH->numFiles < maxfiles);
 }
@@ -42,7 +42,7 @@ void audioDB::insert(const char* dbName, const char* inFile) {
   // Linear scan of filenames check for pre-existing feature
   unsigned alreadyInserted=0;
   for(unsigned k=0; k<dbH->numFiles; k++)
-    if(strncmp(fileTable + k*O2_FILETABLESIZE, key, strlen(key)+1)==0){
+    if(strncmp(fileTable + k*O2_FILETABLE_ENTRY_SIZE, key, strlen(key)+1)==0){
       alreadyInserted=1;
       break;
     }
@@ -64,7 +64,7 @@ void audioDB::insert(const char* dbName, const char* inFile) {
     return;
   }
 
-  strncpy(fileTable + dbH->numFiles*O2_FILETABLESIZE, key, strlen(key));
+  strncpy(fileTable + dbH->numFiles*O2_FILETABLE_ENTRY_SIZE, key, strlen(key));
 
   off_t insertoffset = dbH->length;// Store current state
 
@@ -236,7 +236,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
     unsigned alreadyInserted=0;
   
     for(unsigned k=0; k<dbH->numFiles; k++)
-      if(strncmp(fileTable + k*O2_FILETABLESIZE, thisKey, strlen(thisKey)+1)==0){
+      if(strncmp(fileTable + k*O2_FILETABLE_ENTRY_SIZE, thisKey, strlen(thisKey)+1)==0){
 	alreadyInserted=1;
 	break;
       }
@@ -285,7 +285,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
             close(thispowerfd);
           }
         }
-	strncpy(fileTable + dbH->numFiles*O2_FILETABLESIZE, thisKey, strlen(thisKey));
+	strncpy(fileTable + dbH->numFiles*O2_FILETABLE_ENTRY_SIZE, thisKey, strlen(thisKey));
   
 	off_t insertoffset = dbH->length;// Store current state
 

@@ -5,11 +5,20 @@ option "help" H "print help on audioDB usage and exit." optional
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional
 text "\nDatabase commands are UPPER CASE. Command options are lower case.\n" 
 text ""
-section "Database Setup" sectiondesc="All database operations require a database argument."
+section "Database Operations" sectiondesc="All database operations require a database argument."
 
 option "database" d "database file required by Database commands." string typestr="filename" optional
+
+section "Database Creation" sectiondesc="Creating a new database file."
+
 option "NEW"    N "make a new (initially empty) database." dependon="database" optional
-option "size"   - "size of database file (in MB)" int dependon="NEW" default="2000" optional
+option "size"   - "size of database file (in MB)" int dependon="NEW" optional hidden
+option "datasize" - "size of data table requested (in MB)" int dependon="NEW" default="1355" optional
+option "ntracks" - "capacity of database for tracks" int dependon="NEW" default="20000" optional
+option "datadim" - "dimensionality of stored data" int dependon="NEW" default="9" optional
+
+section "Database Maintenance" sectiondesc="Querying, tweaking and dumping databases."
+
 option "STATUS" S "output database information to stdout." dependon="database" optional
 option "DUMP"   D "output all entries: index key size." dependon="database" optional
 option "output" - "output directory" string dependon="DUMP" default="audioDB.dump" optional

@@ -55,7 +55,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
 // return ordinal position of key in keyTable
 unsigned audioDB::getKeyPos(char* key){  
   for(unsigned k=0; k<dbH->numFiles; k++)
-    if(strncmp(fileTable + k*O2_FILETABLESIZE, key, strlen(key))==0)
+    if(strncmp(fileTable + k*O2_FILETABLE_ENTRY_SIZE, key, strlen(key))==0)
       return k;
   error("Key not found",key);
   return O2_ERR_KEYNOTFOUND;

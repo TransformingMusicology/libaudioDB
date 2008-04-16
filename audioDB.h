@@ -57,10 +57,14 @@
 //#define O2_DEFAULTDBSIZE (4000000000) // 4GB table size
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 
+#define O2_DEFAULT_DATASIZE (1355U) // in MB
+#define O2_DEFAULT_NTRACKS (20000U)
+#define O2_DEFAULT_DATADIM (9U)
+
 #define O2_MAXFILES (20000U)
 #define O2_MAXFILESTR (256U)
-#define O2_FILETABLESIZE (O2_MAXFILESTR)
-#define O2_TRACKTABLESIZE (sizeof(unsigned))
+#define O2_FILETABLE_ENTRY_SIZE (O2_MAXFILESTR)
+#define O2_TRACKTABLE_ENTRY_SIZE (sizeof(unsigned))
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
 #define O2_MAXDIM (1000U)
@@ -170,7 +174,12 @@ class audioDB{
 
   // Flags and parameters
   unsigned verbosity;   // how much do we want to know?
-  off_t size; // given size (for creation)
+
+  //off_t size; // given size (for creation)
+  unsigned datasize; // size in MB
+  unsigned ntracks;
+  unsigned datadim;
+
   unsigned queryType; // point queries default
   unsigned pointNN;   // how many point NNs ?
   unsigned trackNN;   // how many track NNs ?
@@ -281,7 +290,9 @@ class audioDB{
   powerTableLength(0), \
   l2normTableLength(0), \
   verbosity(1), \
-  size(O2_DEFAULTDBSIZE), \
+  datasize(O2_DEFAULT_DATASIZE), \
+  ntracks(O2_DEFAULT_NTRACKS), \
+  datadim(O2_DEFAULT_DATADIM), \
   queryType(O2_POINT_QUERY), \
   pointNN(O2_DEFAULT_POINTNN), \
   trackNN(O2_DEFAULT_TRACKNN), \

@@ -90,7 +90,7 @@ template <class T> void pointQueryReporter<T>::report(char *fileTable, adb__quer
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " ";
+      std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
       std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
     }
   } else {
@@ -109,7 +109,7 @@ template <class T> void pointQueryReporter<T>::report(char *fileTable, adb__quer
       adbQueryResponse->result.Dist[k] = r.dist;
       adbQueryResponse->result.Qpos[k] = r.qpos;
       adbQueryResponse->result.Spos[k] = r.spos;
-      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLESIZE);
+      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
     }
   }
 }
@@ -191,7 +191,7 @@ template <class T> void trackAveragingReporter<T>::report(char *fileTable, adb__
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " ";
+      std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
       std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
     }
   } else {
@@ -210,7 +210,7 @@ template <class T> void trackAveragingReporter<T>::report(char *fileTable, adb__
       adbQueryResponse->result.Dist[k] = r.dist;
       adbQueryResponse->result.Qpos[k] = r.qpos;
       adbQueryResponse->result.Spos[k] = r.spos;
-      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLESIZE);
+      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
     }
   }
 }
@@ -283,7 +283,7 @@ void trackSequenceQueryRadReporter::report(char *fileTable, adb__queryResponse *
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.count << std::endl;
+      std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.count << std::endl;
     }
   } else {
     // FIXME
@@ -349,7 +349,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.dist << std::endl;
+      std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.dist << std::endl;
       for(int k=0; k < (int)pointNN; k++){
 	NNresult rk = point_queues[r.trackID].top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
@@ -372,7 +372,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
       adbQueryResponse->result.Dist[k] = r.dist;
       adbQueryResponse->result.Qpos[k] = r.qpos;
       adbQueryResponse->result.Spos[k] = r.spos;
-      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLESIZE);
+      snprintf(adbQueryResponse->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
     }
   }
   // clean up
@@ -469,7 +469,7 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      std::cout << fileTable + r.trackID*O2_FILETABLESIZE << " " << r.count << std::endl;
+      std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.count << std::endl;
       int qsize=point_queues[r.trackID].size();
       for(int k=0; k < qsize; k++){
 	NNresult rk = point_queues[r.trackID].top();

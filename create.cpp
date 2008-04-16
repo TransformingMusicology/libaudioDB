@@ -24,7 +24,7 @@ void audioDB::create(const char* dbName){
   dbH = new dbTableHeaderT();
   assert(dbH);
 
-  unsigned int maxfiles = (unsigned int) rint((double) O2_MAXFILES * (double) size / (double) O2_DEFAULTDBSIZE);
+  //unsigned int maxfiles = (unsigned int) rint((double) O2_MAXFILES * (double) size / (double) O2_DEFAULTDBSIZE);
 
   // Initialize header
   dbH->magic = O2_MAGIC;
@@ -35,17 +35,21 @@ void audioDB::create(const char* dbName){
   dbH->headerSize = O2_HEADERSIZE;
   dbH->length = 0;
   dbH->fileTableOffset = ALIGN_PAGE_UP(O2_HEADERSIZE);
-  dbH->trackTableOffset = ALIGN_PAGE_UP(dbH->fileTableOffset + O2_FILETABLESIZE*maxfiles);
-  dbH->dataOffset = ALIGN_PAGE_UP(dbH->trackTableOffset + O2_TRACKTABLESIZE*maxfiles);
-  dbH->l2normTableOffset = ALIGN_PAGE_DOWN(size - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
-  dbH->powerTableOffset = ALIGN_PAGE_DOWN(dbH->l2normTableOffset - maxfiles*O2_MEANNUMVECTORS*sizeof(double));
-  dbH->timesTableOffset = ALIGN_PAGE_DOWN(dbH->powerTableOffset - 2*maxfiles*O2_MEANNUMVECTORS*sizeof(double));
-  dbH->dbSize = size;
+  dbH->trackTableOffset = ALIGN_PAGE_UP(dbH->fileTableOffset + O2_FILETABLE_ENTRY_SIZE*ntracks);
+  dbH->dataOffset = ALIGN_PAGE_UP(dbH->trackTableOffset + O2_TRACKTABLE_ENTRY_SIZE*ntracks);
+
+  off_t databytes = ((off_t) datasize) * 1024 * 1024;
+  off_t auxbytes = databytes / datadim;
+
+  dbH->timesTableOffset = ALIGN_PAGE_UP(dbH->dataOffset + databytes);
+  dbH->powerTableOffset = ALIGN_PAGE_UP(dbH->timesTableOffset + 2*auxbytes);
+  dbH->l2normTableOffset = ALIGN_PAGE_UP(dbH->powerTableOffset + auxbytes);
+  dbH->dbSize = ALIGN_PAGE_UP(dbH->l2normTableOffset + auxbytes);
 
   write(dbfid, dbH, O2_HEADERSIZE);
 
   // go to the location corresponding to the last byte
-  if (lseek (dbfid, size - 1, SEEK_SET) == -1)
+  if (lseek (dbfid, dbH->dbSize - 1, SEEK_SET) == -1)
     error("lseek error in db file", "", "lseek");
 
   // write a dummy byte at the last location

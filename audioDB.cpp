@@ -136,10 +136,32 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   }
 
   if(args_info.size_given) {
+    if(args_info.datasize_given) {
+      error("both --size and --datasize given", "");
+    }
+    if(args_info.ntracks_given) {
+      error("both --size and --ntracks given", "");
+    }
+    if(args_info.datadim_given) {
+      error("both --size and --datadim given", "");
+    }
     if (args_info.size_arg < 50 || args_info.size_arg > 32000) {
       error("Size out of range", "");
     }
-    size = (off_t) args_info.size_arg * 1000000;
+    double ratio = (double) args_info.size_arg * 1000000 / ((double) O2_DEFAULTDBSIZE);
+    /* FIXME: what's the safe way of doing this? */
+    datasize = (unsigned int) ceil(datasize * ratio);
+    ntracks = (unsigned int) ceil(ntracks * ratio);
+  } else {
+    if(args_info.datasize_given) {
+      datasize = args_info.datasize_arg;
+    }
+    if(args_info.ntracks_given) {
+      ntracks = args_info.ntracks_arg;
+    }
+    if(args_info.datadim_given) {
+      datadim = args_info.datadim_arg;
+    }
   }
 
   if(args_info.radius_given) {

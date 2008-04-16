@@ -62,7 +62,7 @@ void audioDB::dump(const char* dbName){
   double *data_buffer;
   size_t data_buffer_size;
   for(unsigned k = 0; k < dbH->numFiles; k++) {
-    fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLESIZE);
+    fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLE_ENTRY_SIZE);
     snprintf(fName, 256, "%05d.features", k);
     if ((ffd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
       error("error creating feature file", fName, "open");
@@ -130,7 +130,7 @@ void audioDB::dump(const char* dbName){
     } 
 
     pos += trackTable[k];
-    std::cout << fileTable+k*O2_FILETABLESIZE << " " << trackTable[k] << std::endl;
+    std::cout << fileTable+k*O2_FILETABLE_ENTRY_SIZE << " " << trackTable[k] << std::endl;
   }
 
   FILE *scriptFile;
@@ -142,7 +142,12 @@ void audioDB::dump(const char* dbName){
 \n\
 if [ -z \"${AUDIODB}\" ]; then echo set AUDIODB variable; exit 1; fi\n\
 if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
-\"${AUDIODB}\" -d \"$1\" -N --size=%d\n", (int) (dbH->dbSize / 1000000));
+\"${AUDIODB}\" -d \"$1\" -N --datasize=%d --ntracks=%d --datadim=%d\n",
+          (int) ((dbH->timesTableOffset - dbH->dataOffset) / (1024*1024)),
+          // fileTable entries (char[256]) are bigger than trackTable
+          // (int), so the granularity of page aligning is finer.
+          (int) ((dbH->trackTableOffset - dbH->fileTableOffset) / O2_FILETABLE_ENTRY_SIZE),
+          (int) ceil(((double) (dbH->timesTableOffset - dbH->dataOffset)) / ((double) (dbH->dbSize - dbH->l2normTableOffset))));
   if(dbH->flags & O2_FLAG_L2NORM) {
     fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
   }

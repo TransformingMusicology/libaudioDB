@@ -115,8 +115,8 @@ void audioDB::initDBHeader(const char* dbName) {
       powerTableLength = dbH->l2normTableOffset - dbH->powerTableOffset;
       l2normTableLength = dbH->dbSize - dbH->l2normTableOffset;
     } else {
-      fileTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLESIZE);
-      trackTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_TRACKTABLESIZE);
+      fileTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLE_ENTRY_SIZE);
+      trackTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_TRACKTABLE_ENTRY_SIZE);
       dataBufLength = ALIGN_PAGE_UP(dbH->length);
       timesTableLength = ALIGN_PAGE_UP(2*(dbH->length / dbH->dim));
       powerTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
