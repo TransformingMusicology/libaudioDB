@@ -203,25 +203,31 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
     error("Must use power with power-enabled database", dbName);
 
   unsigned totalVectors=0;
-  char *thisKey = new char[MAXSTR];
   char *thisFile = new char[MAXSTR];
+  char *thisKey = 0;
+  if (key && (key != inFile)) {
+    thisKey = new char[MAXSTR];
+  }
   char *thisTimesFileName = new char[MAXSTR];
   char *thisPowerFileName = new char[MAXSTR];
   
   do{
     filesIn->getline(thisFile,MAXSTR);
-    if(key && key!=inFile)
+    if(key && key!=inFile) {
       keysIn->getline(thisKey,MAXSTR);
-    else
+    } else {
       thisKey = thisFile;
-    if(usingTimes)
-      timesFile->getline(thisTimesFileName,MAXSTR);	  
-    if(usingPower)
+    }
+    if(usingTimes) {
+      timesFile->getline(thisTimesFileName,MAXSTR);
+    }
+    if(usingPower) {
       powerFile->getline(thisPowerFileName, MAXSTR);
+    }
     
-    if(filesIn->eof())
+    if(filesIn->eof()) {
       break;
-
+    }
     initInputFile(thisFile);
 
     if(!enough_per_file_space_free()) {
@@ -316,7 +322,17 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   } while(!filesIn->eof());
 
   VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * dbH->dim * sizeof(double)));
+
+  delete [] thisPowerFileName;
+  if(key && (key != inFile)) {
+    delete [] thisKey;
+  }
+  delete [] thisFile;
+  delete [] thisTimesFileName;
   
+  delete filesIn;
+  delete keysIn;
+
   // Report status
   status(dbName);
 }
