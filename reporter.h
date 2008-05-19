@@ -350,7 +350,8 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.dist << std::endl;
-      for(int k=0; k < (int)pointNN; k++){
+      unsigned int size = point_queues[r.trackID].size();
+      for(unsigned int k = 0; k < size; k++) {
 	NNresult rk = point_queues[r.trackID].top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
 	point_queues[r.trackID].pop();
