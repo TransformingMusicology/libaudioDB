@@ -3,8 +3,6 @@
 #include <set>
 #include <functional>
 
-#define MIN_ARG(a,b) a<b?a:b
-
 typedef struct nnresult {
   unsigned int trackID;
   double dist;
@@ -478,6 +476,100 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse
 	point_queues[r.trackID].pop();
       }
     }
+  } else {
+    // FIXME
+  }
+}
+
+
+
+
+
+/****************** EXPERIMENTAL REPORTERS ***************/
+
+
+
+
+
+
+// track Sequence Query Radius NN Reporter
+// retrieve tracks ordered by query-point matches (one per track per query point)
+//
+// as well as sorted n-NN points per retrieved track
+class trackSequenceQueryRadNNReporterOneToOne : public Reporter { 
+public:
+  trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
+  ~trackSequenceQueryRadNNReporterOneToOne();
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
+  void report(char *fileTable, adb__queryResponse *adbQueryResponse);
+ protected:
+  unsigned int pointNN;
+  unsigned int trackNN;
+  unsigned int numFiles;
+  std::set< NNresult > *set;
+  std::vector< NNresult> *point_queue;
+  unsigned int *count;
+
+};
+
+trackSequenceQueryRadNNReporterOneToOne::trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles):
+pointNN(pointNN), trackNN(trackNN), numFiles(numFiles) {
+  // Where to count Radius track matches (one-to-one)
+  set = new std::set< NNresult >; 
+  // Where to insert individual point matches (one-to-many)
+  point_queue = new std::vector< NNresult >;
+  
+  count = new unsigned int[numFiles];
+  for (unsigned i = 0; i < numFiles; i++) {
+    count[i] = 0;
+  }
+}
+
+trackSequenceQueryRadNNReporterOneToOne::~trackSequenceQueryRadNNReporterOneToOne() {
+  delete set;
+  delete [] count;
+}
+
+void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+  std::set< NNresult >::iterator it;
+  NNresult r;
+  r.qpos = qpos;
+  r.trackID = trackID;
+
+  // Track insertion count <trackID,qpos> pairs
+  it = set->find(r);
+  if ( it == set->end() ) {
+    set->insert(r);
+    count[trackID]++;
+  }
+
+  // Point insertion
+  // Keep the <qpos> result with the smallest <dist> value (greedy local one-to-one algorithm)
+  r.spos = spos;
+  r.dist = dist;
+
+  if(point_queue->size() < r.qpos + 1){
+    point_queue->resize( r.qpos + 1 );
+    (*point_queue)[r.qpos].dist = 1e6;
+  }
+
+  if (r.dist < (*point_queue)[r.qpos].dist)
+    (*point_queue)[r.qpos] = r;
+
+}
+
+void trackSequenceQueryRadNNReporterOneToOne::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
+  if(adbQueryResponse==0) {
+    std::vector< NNresult >::iterator vit;
+    NNresult rk;
+    for( vit = point_queue->begin() ; vit < point_queue->end() ; vit++ ){
+      rk = *vit;
+      std::cout << rk.dist << " " 
+		<< rk.qpos << " " 
+		<< rk.spos << " " 
+		<< fileTable + rk.trackID*O2_FILETABLE_ENTRY_SIZE 
+		<< std::endl;
+      }
   } else {
     // FIXME
   }

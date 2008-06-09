@@ -42,7 +42,7 @@ option "keyList"     K "text file containing list of unique identifiers associat
 
 section "Database Search" sectiondesc="Thse commands control the retrieval behaviour.\n"
 
-option "QUERY" Q "content-based search on --database using --features as a query. Optionally restrict the search to those tracks identified in a --keyList." values="point","track","sequence", "nsequence" typestr="searchtype" dependon="database" dependon="features" optional
+option "QUERY" Q "content-based search on --database using --features as a query. Optionally restrict the search to those tracks identified in a --keyList." values="point","track","sequence","nsequence","onetoonensequence" typestr="searchtype" dependon="database" dependon="features" optional
 option "qpoint" p "ordinal position of query start point in --features file." int typestr="position" default="0" optional
 option "exhaustive" e "exhaustive search: iterate through all query vectors in search. Overrides --qpoint." flag off optional hidden
 option "pointnn" n "number of point nearest neighbours to use in retrieval." int typestr="numpoints" default="10" optional

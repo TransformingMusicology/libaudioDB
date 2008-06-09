@@ -330,6 +330,8 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
       queryType=O2_SEQUENCE_QUERY;
     else if(strncmp(args_info.QUERY_arg, "nsequence", MAXSTR)==0)
       queryType=O2_N_SEQUENCE_QUERY;
+    else if(strncmp(args_info.QUERY_arg, "onetoonensequence", MAXSTR)==0)
+      queryType=O2_ONE_TO_ONE_N_SEQUENCE_QUERY;
     else
       error("unsupported query type",args_info.QUERY_arg);
     
@@ -341,12 +343,12 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
     
     pointNN = args_info.pointnn_arg;
-    if(pointNN < 1 || pointNN > 1000) {
-      error("pointNN out of range: 1 <= pointNN <= 1000");
+    if(pointNN < 1 || pointNN > O2_MAXNN) {
+      error("pointNN out of range: 1 <= pointNN <= 1000000");
     }
     trackNN = args_info.resultlength_arg;
-    if(trackNN < 1 || trackNN > 1000) {
-      error("resultlength out of range: 1 <= resultlength <= 1000");
+    if(trackNN < 1 || trackNN > O2_MAXNN) {
+      error("resultlength out of range: 1 <= resultlength <= 1000000");
     }
     sequenceLength = args_info.sequencelength_arg;
     if(sequenceLength < 1 || sequenceLength > 1000) {

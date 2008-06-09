@@ -68,7 +68,7 @@
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
 #define O2_MAXDIM (1000U)
-#define O2_MAXNN (10000U)
+#define O2_MAXNN (1000000U)
 
 // Flags
 #define O2_FLAG_L2NORM (0x1U)
@@ -81,6 +81,7 @@
 #define O2_SEQUENCE_QUERY (0x8U)
 #define O2_TRACK_QUERY (0x10U)
 #define O2_N_SEQUENCE_QUERY (0x20U)
+#define O2_ONE_TO_ONE_N_SEQUENCE_QUERY (0x40U)
 
 
 // Error Codes
