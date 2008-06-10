@@ -1,5 +1,6 @@
 #include <utility>
 #include <queue>
+#include <deque>
 #include <set>
 #include <functional>
 
@@ -343,16 +344,23 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
     result.pop();
   }
   std::vector<NNresult>::reverse_iterator rit;
-      
+  std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > point_queue;      
+
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.dist << std::endl;
-      unsigned int size = point_queues[r.trackID].size();
-      for(unsigned int k = 0; k < size; k++) {
-	NNresult rk = point_queues[r.trackID].top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+      unsigned int qsize = point_queues[r.trackID].size();
+      // Reverse the order of the points stored in point_queues
+      for(unsigned int k=0; k < qsize; k++){
+	point_queue.push( point_queues[r.trackID].top() );
 	point_queues[r.trackID].pop();
+      }
+      
+      for(unsigned int k = 0; k < qsize; k++) {
+	NNresult rk = point_queue.top();
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	point_queue.pop();
       }
     }
   } else {
@@ -463,39 +471,42 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse
     v.push_back(r);
     result.pop();
   }
+
+
+  // Traverse tracks in descending order of count cardinality
   std::vector<Radresult>::reverse_iterator rit;
-      
+  std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > point_queue;
+
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " " << r.count << std::endl;
-      int qsize=point_queues[r.trackID].size();
-      for(int k=0; k < qsize; k++){
-	NNresult rk = point_queues[r.trackID].top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+
+      // Reverse the order of the points stored in point_queues
+      unsigned int qsize=point_queues[r.trackID].size();
+      for(unsigned int k=0; k < qsize; k++){
+	point_queue.push(point_queues[r.trackID].top());
 	point_queues[r.trackID].pop();
+      }
+
+      for(unsigned int k=0; k < qsize; k++){
+	NNresult rk = point_queue.top();
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	point_queue.pop();
       }
     }
   } else {
     // FIXME
   }
+  delete[] point_queues;
 }
 
 
+/********** ONE-TO-ONE REPORTERS *****************/
 
-
-
-/****************** EXPERIMENTAL REPORTERS ***************/
-
-
-
-
-
-
-// track Sequence Query Radius NN Reporter
-// retrieve tracks ordered by query-point matches (one per track per query point)
-//
-// as well as sorted n-NN points per retrieved track
+// track Sequence Query Radius NN Reporter One-to-One
+// for each query point find the single best matching target point in all database
+// report qpos, spos and trackID
 class trackSequenceQueryRadNNReporterOneToOne : public Reporter { 
 public:
   trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
@@ -533,18 +544,9 @@ trackSequenceQueryRadNNReporterOneToOne::~trackSequenceQueryRadNNReporterOneToOn
 void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
   std::set< NNresult >::iterator it;
   NNresult r;
+
   r.qpos = qpos;
   r.trackID = trackID;
-
-  // Track insertion count <trackID,qpos> pairs
-  it = set->find(r);
-  if ( it == set->end() ) {
-    set->insert(r);
-    count[trackID]++;
-  }
-
-  // Point insertion
-  // Keep the <qpos> result with the smallest <dist> value (greedy local one-to-one algorithm)
   r.spos = spos;
   r.dist = dist;
 
