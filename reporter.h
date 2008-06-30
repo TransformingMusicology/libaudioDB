@@ -28,6 +28,10 @@ bool operator< (const Radresult &a, const Radresult &b) {
   return a.count < b.count;
 }
 
+bool operator> (const Radresult &a, const Radresult &b) {
+  return a.count > b.count;
+}
+
 class Reporter {
 public:
   virtual ~Reporter() {};
@@ -254,7 +258,7 @@ void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int
 }
 
 void trackSequenceQueryRadReporter::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
-  std::priority_queue < Radresult > result;
+  std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
   for (int i = numFiles-1; i >= 0; i--) {
@@ -448,7 +452,7 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
 }
 
 void trackSequenceQueryRadNNReporter::report(char *fileTable, adb__queryResponse *adbQueryResponse) {
-  std::priority_queue < Radresult > result;
+  std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
   for (int i = numFiles-1; i >= 0; i--) {
