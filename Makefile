@@ -2,6 +2,7 @@ HELP2MAN=help2man
 GENGETOPT=gengetopt
 SOAPCPP2=soapcpp2
 GSOAP_CPP=-lgsoap++
+LIBGSL=-lgsl -lgslcblas
 GSOAP_INCLUDE=
 
 override CFLAGS+=-O3 -g
@@ -40,7 +41,7 @@ soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o
 
 ${EXECUTABLE}: ${OBJS} soapServer.cpp soapClient.cpp soapC.cpp cmdline.c
-	g++ -o ${EXECUTABLE} ${CFLAGS} -lgsl -lgslcblas ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
+	g++ -o ${EXECUTABLE} ${CFLAGS} ${LIBGSL} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
 
 clean:
 	-rm cmdline.c cmdline.h
@@ -48,10 +49,11 @@ clean:
 	-rm adb.nsmap adb.xsd adb.wsdl adb.*.req.xml adb.*.res.xml
 	-rm HELP.txt
 	-rm ${EXECUTABLE} ${EXECUTABLE}.1 ${OBJS}
+	-rm xthresh
 	-sh -c "cd tests && sh ./clean.sh"
 
 test: ${EXECUTABLE}
 	-sh -c "cd tests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
-	gcc -o $@ -lgsl -lgslcblas $<
+	gcc -o $@ ${LIBGSL} $<

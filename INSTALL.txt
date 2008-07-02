@@ -15,6 +15,8 @@ help2man: a spartan manual page is automatically generated from the
 bash: audioDB's test suite depends on /bin/sh being bash, version 3.0
       or greater.
 
+gsl: the GNU Scientific Library.
+
 Compiling
 ---------
 
@@ -28,7 +30,8 @@ OS X or Win32: make \
   GENGETOPT=/path/to/bin/gengetopt \
   SOAPCPP2=/path/to/bin/soapcpp2 \
   GSOAP_CPP=/path/to/gsoap/stdsoap2.cpp \
-  GSOAP_INCLUDE="-I /path/to/gsoap"
+  GSOAP_INCLUDE="-I /path/to/gsoap" \
+  LIBGSL="-L/path/to/libgsl/libraries -lgsl -lgslcblas"
 (where the path in GSOAP_INCLUDE should name the directory in which
 stdsoap2.h resides)
 
