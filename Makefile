@@ -37,10 +37,10 @@ soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 %.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h
 	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} -Wall -Werror $<
 
-OBJS=insert.o create.o common.o dump.o query.o soap.o audioDB.o
+OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o
 
 ${EXECUTABLE}: ${OBJS} soapServer.cpp soapClient.cpp soapC.cpp cmdline.c
-	g++ -o ${EXECUTABLE} ${CFLAGS} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
+	g++ -o ${EXECUTABLE} ${CFLAGS} -lgsl -lgslcblas ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
 
 clean:
 	-rm cmdline.c cmdline.h
@@ -52,3 +52,6 @@ clean:
 
 test: ${EXECUTABLE}
 	-sh -c "cd tests && sh ./run-tests.sh"
+
+xthresh: xthresh.c
+	gcc -o $@ -lgsl -lgslcblas $<

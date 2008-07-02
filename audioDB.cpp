@@ -37,6 +37,9 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
       ws_status(dbName,(char*)hostport);
     else
       status(dbName);
+
+  else if(O2_ACTION(COM_SAMPLE))
+    sample(dbName);
   
   else if(O2_ACTION(COM_L2NORM))
     l2norm(dbName);
@@ -207,6 +210,17 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
   if(args_info.STATUS_given){
     command=COM_STATUS;
     dbName=args_info.database_arg;
+    return 0;
+  }
+
+  if(args_info.SAMPLE_given) {
+    command = COM_SAMPLE;
+    dbName = args_info.database_arg;
+    sequenceLength = args_info.sequencelength_arg;
+    if(sequenceLength < 1 || sequenceLength > 1000) {
+      error("seqlen out of range: 1 <= seqlen <= 1000");
+    }
+    nsamples = args_info.nsamples_arg;
     return 0;
   }
 

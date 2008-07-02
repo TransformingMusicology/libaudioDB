@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <float.h>
 #include <signal.h>
+#include <gsl/gsl_rng.h>
 
 // includes for web services
 #include "soapH.h"
@@ -29,6 +30,7 @@
 #define COM_POWER "--POWER"
 #define COM_DUMP "--DUMP"
 #define COM_SERVER "--SERVER"
+#define COM_SAMPLE "--SAMPLE"
 
 // parameters
 #define COM_CLIENT "--client"
@@ -176,6 +178,8 @@ class audioDB{
   // Flags and parameters
   unsigned verbosity;   // how much do we want to know?
 
+  unsigned nsamples;
+
   //off_t size; // given size (for creation)
   unsigned datasize; // size in MB
   unsigned ntracks;
@@ -247,6 +251,8 @@ class audioDB{
   void batchinsert(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
+  unsigned random_track(unsigned *propTable, unsigned total, gsl_rng *);
+  void sample(const char *dbName);
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
@@ -291,6 +297,7 @@ class audioDB{
   powerTableLength(0), \
   l2normTableLength(0), \
   verbosity(1), \
+  nsamples(2000), \
   datasize(O2_DEFAULT_DATASIZE), \
   ntracks(O2_DEFAULT_NTRACKS), \
   datadim(O2_DEFAULT_DATADIM), \
