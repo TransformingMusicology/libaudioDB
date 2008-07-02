@@ -3,6 +3,7 @@ GENGETOPT=gengetopt
 SOAPCPP2=soapcpp2
 GSOAP_CPP=-lgsoap++
 LIBGSL=-lgsl -lgslcblas
+GSL_INCLUDE=
 GSOAP_INCLUDE=
 
 override CFLAGS+=-O3 -g
@@ -36,12 +37,12 @@ soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 	${SOAPCPP2} audioDBws.h
 
 %.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h
-	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} -Wall -Werror $<
+	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} ${GSL_INCLUDE} -Wall  $<
 
 OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o
 
 ${EXECUTABLE}: ${OBJS} soapServer.cpp soapClient.cpp soapC.cpp cmdline.c
-	g++ -o ${EXECUTABLE} ${CFLAGS} ${LIBGSL} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
+	g++ -o ${EXECUTABLE} ${CFLAGS} ${GSL_INCLUDE} ${LIBGSL} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
 
 clean:
 	-rm cmdline.c cmdline.h
@@ -56,4 +57,4 @@ test: ${EXECUTABLE}
 	-sh -c "cd tests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
-	gcc -o $@ ${LIBGSL} $<
+	gcc -o $@ ${CFLAGS} ${GSL_INCLUDE} ${LIBGSL} $<

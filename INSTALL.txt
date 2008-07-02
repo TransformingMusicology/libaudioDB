@@ -31,9 +31,11 @@ OS X or Win32: make \
   SOAPCPP2=/path/to/bin/soapcpp2 \
   GSOAP_CPP=/path/to/gsoap/stdsoap2.cpp \
   GSOAP_INCLUDE="-I /path/to/gsoap" \
+  GSL_INCLUDE'"-I /path/to/gsl/"
   LIBGSL="-L/path/to/libgsl/libraries -lgsl -lgslcblas"
 (where the path in GSOAP_INCLUDE should name the directory in which
-stdsoap2.h resides)
+stdsoap2.h resides and the path to GSL_INCLUDE should name the directory
+which gsl_rng.h resides.)
 
 Testing
 -------
