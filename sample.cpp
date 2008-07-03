@@ -16,7 +16,8 @@ double yinv(double y) {
   double ay = yfun(a);
   double by = yfun(b);
 
-  double c, cy;
+  double c = 0;
+  double cy;
 
   /* FIXME: simple binary search; there's probably some clever solver
      in gsl somewhere which is less sucky. */
