@@ -159,6 +159,8 @@ class audioDB{
   char* indata;
   struct stat statbuf;  
   dbTableHeaderPtr dbH;
+
+  gsl_rng *rng;
   
   char *fileTable;
   unsigned* trackTable;
@@ -224,6 +226,7 @@ class audioDB{
   void set_up_db(double **snp, double **vsnp, double **spp, double **vspp, double **mddp, unsigned int *dvp);
   void query_loop(const char* dbName, const char* inFile, Reporter *reporter);
 
+  void initRNG();
   void initDBHeader(const char *dbName);
   void initInputFile(const char *inFile);
   void initTables(const char* dbName, const char* inFile);
@@ -251,7 +254,7 @@ class audioDB{
   void batchinsert(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
-  unsigned random_track(unsigned *propTable, unsigned total, gsl_rng *);
+  unsigned random_track(unsigned *propTable, unsigned total);
   void sample(const char *dbName);
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *trackKey, const char* hostport);
@@ -285,6 +288,7 @@ class audioDB{
   db(0), \
   indata(0), \
   dbH(0), \
+  rng(0), \
   fileTable(0), \
   trackTable(0), \
   dataBuf(0), \

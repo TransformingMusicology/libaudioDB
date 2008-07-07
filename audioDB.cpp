@@ -97,6 +97,9 @@ void audioDB::cleanup() {
   if(l2normTable)
     munmap(l2normTable, l2normTableLength);
 
+  if(rng)
+    gsl_rng_free(rng);
+
   if(dbfid>0)
     close(dbfid);
   if(infid>0)

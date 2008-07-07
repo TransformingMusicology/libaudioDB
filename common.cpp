@@ -70,6 +70,15 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
   }
 }
 
+void audioDB::initRNG() {
+  rng = gsl_rng_alloc(gsl_rng_mt19937);
+  if(!rng) {
+    error("could not allocate Random Number Generator");
+  }
+  /* FIXME: maybe we should use a real source of entropy? */
+  gsl_rng_set(rng, time(NULL));
+}
+
 void audioDB::initDBHeader(const char* dbName) {
   if ((dbfid = open(dbName, forWrite ? O_RDWR : O_RDONLY)) < 0) {
     error("Can't open database file", dbName, "open");
@@ -179,6 +188,13 @@ void audioDB::initInputFile (const char *inFile) {
 }
 
 void audioDB::initTables(const char* dbName, const char* inFile = 0) {
+  /* FIXME: initRNG() really logically belongs in the audioDB
+     contructor.  However, there are of the order of four constructors
+     at the moment, and more to come from API implementation.  Given
+     that duplication, I think this is the least worst place to put
+     it; the assumption is that nothing which doesn't look at a
+     database will need an RNG.  -- CSR, 2008-07-02 */
+  initRNG();
   initDBHeader(dbName);
   initInputFile(inFile);
 }

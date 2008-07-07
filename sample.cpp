@@ -36,7 +36,7 @@ double yinv(double y) {
   return c;
 }
 
-unsigned audioDB::random_track(unsigned *propTable, unsigned total, gsl_rng *rng) {
+unsigned audioDB::random_track(unsigned *propTable, unsigned total) {
   /* FIXME: make this O(1) by using the alias-rejection method, or
      some other sensible method of sampling from a discrete
      distribution. */
@@ -56,18 +56,6 @@ unsigned audioDB::random_track(unsigned *propTable, unsigned total, gsl_rng *rng
 
 void audioDB::sample(const char *dbName) {
   initTables(dbName, 0);
-
-  gsl_rng *rng = gsl_rng_alloc(gsl_rng_mt19937);
-
-  /* FIXME: in Real Life we'll want to initialize the RNG using
-     /dev/random or the current time or something, like this:
-
-     unsigned int seed;
-     int fd = open("/dev/urandom", O_RDONLY);
-     read(fd, &seed, 4);
-     
-     gsl_rng_set(rng, seed);
-  */
 
   // build track offset table (FIXME: cut'n'pasted from query.cpp)
   off_t *trackOffsetTable = new off_t[dbH->numFiles];
@@ -105,8 +93,8 @@ void audioDB::sample(const char *dbName) {
   double sumlogdist = 0;
 
   for (unsigned int i = 0; i < nsamples;) {
-    unsigned track1 = random_track(propTable, total, rng);
-    unsigned track2 = random_track(propTable, total, rng);
+    unsigned track1 = random_track(propTable, total);
+    unsigned track2 = random_track(propTable, total);
 
     if(track1 == track2)
       continue;
