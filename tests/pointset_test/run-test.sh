@@ -11,8 +11,19 @@ floatstring -1 >> testpower
 
 ${AUDIODB} -d testdb -P
 
+NPOINTS=100
+NDIM=10
 
-for i in rad[0-9][0-9]/*
+if [ -d rad[0-9]* ]; then rm -r rad[0-9]*; fi
+
+for j in 1 2 3 9
+do
+mkdir -p "rad$j"
+./genpoints2 ${NPOINTS} $(( j*j )) ${NDIM}
+mv testfeature* "rad$j"
+done
+
+for i in rad[0-9]/*
 do
 ${AUDIODB} -d testdb -I -f $i -w testpower
 done
@@ -22,7 +33,41 @@ ${AUDIODB} -d testdb -L
 
 rm -f testdb.lsh.*
 
-${AUDIODB} -d testdb -X -R 1 -l 1 --lsh_N 10000 --lsh_b 10000 --lsh_k 10 --lsh_m 5 --absolute-threshold -10
+LSH_K=10
+LSH_M=5
 
-${AUDIODB} -d testdb -Q sequence -R 1 -l 1 -f testfeature -w testpower --absolute-threshold -10 -e
+INDEXING=true
+if [ ${INDEXING} ]
+    then
+    for j in 1 2 3 9
+      do
+      ${AUDIODB} -d testdb -X -R $(( j*j )) -l 1 --lsh_N 1000 \
+	  --lsh_b 1000 --lsh_k ${LSH_K} --lsh_m ${LSH_M} --absolute-threshold -1
+    done
+fi
 
+for j in 1 2 3 9
+do
+${AUDIODB} \
+    -d testdb -Q sequence -R $(( j*j )) \
+    -l 1 -f queryfeature -w testpower --absolute-threshold -1 -e -r 400 > output
+echo APPRX points retrieved at Radius $j: \
+`egrep "^rad1" output | wc | awk '{print $1}'` \
+`egrep "^rad2" output | wc | awk '{print $1}'` \
+`egrep "^rad3" output | wc | awk '{print $1}'` \
+`egrep "^rad9" output | wc | awk '{print $1}'` 
+done
+
+rm -f *.lsh*
+echo
+for j in 1 2 3 9
+do
+${AUDIODB} \
+    -d testdb -Q sequence -R $(( j*j )) \
+    -l 1 -f queryfeature -w testpower --absolute-threshold -1 -e -r 400 > output
+echo EXACT points retrieved at Radius $j: \
+`egrep "^rad1" output | wc | awk '{print $1}'` \
+`egrep "^rad2" output | wc | awk '{print $1}'` \
+`egrep "^rad3" output | wc | awk '{print $1}'` \
+`egrep "^rad9" output | wc | awk '{print $1}'` 
+done

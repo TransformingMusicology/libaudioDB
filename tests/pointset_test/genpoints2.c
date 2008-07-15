@@ -49,19 +49,18 @@ int main(int argc, char *argv[]) {
     // Translate to (0,0,...,1)
     coords[dim-1]+=1.0; 
 
-    // Recompute norm-squared
+    // Compute distance to (0,0,...,1)
     nmsq = 0.0;
-    for (j = 0; j < dim; j++){
+    for (j = 0; j < dim-1; j++){
       nmsq += coords[j]*coords[j];
     }
-
     // Save last value to distance calulcation to query(0,0,...,1)
     double nth = coords[dim-1];
     // Output to ASCII terminal
     printf("(");
     for(j = 0; j < dim; j++)
       printf("%8.3f ", coords[j]);
-    printf(") d = %8.3f\n", sqrt(nmsq - nth*nth + (nth-1)*(nth-1)));
+    printf(") d = %8.3f\n", sqrt(nmsq + (nth-1)*(nth-1)));
     
 
     // Save single feature vector
