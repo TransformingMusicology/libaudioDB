@@ -14,16 +14,17 @@ ${AUDIODB} -d testdb -P
 NPOINTS=100
 NDIM=10
 
-if [ -d rad[0-9]* ]; then rm -r rad[0-9]*; fi
+if [ -d rad.[0-9]* ]; then rm -r rad.[0-9]*; fi
 
-for j in 1 2 3 9
+for j in .01 .02 .03 .05 01 02 03 05 09 10
 do
-mkdir -p "rad$j"
-./genpoints2 ${NPOINTS} $(( j*j )) ${NDIM}
-mv testfeature* "rad$j"
+  R_SQ=`echo "scale=6; $j^2" | bc`
+  mkdir -p "rad$j"
+  ./genpoints2 ${NPOINTS} ${R_SQ} ${NDIM}
+  mv testfeature* "rad$j"
 done
 
-for i in rad[0-9]/*
+for i in rad*[0-9]*/*
 do
 ${AUDIODB} -d testdb -I -f $i -w testpower
 done
@@ -33,41 +34,51 @@ ${AUDIODB} -d testdb -L
 
 rm -f testdb.lsh.*
 
-LSH_K=10
-LSH_M=5
+LSH_W=1
+LSH_K=1
+LSH_M=1
+LSH_N=1000
 
 INDEXING=true
 if [ ${INDEXING} ]
     then
-    for j in 1 2 3 9
+    for j in .01 .02 .03 .05 01 02 03 05 09 10
       do
-      ${AUDIODB} -d testdb -X -R $(( j*j )) -l 1 --lsh_N 1000 \
-	  --lsh_b 1000 --lsh_k ${LSH_K} --lsh_m ${LSH_M} --absolute-threshold -1
+      R_SQ=`echo "scale=6; $j^2" | bc`
+      ${AUDIODB} -d testdb -X -R ${R_SQ} -l 1 --lsh_N ${LSH_N} \
+	  --lsh_b ${LSH_N} --lsh_k ${LSH_K} --lsh_m ${LSH_M} --lsh_w ${LSH_W} \
+	  --absolute-threshold -1 --no_unit_norming
     done
 fi
 
-for j in 1 2 3 9
-do
-${AUDIODB} \
-    -d testdb -Q sequence -R $(( j*j )) \
-    -l 1 -f queryfeature -w testpower --absolute-threshold -1 -e -r 400 > output
-echo APPRX points retrieved at Radius $j: \
-`egrep "^rad1" output | wc | awk '{print $1}'` \
-`egrep "^rad2" output | wc | awk '{print $1}'` \
-`egrep "^rad3" output | wc | awk '{print $1}'` \
-`egrep "^rad9" output | wc | awk '{print $1}'` 
+#if [ -f cumulativeResult.txt ]; then rm -f cumulativeResult.txt;fi
+
+for j in .01 .02 .03 .05 01 02 03 05 09 10
+  do
+  R_SQ=`echo "scale=6; $j^2" | bc`
+  ${AUDIODB} \
+      -d testdb -Q sequence -R ${R_SQ} -l 1 -e \
+      -f queryfeature -w testpower --absolute-threshold -1 --no_unit_norming -r 1000 > output${j}
+  echo `for k in .01 .02 .03 .05 01 02 03 05 09 10;do egrep "^rad$k" output${j} | wc | awk '{print $1}';done` >> cumulativeResult.txt
 done
 
-rm -f *.lsh*
-echo
-for j in 1 2 3 9
-do
-${AUDIODB} \
-    -d testdb -Q sequence -R $(( j*j )) \
-    -l 1 -f queryfeature -w testpower --absolute-threshold -1 -e -r 400 > output
-echo EXACT points retrieved at Radius $j: \
-`egrep "^rad1" output | wc | awk '{print $1}'` \
-`egrep "^rad2" output | wc | awk '{print $1}'` \
-`egrep "^rad3" output | wc | awk '{print $1}'` \
-`egrep "^rad9" output | wc | awk '{print $1}'` 
-done
+
+
+#Perform exact search as a sanity test
+#rm -f *.lsh*
+#echo
+#for j in .01 .02 .03 .05 01 02 03 05 09 10
+#  do
+#  R_SQ=`echo "scale=6; $j^2" | bc`
+#  ${AUDIODB} \
+#      -d testdb -Q sequence -R ${R_SQ} -l 1 -e \
+#      -f queryfeature -w testpower --absolute-threshold -1 --no_unit_norming -r 1000 > outputEUC
+#  echo EUC points retrieved at Radius $j: \
+#`for k in .01 .02 .03 .05 01 02 03 05 09 10; do egrep "^rad$k" outputEUC | wc | awk '{print $1}';done` 
+#done
+
+#Inspect the indexing parameters
+#echo
+#egrep "^INDEX:" output[1-9]
+#echo
+
