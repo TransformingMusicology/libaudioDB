@@ -27,7 +27,7 @@ option "POWER"  P "turn on power flag for database." dependon="database" optiona
 section "Database Information" sectiondesc="Information about databases."
 
 option "STATUS" S "output database information to stdout." dependon="database" optional
-option "SAMPLE" X "sample statistics for database." dependon="database" optional
+option "SAMPLE" - "sample statistics for database." dependon="database" optional
 option "nsamples" - "number of pairwise samples to take." dependon="SAMPLE" int typestr="number" default="2000" optional
 
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
