@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     // Save single feature vector
     char name[40];
     if(i < count)
-      snprintf(name, 39, "testfeature%d", i);
+      snprintf(name, 39, i<10?"testfeature0%d":"testfeature%d", i);
     else
       snprintf(name, 39, "queryfeature");
     /* assumes $PWD is right */

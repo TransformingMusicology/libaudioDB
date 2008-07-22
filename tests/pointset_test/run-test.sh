@@ -57,7 +57,7 @@ for W in ${LSH_W}
 	    do
 	    R_SQ=`echo "scale=6; $j^2" | bc`
 	    ${AUDIODB} -d testdb -X -R ${R_SQ} -l 1 --lsh_N ${LSH_N} \
-		--lsh_b ${LSH_N} --lsh_k ${LSH_K} --lsh_m ${LSH_M} --lsh_w ${W} \
+		--lsh_b ${LSH_N} --lsh_k ${LSH_K} --lsh_m ${LSH_M} --lsh_w ${W} --lsh_ncols 1000 \
 		--absolute-threshold -1 --no_unit_norming
 	  done
       fi
