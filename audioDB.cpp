@@ -1,5 +1,23 @@
 #include "audioDB.h"
 
+PointPair::PointPair(Uns32T a, Uns32T b, Uns32T c):trackID(a),qpos(b),spos(c){};
+
+bool operator<(const PointPair& a, const PointPair& b){
+  return ( (a.qpos<b.qpos) || 
+	   ((a.qpos==b.qpos) && 
+	    ( (a.trackID<b.trackID)) || ((a.trackID==b.trackID)&&(a.spos<b.spos)) ) );	    
+}
+
+bool operator>(const PointPair& a, const PointPair& b){
+  return ( (a.qpos>b.qpos) || 
+	   ((a.qpos==b.qpos) && 
+	    ( (a.trackID>b.trackID)) || ((a.trackID==b.trackID)&&(a.spos>b.spos)) ) );
+}
+
+bool operator==(const PointPair& a, const PointPair& b){
+  return ( (a.trackID==b.trackID) && (a.qpos==b.qpos) && (a.spos==b.spos) );
+}
+
 audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZERS
 {
   if(processArgs(argc, argv)<0){
@@ -49,6 +67,9 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
 
   else if(O2_ACTION(COM_DUMP))
     dump(dbName);
+
+  else if(O2_ACTION(COM_INDEX))
+    index_index_db(dbName);
   
   else
     error("Unrecognized command",command);
@@ -96,10 +117,16 @@ void audioDB::cleanup() {
     munmap(timesTable, timesTableLength);
   if(l2normTable)
     munmap(l2normTable, l2normTableLength);
-
+  if(trackOffsetTable)
+    delete trackOffsetTable;
+  if(reporter)
+    delete reporter;
+  if(exact_evaluation_queue)
+    delete exact_evaluation_queue;
   if(rng)
     gsl_rng_free(rng);
-
+  if(vv)
+    delete vv;
   if(dbfid>0)
     close(dbfid);
   if(infid>0)
@@ -179,6 +206,27 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
   }
   
+  sequenceLength = args_info.sequencelength_arg;
+  if(sequenceLength < 1 || sequenceLength > 1000) {
+    error("seqlen out of range: 1 <= seqlen <= 1000");
+  }
+  sequenceHop = args_info.sequencehop_arg;
+  if(sequenceHop < 1 || sequenceHop > 1000) {
+    error("seqhop out of range: 1 <= seqhop <= 1000");
+  }
+  
+  if (args_info.absolute_threshold_given) {
+    if (args_info.absolute_threshold_arg >= 0) {
+      error("absolute threshold out of range: should be negative");
+    }
+    use_absolute_threshold = true;
+    absolute_threshold = args_info.absolute_threshold_arg;
+  }
+  if (args_info.relative_threshold_given) {
+    use_relative_threshold = true;
+    relative_threshold = args_info.relative_threshold_arg;
+  }
+
   if(args_info.SERVER_given){
     command=COM_SERVER;
     port=args_info.SERVER_arg;
@@ -251,7 +299,10 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     dbName=args_info.database_arg;
     inFile=args_info.features_arg;
     if(args_info.key_given)
-      key=args_info.key_arg;
+      if(!args_info.features_given)
+	error("INSERT: '-k key' argument depends on '-f features'");
+      else
+	key=args_info.key_arg;
     if(args_info.times_given){
       timesFileName=args_info.times_arg;
       if(strlen(timesFileName)>0){
@@ -277,7 +328,10 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     dbName=args_info.database_arg;
     inFile=args_info.featureList_arg;
     if(args_info.keyList_given)
-      key=args_info.keyList_arg; // INCONSISTENT NO CHECK
+      if(!args_info.features_given)
+	error("INSERT: '-k key' argument depends on '-f features'");
+      else
+	key=args_info.key_arg;     // INCONSISTENT NO CHECK
 
     /* TO DO: REPLACE WITH
       if(args_info.keyList_given){
@@ -306,13 +360,64 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
     return 0;
   }
-  
+
+  // Set no_unit_norm flag  
+  no_unit_norming = args_info.no_unit_norming_flag;
+  lsh_use_u_functions = args_info.lsh_use_u_functions_flag;
+
+  // LSH Index Command
+  if(args_info.INDEX_given){
+    if(radius <= 0 )
+      error("INDEXing requires a Radius argument");
+    if(!(sequenceLength>0 && sequenceLength <= O2_MAXSEQLEN))
+      error("INDEXing requires 1 <= sequenceLength <= 1000");
+    command=COM_INDEX;
+    dbName=args_info.database_arg;
+
+    // Whether to store LSH hash tables for query in core (FORMAT2)
+    lsh_in_core = args_info.lsh_inCore_flag;
+
+    lsh_param_w = args_info.lsh_w_arg;
+    if(!(lsh_param_w>0 && lsh_param_w<=O2_SERIAL_MAX_BINWIDTH))
+      error("Indexing parameter w out of range (0.0 < w <= 100.0)");
+
+    lsh_param_k = args_info.lsh_k_arg;      
+    if(!(lsh_param_k>0 && lsh_param_k<=O2_SERIAL_MAX_FUNS))
+      error("Indexing parameter k out of range (1 <= k <= 100)");
+
+    lsh_param_m = args_info.lsh_m_arg;
+    if(!(lsh_param_m>0 && lsh_param_m<= (1 + (sqrt(1 + O2_SERIAL_MAX_TABLES*8.0)))/2.0))
+      error("Indexing parameter m out of range (1 <= m <= 20)");
+
+    lsh_param_N = args_info.lsh_N_arg;    
+    if(!(lsh_param_N>0 && lsh_param_N<=O2_SERIAL_MAX_ROWS))
+      error("Indexing parameter N out of range (1 <= N <= 1000000)");
+    
+    lsh_param_b = args_info.lsh_b_arg;
+    if(!(lsh_param_b>0 && lsh_param_b<=O2_SERIAL_MAX_TRACKBATCH))
+      error("Indexing parameter b out of range (1 <= b <= 10000)");
+    
+    lsh_param_ncols = args_info.lsh_ncols_arg;
+    if( !(lsh_param_ncols>0 && lsh_param_ncols<=O2_SERIAL_MAX_COLS))
+      error("Indexing parameter ncols out of range (1 <= ncols <= 1000");
+
+    return 0;
+  }
+
   // Query command and arguments
   if(args_info.QUERY_given){
     command=COM_QUERY;
     dbName=args_info.database_arg;
-    inFile=args_info.features_arg;
-    
+    // XOR features and key search
+    if(!args_info.features_given && !args_info.key_given || (args_info.features_given && args_info.key_given))
+      error("QUERY requires exactly one of either -f features or -k key");
+    if(args_info.features_given)
+      inFile=args_info.features_arg; // query from file
+    else{
+      query_from_key = true;
+      key=args_info.key_arg;      // query from key
+    }
+
     if(args_info.keyList_given){
       trackFileName=args_info.keyList_arg;
       if(strlen(trackFileName)>0 && !(trackFile = new std::ifstream(trackFileName,std::ios::in)))
@@ -358,7 +463,13 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
       if(queryPoint<0 || queryPoint >10000)
         error("queryPoint out of range: 0 <= queryPoint <= 10000");
     }
-    
+
+    // Whether to pre-load LSH hash tables for query
+    lsh_in_core = args_info.lsh_inCore_flag;
+
+    // Whether to perform exact evaluation of points returned by LSH
+    lsh_exact = args_info.lsh_exact_flag;
+
     pointNN = args_info.pointnn_arg;
     if(pointNN < 1 || pointNN > O2_MAXNN) {
       error("pointNN out of range: 1 <= pointNN <= 1000000");
@@ -366,26 +477,6 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     trackNN = args_info.resultlength_arg;
     if(trackNN < 1 || trackNN > O2_MAXNN) {
       error("resultlength out of range: 1 <= resultlength <= 1000000");
-    }
-    sequenceLength = args_info.sequencelength_arg;
-    if(sequenceLength < 1 || sequenceLength > 1000) {
-      error("seqlen out of range: 1 <= seqlen <= 1000");
-    }
-    sequenceHop = args_info.sequencehop_arg;
-    if(sequenceHop < 1 || sequenceHop > 1000) {
-      error("seqhop out of range: 1 <= seqhop <= 1000");
-    }
-
-    if (args_info.absolute_threshold_given) {
-      if (args_info.absolute_threshold_arg >= 0) {
-	error("absolute threshold out of range: should be negative");
-      }
-      use_absolute_threshold = true;
-      absolute_threshold = args_info.absolute_threshold_arg;
-    }
-    if (args_info.relative_threshold_given) {
-      use_relative_threshold = true;
-      relative_threshold = args_info.relative_threshold_arg;
     }
     return 0;
   }

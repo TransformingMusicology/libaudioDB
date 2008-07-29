@@ -147,6 +147,14 @@ void audioDB::initDBHeader(const char* dbName) {
     CHECKED_MMAP(double *, powerTable, dbH->powerTableOffset, powerTableLength);
     CHECKED_MMAP(double *, l2normTable, dbH->l2normTableOffset, l2normTableLength);
   }
+
+  // build track offset table
+  trackOffsetTable = new off_t[dbH->numFiles];
+  Uns32T cumTrack=0;
+  for(Uns32T k = 0; k < dbH->numFiles; k++){
+    trackOffsetTable[k] = cumTrack;
+    cumTrack += trackTable[k] * dbH->dim;
+  }  
 }
 
 void audioDB::initInputFile (const char *inFile) {
@@ -187,7 +195,7 @@ void audioDB::initInputFile (const char *inFile) {
   }
 }
 
-void audioDB::initTables(const char* dbName, const char* inFile = 0) {
+void audioDB::initTables(const char* dbName, const char* inFile) {
   /* FIXME: initRNG() really logically belongs in the audioDB
      contructor.  However, there are of the order of four constructors
      at the moment, and more to come from API implementation.  Given
@@ -196,5 +204,7 @@ void audioDB::initTables(const char* dbName, const char* inFile = 0) {
      database will need an RNG.  -- CSR, 2008-07-02 */
   initRNG();
   initDBHeader(dbName);
-  initInputFile(inFile);
+  if(inFile)
+    initInputFile(inFile);
 }
+

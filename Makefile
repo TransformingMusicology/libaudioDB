@@ -36,10 +36,10 @@ cmdline.c cmdline.h: gengetopt.in
 soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 	${SOAPCPP2} audioDBws.h
 
-%.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h
+%.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
 	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} ${GSL_INCLUDE} -Wall  $<
 
-OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o
+OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o index.o lshlib.o
 
 ${EXECUTABLE}: ${OBJS} soapServer.cpp soapClient.cpp soapC.cpp cmdline.c
 	g++ -o ${EXECUTABLE} ${CFLAGS} ${GSL_INCLUDE} ${LIBGSL} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
