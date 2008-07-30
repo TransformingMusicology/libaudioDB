@@ -1,5 +1,5 @@
-CFLAGS= -O3 -g 
-#CFLAGS= -ggdb --save-temps
+#CFLAGS= -O3 -g 
+CFLAGS= -ggdb --save-temps
 MTSOURCES=mt19937/mt19937ar.c
 CFLAGS+=-DMT19937
 GENGETOPT=gengetopt
@@ -7,12 +7,9 @@ SOAPCPP2=soapcpp2
 GSOAP_CPP=-lgsoap++
 GSOAP_INCLUDE=
 
-TARGET=TEST_LSH_LIB
-TARGET2=UNIT_TEST_LSH
-LSHOBS=TEST_LSH_LIB.cpp lshlib.cpp 
-LSHOBS2=UNIT_TEST_LSH.cpp lshlib.cpp
-LSHHDRS=TEST_LSH_LIB.h lshlib.h reporter.h audioDB.h ReporterBase.h
-LSHHDRS2=lshlib.h
+TARGET=UNIT_TEST_LSH
+LSHOBS=UNIT_TEST_LSH.cpp lshlib.cpp
+LSHHDRS=lshlib.h
 
 ifeq ($(shell uname),Linux)
 override CFLAGS+=-D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 
@@ -20,15 +17,8 @@ endif
 
 all: ${TARGET}
 
-unit: ${TARGET2}
-
 ${TARGET}: ${LSHOBS} ${LSHHDRS} ${MTSOURCES} MakefileLSH
 	${GENGETOPT} -e <gengetopt.in
 	${SOAPCPP2} audioDBws.h
 	g++ -o ${TARGET} ${CFLAGS} ${LSHOBS} ${MTSOURCES}
-	  
-${TARGET2}: ${LSHOBS2} ${LSHHDRS2} ${MTSOURCES} MakefileLSH
-	${GENGETOPT} -e <gengetopt.in
-	${SOAPCPP2} audioDBws.h
-	g++ -o ${TARGET2} ${CFLAGS} ${LSHOBS2} ${MTSOURCES}
 

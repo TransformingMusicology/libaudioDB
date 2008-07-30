@@ -51,13 +51,13 @@ int main(int argc, char* argv[]){
     serialized=true;
     trackBase = (lsh->get_maxp()>>N_POINT_BITS)+1; // Our encoding of tracks and points
   }  
-  cout << "k:" << lsh->k << " ";
-  cout << "m:" << lsh->m << "(L:" << lsh->L << ") ";
-  cout << "d:" << lsh->d << " ";
-  cout << "N:" << lsh->N << " ";
-  cout << "C:" << lsh->C << " ";
-  cout << "R:" << lsh->get_radius() << endl;
-  cout << "p:" << lsh->p << endl;
+  cout << "k:" << lsh->get_numFuns() << " ";
+  cout << "L:" << lsh->get_numTables() << " ";
+  cout << "d:" << lsh->get_dataDim() << " ";
+  cout << "N:" << lsh->get_numRows() << " ";
+  cout << "C:" << lsh->get_numCols() << " ";
+  cout << "R:" << lsh->get_radius() << " ";
+  cout << "p:" << lsh->get_maxp() << endl;
   cout.flush();
 
   cout << endl << "Constructing " << nT << " tracks with " << nP << " vectors of dimension " << d << endl;

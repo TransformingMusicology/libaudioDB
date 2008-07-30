@@ -661,7 +661,7 @@ void G::serialize(char* filename, Uns32T serialFormat){
     lshHeader->maxp=H::maxp;
     // Default to FILEFORMAT1
     if(!(lshHeader->flags&O2_SERIAL_FILEFORMAT2))
-      lshHeader->flags|=O2_SERIAL_FILEFORMAT2;
+      lshHeader->flags|=O2_SERIAL_FILEFORMAT1;
     memcpy((char*)db, (char*)lshHeader, sizeof(SerialHeaderT));
     serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
   }
