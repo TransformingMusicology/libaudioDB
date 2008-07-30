@@ -21,27 +21,28 @@ void H::error(const char* a, const char* b, const char *sysFunc) {
   exit(1);
 }
 
-H::H(Uns32T kk, Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC):
+H::H(){
+  // Delay initialization of lsh functions until we know the parameters
+}
+
+H::H(Uns32T kk, Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float ww, float rr):
 #ifdef USE_U_FUNCTIONS
   use_u_functions(true),
 #else
   use_u_functions(false),
 #endif
+  maxp(0),
   bucketCount(0),
   pointCount(0),
   N(NN),
   C(CC),
   k(kk),
   m(mm),
-  L(mm*(mm-1)/2),
-  d(dd)
+  L((mm*(mm-1))/2),
+  d(dd),
+  w(ww),
+  radius(rr)
 {
-  Uns32T j;
-  cout << "file size: ~" << (((unsigned long long)L*N*C*sizeof(SerialElementT))/1000000UL) << "MB" << endl;
-  if(((unsigned long long)L*N*C*sizeof(SerialElementT))>4000000000UL)
-    error("Maximum size of LSH file exceded: 12*L*N*C > 4000MB");
-  else if(((unsigned long long)N*C*sizeof(SerialElementT))>1000000000UL)
-    cout << "warning: hash tables exceed 1000MB." << endl;
 
   if(m<2){
     m=2;
@@ -52,16 +53,18 @@ H::H(Uns32T kk, Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC):
     k++; // make sure k is even
     cout << "warning: setting k even" << endl;
   }
-  __initialize_data_structures();
-  for(j=0; j<L; j++)
-    for(kk=0; kk<k; kk++) {
-      r1[j][kk]=__randr(); // random 1..2^29
-      r2[j][kk]=__randr(); // random 1..2^29
-    }
+
+  cout << "file size: ~" << (((unsigned long long)L*N*C*sizeof(SerialElementT))/1000000UL) << "MB" << endl;
+  if(((unsigned long long)L*N*C*sizeof(SerialElementT))>4000000000UL)
+    error("Maximum size of LSH file exceded: 12*L*N*C > 4000MB");
+  else if(((unsigned long long)N*C*sizeof(SerialElementT))>1000000000UL)
+    cout << "warning: hash tables exceed 1000MB." << endl;
+  
+  // We have the necessary parameters, so construct hashfunction datastructures
+  initialize_lsh_functions();
 }
 
-// Post constructor initialization
-void H::__initialize_data_structures(){  
+void H::initialize_lsh_functions(){
   H::P = UH_PRIME_DEFAULT;
   
   /* FIXME: don't use time(); instead use /dev/random or similar */
@@ -72,28 +75,155 @@ void H::__initialize_data_structures(){
 #else
   srand(time(NULL)); // seed random number generator
 #endif
-  Uns32T i,j;
-  H::h = new bucket**[ H::L ];  
-  H::r1 = new Uns32T*[ H::L ];
-  H::r2 = new Uns32T*[ H::L ];
-  assert( H::h && H::r1 && H::r2 ); // failure
-  for( j = 0 ; j < H::L ; j++ ){
-    H::r1[ j ] = new Uns32T[ H::k ];
-    H::r2[ j ] = new Uns32T[ H::k ];
-    assert( H::r1[j] && H::r2[j] ); // failure
+  Uns32T i,j, kk;
+#ifdef USE_U_FUNCTIONS
+  H::A = new float**[ H::m ]; // m x k x d random projectors
+  H::b = new float*[ H::m ];  // m x k random biases
+#else
+  H::A = new float**[ H::L ]; // m x k x d random projectors
+  H::b = new float*[ H::L ];  // m x k random biases
+#endif
+  H::g = new Uns32T*[ H::L ];   //  L x k random projections 
+  assert( H::g && H::A && H::b ); // failure
+#ifdef USE_U_FUNCTIONS
+  // Use m \times u_i functions \in R^{(k/2) \times (d)}
+  // Combine to make L=m(m-1)/2 hash functions \in R^{k \times d}
+  for( j = 0; j < H::m ; j++ ){ // m functions u_i(v)
+    H::A[j] = new float*[ H::k/2 ];  // k/2 x d  2-stable distribution coefficients     
+    H::b[j] = new float[ H::k/2 ];   // bias
+    assert( H::A[j] && H::b[j] ); // failure
+    for( kk = 0; kk < H::k/2 ; kk++ ){
+      H::A[j][kk] = new float[ H::d ];
+      assert( H::A[j][kk] ); // failure
+      for(Uns32T i = 0 ; i < H::d ; i++ )
+	H::A[j][kk][i] = H::randn(); // Normal
+      H::b[j][kk] = H::ranf()*H::w;        // Uniform
+    }
+  }
+#else
+  // Use m \times u_i functions \in R^{k \times (d)}
+  // Combine to make L=m(m-1)/2 hash functions \in R^{k \times d}
+  for( j = 0; j < H::L ; j++ ){ // m functions u_i(v)
+    H::A[j] = new float*[ H::k ];  // k x d  2-stable distribution coefficients     
+    H::b[j] = new float[ H::k ];   // bias
+    assert( H::A[j] && H::b[j] ); // failure
+    for( kk = 0; kk < H::k ; kk++ ){
+      H::A[j][kk] = new float[ H::d ];
+      assert( H::A[j][kk] ); // failure
+      for(Uns32T i = 0 ; i < H::d ; i++ )
+	H::A[j][kk][i] = H::randn(); // Normal
+      H::b[j][kk] = H::ranf()*H::w;        // Uniform
+    }
+  }
+#endif
+
+  // Storage for LSH hash function output (Uns32T)
+  for( j = 0 ; j < H::L ; j++ ){    // L functions g_j(u_a, u_b) a,b \in nchoosek(m,2)
+    H::g[j] = new Uns32T[ H::k ];   // k x 32-bit hash values, gj(v)=[x0 x1 ... xk-1] xk \in Z
+    assert( H::g[j] );
   }
 
+  // LSH Hash tables
+  H::h = new bucket**[ H::L ];  
+  assert( H::h );
   for( j = 0 ; j < H::L ; j++ ){
     H::h[j] = new bucket*[ H::N ];
     assert( H::h[j] );
     for( i = 0 ; i < H::N ; i++)
       H::h[j][i] = 0;
   }
+
+  // Standard hash functions
+  H::r1 = new Uns32T*[ H::L ];
+  H::r2 = new Uns32T*[ H::L ];
+  assert( H::r1 && H::r2 ); // failure
+  for( j = 0 ; j < H::L ; j++ ){
+    H::r1[ j ] = new Uns32T[ H::k ];
+    H::r2[ j ] = new Uns32T[ H::k ];
+    assert( H::r1[j] && H::r2[j] ); // failure
+    for( i = 0; i<H::k; i++){
+      H::r1[j][i] = randr();
+      H::r2[j][i] = randr();
+    }
+  }
+
+  // Storage for whole or partial function evaluation depdenting on USE_U_FUNCTIONS
+  H::initialize_partial_functions();
+}
+
+void H::initialize_partial_functions(){
+
+#ifdef USE_U_FUNCTIONS
+  H::uu = vector<vector<Uns32T> >(H::m);
+  for( Uns32T aa=0 ; aa < H::m ; aa++ )
+    H::uu[aa] = vector<Uns32T>( H::k/2 );
+#else
+  H::uu = vector<vector<Uns32T> >(H::L);
+  for( Uns32T aa=0 ; aa < H::L ; aa++ )
+    H::uu[aa] = vector<Uns32T>( H::k );
+#endif
+}
+
+
+// Generate z ~ N(0,1)
+float H::randn(){
+// Box-Muller
+  float x1, x2;
+  do{
+    x1 = ranf();
+  } while (x1 == 0); // cannot take log of 0
+  x2 = ranf();
+  float z;
+  z = sqrtf(-2.0 * logf(x1)) * cosf(2.0 * M_PI * x2);
+  return z;
+}
+
+float H::ranf(){
+#ifdef MT19937
+  return (float) genrand_real2();
+#else
+  return (float)( (double)rand() / ((double)(RAND_MAX)+(double)(1)) );
+#endif
+}
+
+// range is 1..2^29
+/* FIXME: that looks like an ... odd range.  Still. */
+Uns32T H::randr(){
+#ifdef MT19937
+  return (Uns32T)((genrand_int32() >> 3) + 1);
+#else
+  return (Uns32T) ((rand() >> 2) + 1); 
+#endif
 }
 
 // Destruct hash tables
 H::~H(){
-  Uns32T i,j;
+  Uns32T i,j,kk;
+#ifdef USE_U_FUNCTIONS
+  for( j = 0 ; j < H::m ; j++ ){
+    for( kk = 0 ; kk < H::k/2 ; kk++ )
+      delete[] A[j][kk];
+    delete[] A[j];
+  }
+  delete[] A;    
+  for( j = 0 ; j < H::m ; j++ )
+    delete[] b[j];
+  delete[] b;
+#else
+  for( j = 0 ; j < H::L ; j++ ){
+    for( kk = 0 ; kk < H::k ; kk++ )
+      delete[] A[j][kk];
+    delete[] A[j];
+  }
+  delete[] A;    
+  for( j = 0 ; j < H::L ; j++ )
+    delete[] b[j];
+  delete[] b;
+#endif
+
+  for( j = 0 ; j < H::L ; j++ )
+    delete[] g[j];
+  delete[] g;
   for( j=0 ; j < H::L ; j++ ){
       delete[] H::r1[ j ];
       delete[] H::r2[ j ];
@@ -107,17 +237,93 @@ H::~H(){
 }
 
 
-// make hash value \in Z
-void H::__generate_hash_keys(Uns32T*g,Uns32T* r1, Uns32T* r2){
-  H::t1 = __computeProductModDefaultPrime( g, r1, H::k ) % H::N;
-  H::t2 = __computeProductModDefaultPrime( g, r2, H::k );
+// Compute all hash functions for vector v
+// #ifdef USE_U_FUNCTIONS use Combination of m \times h_i \in R^{(k/2) \times d}
+// to make L \times g_j functions \in Z^k
+void H::compute_hash_functions(vector<float>& v){ // v \in R^d
+  float iw = 1. / H::w; // hash bucket width
+  Uns32T aa, kk;
+  if( v.size() != H::d ) 
+    error("v.size != H::d","","compute_hash_functions"); // check input vector dimensionality
+  double tmp = 0;
+  float *pA, *pb;
+  Uns32T *pg;
+  int dd;
+  vector<float>::iterator vi;
+  vector<Uns32T>::iterator ui;
 
+#ifdef USE_U_FUNCTIONS
+  Uns32T bb;
+  // Store m dot products to expand
+  for( aa=0; aa < H::m ; aa++ ){
+    ui = H::uu[aa].begin();
+    for( kk = 0 ; kk < H::k/2 ; kk++ ){
+      pb = *( H::b + aa ) + kk;
+      pA = * ( * ( H::A + aa ) + kk );
+      dd = H::d;
+      tmp = 0.;
+      vi = v.begin();
+      while( dd-- )
+	tmp += *pA++ * *vi++;  // project
+      tmp += *pb;              // translate
+      tmp *= iw;               // scale      
+      *ui++ = (Uns32T) floor(tmp);   // floor
+    }
+  }
+  // Binomial combinations of functions u_{a,b} \in Z^{(k/2) \times d}
+  Uns32T j;
+  for( aa=0, j=0 ; aa < H::m-1 ; aa++ )
+    for( bb = aa + 1 ; bb < H::m ; bb++, j++ ){
+      pg= *( H::g + j ); // L \times functions g_j(v) \in Z^k      
+      // u_1 \in Z^{(k/2) \times d}
+      ui = H::uu[aa].begin();
+      kk=H::k/2;
+      while( kk-- )
+	*pg++ = *ui++;      // hash function g_j(v)=[x1 x2 ... x(k/2)]; xk \in Z
+      // u_2 \in Z^{(k/2) \times d}
+      ui = H::uu[bb].begin();
+      kk=H::k/2;
+      while( kk--)
+	*pg++ = *ui++;      // hash function g_j(v)=[x(k/2+1) x(k/2+2) ... xk]; xk \in Z
+    }
+#else
+  for( aa=0; aa < H::L ; aa++ ){
+    ui = H::uu[aa].begin();
+    for( kk = 0 ; kk < H::k ; kk++ ){
+      pb = *( H::b + aa ) + kk;
+      pA = * ( * ( H::A + aa ) + kk );
+      dd = H::d;
+      tmp = 0.;
+      vi = v.begin();
+      while( dd-- )
+	tmp += *pA++ * *vi++;  // project
+      tmp += *pb;              // translate
+      tmp *= iw;               // scale      
+      *ui++ = (Uns32T) (floor(tmp));   // floor
+    }
+  }
+  // Compute hash functions
+  for( aa=0 ; aa < H::L ; aa++ ){
+    pg= *( H::g + aa ); // L \times functions g_j(v) \in Z^k      
+    // u_1 \in Z^{k \times d}
+    ui = H::uu[aa].begin();
+    kk=H::k;    
+    while( kk-- )
+      *pg++ = *ui++;      // hash function g_j(v)=[x1 x2 ... xk]; xk \in Z
+  }
+#endif
+}
+
+// make hash value \in Z
+void H::generate_hash_keys(Uns32T*g, Uns32T* r1, Uns32T* r2){
+  H::t1 = computeProductModDefaultPrime( g, r1, H::k ) % H::N;
+  H::t2 = computeProductModDefaultPrime( g, r2, H::k );
 }
 
 #define CR_ASSERT(b){if(!(b)){fprintf(stderr, "ASSERT failed on line %d, file %s.\n", __LINE__, __FILE__); exit(1);}}
 
 // Computes (a.b) mod UH_PRIME_DEFAULT
-inline Uns32T H::__computeProductModDefaultPrime(Uns32T *a, Uns32T *b, IntT size){
+inline Uns32T H::computeProductModDefaultPrime(Uns32T *a, Uns32T *b, IntT size){
   LongUns64T h = 0;
 
   for(IntT i = 0; i < size; i++){
@@ -197,68 +403,18 @@ void H::__sbucket_insert_point(sbucket* p){
   }
 }
 
-inline bucket** H::__get_bucket(int j){
+inline bucket** H::get_bucket(int j){
   return  *(h+j);
 }
 
-// hash functions G
-G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float r):
-  H(kk,mm,dd,NN,CC),
-  w(ww),
-  radius(r),
-  maxp(0),
+// Interface to Locality Sensitive Hashing G
+G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float rr):
+  H(kk,mm,dd,NN,CC,ww,rr), // constructor to initialize data structures
+  lshHeader(0),
   calling_instance(0),
-  add_point_callback(0),
-  lshHeader(0)
+  add_point_callback(0)
 {
-  Uns32T j;
-#ifdef USE_U_FUNCTIONS
-  G::A = new float**[ H::m ]; // m x k x d random projectors
-  G::b = new float*[ H::m ];  // m x k random biases
-#else
-  G::A = new float**[ H::L ]; // m x k x d random projectors
-  G::b = new float*[ H::L ];  // m x k random biases
-#endif
-  G::g = new Uns32T*[ H::L ];   //  L x k random projections 
-  assert( G::g && G::A && G::b ); // failure
-#ifdef USE_U_FUNCTIONS
-  // Use m \times u_i functions \in R^{(k/2) \times (d)}
-  // Combine to make L=m(m-1)/2 hash functions \in R^{k \times d}
-  for( j = 0; j < H::m ; j++ ){ // m functions u_i(v)
-    G::A[j] = new float*[ H::k/2 ];  // k/2 x d  2-stable distribution coefficients     
-    G::b[j] = new float[ H::k/2 ];   // bias
-    assert( G::A[j] && G::b[j] ); // failure
-    for( kk = 0; kk < H::k/2 ; kk++ ){
-      G::A[j][kk] = new float[ H::d ];
-      assert( G::A[j][kk] ); // failure
-      for(Uns32T i = 0 ; i < H::d ; i++ )
-	G::A[j][kk][i] = randn(); // Normal
-      G::b[j][kk] = ranf()*G::w;        // Uniform
-    }
-  }
-#else
-  // Use m \times u_i functions \in R^{k \times (d)}
-  // Combine to make L=m(m-1)/2 hash functions \in R^{k \times d}
-  for( j = 0; j < H::L ; j++ ){ // m functions u_i(v)
-    G::A[j] = new float*[ H::k ];  // k x d  2-stable distribution coefficients     
-    G::b[j] = new float[ H::k ];   // bias
-    assert( G::A[j] && G::b[j] ); // failure
-    for( kk = 0; kk < H::k ; kk++ ){
-      G::A[j][kk] = new float[ H::d ];
-      assert( G::A[j][kk] ); // failure
-      for(Uns32T i = 0 ; i < H::d ; i++ )
-	G::A[j][kk][i] = randn(); // Normal
-      G::b[j][kk] = ranf()*G::w;        // Uniform
-    }
-  }
-#endif
-  
-  for( j = 0 ; j < H::L ; j++ ){ // L functions g_j(u_a, u_b) a,b \in nchoosek(m,2)
-    G::g[j] = new Uns32T[ H::k ];   // k x 32-bit hash values, gj(v)=[x0 x1 ... xk-1] xk \in Z
-    assert( G::g[j] );
-  }
-  
-  initialize_partial_functions(); // m partially evaluated hash functions
+
 }
 
 // Serialize from file LSH constructor
@@ -266,12 +422,15 @@ G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float r):
 // Load the hash functions, close the database
 // Optionally load the LSH tables into head-allocated lists in core 
 G::G(char* filename, bool lshInCoreFlag):
+  H(), // default base-class constructor call delays data-structure initialization 
+  lshHeader(0),
   calling_instance(0),
   add_point_callback(0)
 {
   int dbfid = unserialize_lsh_header(filename);
-  unserialize_lsh_functions(dbfid);
-  initialize_partial_functions();
+
+  H::initialize_lsh_functions(); // Base-class data-structure initialization
+  unserialize_lsh_functions(dbfid); // populate with on-disk hashfunction values
 
   // Format1 only needs unserializing if specifically requested
   if(!(lshHeader->flags&O2_SERIAL_FILEFORMAT2) && lshInCoreFlag){
@@ -283,172 +442,21 @@ G::G(char* filename, bool lshInCoreFlag):
     unserialize_lsh_hashtables_format2(dbfid);
   }
 
-  close(dbfid);
-}
-
-void G::initialize_partial_functions(){
-
-#ifdef USE_U_FUNCTIONS
-  uu = vector<vector<Uns32T> >(H::m);
-  for( Uns32T aa=0 ; aa < H::m ; aa++ )
-    uu[aa] = vector<Uns32T>( H::k/2 );
-#else
-  uu = vector<vector<Uns32T> >(H::L);
-  for( Uns32T aa=0 ; aa < H::L ; aa++ )
-    uu[aa] = vector<Uns32T>( H::k );
-#endif
-}
-
-
-// Generate z ~ N(0,1)
-float G::randn(){
-// Box-Muller
-  float x1, x2;
-  do{
-    x1 = ranf();
-  } while (x1 == 0); // cannot take log of 0
-  x2 = ranf();
-  float z;
-  z = sqrtf(-2.0 * logf(x1)) * cosf(2.0 * M_PI * x2);
-  return z;
-}
-
-float G::ranf(){
-#ifdef MT19937
-  return (float) genrand_real2();
-#else
-  return (float)( (double)rand() / ((double)(RAND_MAX)+(double)(1)) );
-#endif
-}
-
-// range is 1..2^29
-/* FIXME: that looks like an ... odd range.  Still. */
-Uns32T H::__randr(){
-#ifdef MT19937
-  return (Uns32T)((genrand_int32() >> 3) + 1);
-#else
-  return (Uns32T) ((rand() >> 2) + 1); 
-#endif
-}
+  close(dbfid);}
 
 G::~G(){
-  Uns32T j,kk;
-#ifdef USE_U_FUNCTIONS
-  for( j = 0 ; j < H::m ; j++ ){
-    for( kk = 0 ; kk < H::k/2 ; kk++ )
-      delete[] A[j][kk];
-    delete[] A[j];
-  }
-  delete[] A;    
-  for( j = 0 ; j < H::m ; j++ )
-    delete[] b[j];
-  delete[] b;
-#else
-  for( j = 0 ; j < H::L ; j++ ){
-    for( kk = 0 ; kk < H::k ; kk++ )
-      delete[] A[j][kk];
-    delete[] A[j];
-  }
-  delete[] A;    
-  for( j = 0 ; j < H::L ; j++ )
-    delete[] b[j];
-  delete[] b;
-#endif
-
-  for( j = 0 ; j < H::L ; j++ )
-    delete[] g[j];
-  delete[] g;
   delete lshHeader;
 }
-
-// Compute all hash functions for vector v
-// #ifdef USE_U_FUNCTIONS use Combination of m \times h_i \in R^{(k/2) \times d}
-// to make L \times g_j functions \in Z^k
-void G::compute_hash_functions(vector<float>& v){ // v \in R^d
-  float iw = 1. / G::w; // hash bucket width
-  Uns32T aa, kk;
-  if( v.size() != H::d ) 
-    error("v.size != H::d","","compute_hash_functions"); // check input vector dimensionality
-  double tmp = 0;
-  float *pA, *pb;
-  Uns32T *pg;
-  int dd;
-  vector<float>::iterator vi;
-  vector<Uns32T>::iterator ui;
-
-#ifdef USE_U_FUNCTIONS
-  Uns32T bb;
-  // Store m dot products to expand
-  for( aa=0; aa < H::m ; aa++ ){
-    ui = uu[aa].begin();
-    for( kk = 0 ; kk < H::k/2 ; kk++ ){
-      pb = *( G::b + aa ) + kk;
-      pA = * ( * ( G::A + aa ) + kk );
-      dd = H::d;
-      tmp = 0.;
-      vi = v.begin();
-      while( dd-- )
-	tmp += *pA++ * *vi++;  // project
-      tmp += *pb;              // translate
-      tmp *= iw;               // scale      
-      *ui++ = (Uns32T) floor(tmp);   // floor
-    }
-  }
-  // Binomial combinations of functions u_{a,b} \in Z^{(k/2) \times d}
-  Uns32T j;
-  for( aa=0, j=0 ; aa < H::m-1 ; aa++ )
-    for( bb = aa + 1 ; bb < H::m ; bb++, j++ ){
-      pg= *( G::g + j ); // L \times functions g_j(v) \in Z^k      
-      // u_1 \in Z^{(k/2) \times d}
-      ui = uu[aa].begin();
-      kk=H::k/2;
-      while( kk-- )
-	*pg++ = *ui++;      // hash function g_j(v)=[x1 x2 ... x(k/2)]; xk \in Z
-      // u_2 \in Z^{(k/2) \times d}
-      ui = uu[bb].begin();
-      kk=H::k/2;
-      while( kk--)
-	*pg++ = *ui++;      // hash function g_j(v)=[x(k/2+1) x(k/2+2) ... xk]; xk \in Z
-    }
-#else
-  for( aa=0; aa < H::L ; aa++ ){
-    ui = uu[aa].begin();
-    for( kk = 0 ; kk < H::k ; kk++ ){
-      pb = *( G::b + aa ) + kk;
-      pA = * ( * ( G::A + aa ) + kk );
-      dd = H::d;
-      tmp = 0.;
-      vi = v.begin();
-      while( dd-- )
-	tmp += *pA++ * *vi++;  // project
-      tmp += *pb;              // translate
-      tmp *= iw;               // scale      
-      *ui++ = (Uns32T) (floor(tmp));   // floor
-    }
-  }
-  // Compute hash functions
-  for( aa=0 ; aa < H::L ; aa++ ){
-    pg= *( G::g + aa ); // L \times functions g_j(v) \in Z^k      
-    // u_1 \in Z^{k \times d}
-    ui = uu[aa].begin();
-    kk=H::k;    
-    while( kk-- )
-      *pg++ = *ui++;      // hash function g_j(v)=[x1 x2 ... xk]; xk \in Z
-  }
-#endif
-
-}
-
 
 // single point insertion; inserted values are hash value and pointID
 Uns32T G::insert_point(vector<float>& v, Uns32T pp){
   Uns32T collisionCount = 0;
   H::p = pp;
-  if(pp>G::maxp)
-    G::maxp=pp; // Store highest pointID in database
-  compute_hash_functions( v );
+  if(pp>H::maxp)
+    H::maxp=pp; // Store highest pointID in database
+  H::compute_hash_functions( v );
   for(Uns32T j = 0 ; j < H::L ; j++ ){ // insertion
-    __generate_hash_keys( *( G::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
+    H::generate_hash_keys( *( H::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
     collisionCount += bucket_insert_point( *(h + j) + t1 );
   }
   return collisionCount;
@@ -466,10 +474,10 @@ void G::insert_point_set(vector<vector<float> >& vv, Uns32T basePointID){
 void G::retrieve_point(vector<float>& v, Uns32T qpos, ReporterCallbackPtr add_point, void* caller){
   calling_instance = caller;
   add_point_callback = add_point;
-  compute_hash_functions( v );
+  H::compute_hash_functions( v );
   for(Uns32T j = 0 ; j < H::L ; j++ ){
-    __generate_hash_keys( *( G::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
-    if( bucket* bPtr = *(__get_bucket(j) + get_t1()) )
+    H::generate_hash_keys( *( H::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
+    if( bucket* bPtr = *(get_bucket(j) + get_t1()) )
 #ifdef LSH_BLOCK_FULL_ROWS
       bucket_chain_point( bPtr->next, qpos);
 #else
@@ -519,6 +527,7 @@ void G::retrieve_point_set(vector<vector<float> >& vv, ReporterCallbackPtr add_p
 // ...
 // r2[L-1][0] r2[L-1][1] ... r2[L-1][k-1]
 //
+// ******* HASHTABLES FORMAT1 (optimized for LSH_ON_DISK retrieval) *******
 // ---hash table 0: N x C x 8 ---
 // [t2 pointID][t2 pointID]...[t2 pointID]
 // [t2 pointID][t2 pointID]...[t2 pointID]
@@ -538,6 +547,29 @@ void G::retrieve_point_set(vector<vector<float> >& vv, ReporterCallbackPtr add_p
 // [t2 pointID][t2 pointID]...[t2 pointID]
 // ...
 // [t2 pointID][t2 pointID]...[t2 pointID]
+//
+// ******* HASHTABLES FORMAT2 (optimized for LSH_IN_CORE retrieval) *******
+//
+// State machine controlled by regular expression.
+// legend:
+//
+// O2_SERIAL_FLAGS_T1_BIT = 0x80000000U
+// O2_SERIAL_FLAGS_T2_BIT = 0x40000000U
+// O2_SERIAL_FLAGS_END_BIT = 0x20000000U
+//
+// T1(t1) - T1 hash token containing t1 hash key with O2_SERIAL_FLAGS_T1_BIT set (t1 range 0..2^29-1) 
+// T2 - T2 hash token with O2_SERIAL_FLAGS_T2_BIT set
+// t2 - t2 hash key (range 1..2^32-6)
+// p  - point identifier (range 0..2^32-1)
+// E  - end hash table token with O2_SERIAL_FLAGS_END_BIT set
+// {...} required arguments
+// [...] optional arguments
+// *  - match zero or more occurences
+// +  - match one or more occurences
+// {...}^L - repeat argument L times
+//
+// FORMAT2 Regular expression:
+// { [T1(t1) T2 t2 p+ [T2 t2 p+]* ]* E. }^L
 //
 
 // Serial header constructors
@@ -625,8 +657,8 @@ void G::serialize(char* filename, Uns32T serialFormat){
   if(!dbIsNew){
     db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);// get database pointer
     //serial_get_header(db);           // read header
-    cout << "maxp = " << G::maxp << endl;
-    lshHeader->maxp=G::maxp;
+    cout << "maxp = " << H::maxp << endl;
+    lshHeader->maxp=H::maxp;
     // Default to FILEFORMAT1
     if(!(lshHeader->flags&O2_SERIAL_FILEFORMAT2))
       lshHeader->flags|=O2_SERIAL_FILEFORMAT2;
@@ -674,7 +706,7 @@ int G::serialize_lsh_hashfunctions(int fid){
   Uns32T *pu;
   Uns32T x,y,z;
   
-  db = serial_mmap(fid, get_serial_hashtable_offset(), 1);// get database pointer  
+  char* db = serial_mmap(fid, get_serial_hashtable_offset(), 1);// get database pointer  
   pf = get_serial_hashfunction_base(db);
 
   // HASH FUNCTIONS
@@ -687,7 +719,7 @@ int G::serialize_lsh_hashfunctions(int fid){
 	for( y = 0 ; y < H::k ; y++ )
 #endif
 	  for( z = 0 ; z < d ; z++ )
-	    *pf++ = A[x][y][z];
+	    *pf++ = H::A[x][y][z];
   
   // Write the random biases b[][]
 #ifdef USE_U_FUNCTIONS
@@ -697,19 +729,19 @@ int G::serialize_lsh_hashfunctions(int fid){
       for( x = 0 ; x < H::L ; x++ )
 	for( y = 0 ; y < H::k ; y++ )
 #endif
-	  *pf++=b[x][y];
+	  *pf++ = H::b[x][y];
   
   pu = (Uns32T*)pf;
   
   // Write the Z projectors r1[][]
   for( x = 0 ; x < H::L ; x++)
     for( y = 0 ; y < H::k ; y++)
-      *pu++ = r1[x][y];
+      *pu++ = H::r1[x][y];
   
   // Write the Z projectors r2[][]
   for( x = 0 ; x < H::L ; x++)
     for( y = 0; y < H::k ; y++)
-      *pu++ = r2[x][y];  
+      *pu++ = H::r2[x][y];  
   
   serial_munmap(db, get_serial_hashtable_offset());
   return 1;
@@ -952,7 +984,7 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
   if (write (dbfid, "", 1) != 1)
     error("write error", "", "write");
   
-  db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);
+  char* db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);
 
   memcpy (db, lshHeader, O2_SERIAL_HEADER_SIZE);
 
@@ -966,6 +998,7 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
 }
 
 char* G::serial_mmap(int dbfid, Uns32T memSize, Uns32T forWrite, off_t offset){
+  char* db;
   if(forWrite){
     if ((db = (char*) mmap(0, memSize, PROT_READ | PROT_WRITE,
 			   MAP_SHARED, dbfid, offset)) == (caddr_t) -1)
@@ -1033,9 +1066,9 @@ int G::unserialize_lsh_header(char* filename){
   H::C = lshHeader->numCols;
   H::k = lshHeader->numFuns;
   H::d = lshHeader->dataDim;
-  G::w = lshHeader->binWidth;
-  G::radius = lshHeader->radius;
-  G::maxp = lshHeader->maxp;
+  H::w = lshHeader->binWidth;
+  H::radius = lshHeader->radius;
+  H::maxp = lshHeader->maxp;
 
   return dbfid;
 }
@@ -1051,35 +1084,17 @@ void G::unserialize_lsh_functions(int dbfid){
   // Load the hash functions into core
   char* db = serial_mmap(dbfid, get_serial_hashtable_offset(), 0);// get database pointer again  
   
-#ifdef USE_U_FUNCTIONS
-  G::A = new float**[ H::m ]; // m x k x d random projectors
-  G::b = new float*[ H::m ];  // m x k random biases
-#else
-  G::A = new float**[ H::L ]; // m x k x d random projectors
-  G::b = new float*[ H::L ];  // m x k random biases
-#endif
-  G::g = new Uns32T*[ H::L ];   //  L x k random projections 
-  assert(g&&A&&b); // failure
-  
   pf = get_serial_hashfunction_base(db);
   
 #ifdef USE_U_FUNCTIONS
   for( j = 0 ; j < H::m ; j++ ){ // L functions gj(v)
-    G::A[j] = new float*[ H::k/2 ];  // k x d  2-stable distribution coefficients     
-    G::b[j] = new float[ H::k/2 ];   // bias
-    assert( G::A[j] && G::b[j] ); // failure    
     for( kk = 0 ; kk < H::k/2 ; kk++ ){ // Normally distributed hash functions
 #else
       for( j = 0 ; j < H::L ; j++ ){ // L functions gj(v)
-	G::A[j] = new float*[ H::k ];  // k x d  2-stable distribution coefficients     
-	G::b[j] = new float[ H::k ];   // bias
-	assert( G::A[j] && G::b[j] ); // failure    
 	for( kk = 0 ; kk < H::k ; kk++ ){ // Normally distributed hash functions
 #endif
-	  G::A[j][kk] = new float[ H::d ];
-	  assert( G::A[j][kk] ); // failure
 	  for(Uns32T i = 0 ; i < H::d ; i++ )
-	    G::A[j][kk][i] = *pf++; // Normally distributed random vectors
+	    H::A[j][kk][i] = *pf++; // Normally distributed random vectors
 	}
       }
 #ifdef USE_U_FUNCTIONS
@@ -1089,15 +1104,7 @@ void G::unserialize_lsh_functions(int dbfid){
 	  for( j = 0 ; j < H::L ; j++ ) // biases b
 	    for( kk = 0 ; kk < H::k ; kk++ )
 #endif
-	      G::b[j][kk] = *pf++;
-      
-      for( j = 0 ; j < H::L ; j++){ // 32-bit hash values, gj(v)=[x0 x1 ... xk-1] xk \in Z
-	G::g[j] = new Uns32T[ H::k ];   
-	assert( G::g[j] );
-      }
-      
-      
-      H::__initialize_data_structures();
+	      H::b[j][kk] = *pf++;
       
       pu = (Uns32T*)pf;
       for( j = 0 ; j < H::L ; j++ ) // Z projectors r1
@@ -1108,7 +1115,7 @@ void G::unserialize_lsh_functions(int dbfid){
 	for( kk = 0 ; kk < H::k ; kk++ )
 	  H::r2[j][kk] = *pu++;
 
-  serial_munmap(db, get_serial_hashtable_offset());
+      serial_munmap(db, get_serial_hashtable_offset());
 }
 
 void G::unserialize_lsh_hashtables_format1(int fid){
@@ -1289,8 +1296,8 @@ void G::serial_retrieve_point_set(char* filename, vector<vector<float> >& vv, Re
       error("could not advise local hashtable memory","","madvise");
     SerialElementT* pe = (SerialElementT*)db ;
     for(Uns32T qpos=0; qpos<vv.size(); qpos++){
-      compute_hash_functions(vv[qpos]);
-      __generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
+      H::compute_hash_functions(vv[qpos]);
+      H::generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
       serial_bucket_chain_point(pe+t1*lshHeader->numCols, qpos); // Point to correct row
     }
     serial_munmap(db, hashTableSize); // drop hashtable mmap
@@ -1313,7 +1320,7 @@ void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, Rep
   Uns32T hashTableSize=sizeof(SerialElementT)*lshHeader->numRows*lshHeader->numCols;
   calling_instance = caller;
   add_point_callback = add_point;
-  compute_hash_functions(v);
+  H::compute_hash_functions(v);
   for(Uns32T j=0; j<L; j++){
     // memory map a single hash table for random access
     char* db = serial_mmap(dbfid, hashTableSize, 0, 
@@ -1321,7 +1328,7 @@ void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, Rep
     if(madvise(db, hashTableSize, MADV_RANDOM)<0)
       error("could not advise local hashtable memory","","madvise");
     SerialElementT* pe = (SerialElementT*)db ;
-    __generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
+    H::generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
     serial_bucket_chain_point(pe+t1*lshHeader->numCols, qpos); // Point to correct row
     serial_munmap(db, hashTableSize); // drop hashtable mmap
   }  

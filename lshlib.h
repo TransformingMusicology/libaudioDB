@@ -184,26 +184,27 @@ class bucket {
 class H{
   friend class G;
  private:
-  bucket*** h;      // hash functions
+
+  float *** A; // m x k x d random projectors from R^d->R^k
+  float ** b;  // m x k uniform additive constants
+
+  Uns32T ** g; // L x k random hash projections \in Z^k    
   Uns32T** r1;     // random ints for hashing
   Uns32T** r2;     // random ints for hashing
-  Uns32T t1;       // first hash table key
-  Uns32T t2;       // second hash table key
-  Uns32T P;        // hash table prime number
+
+  bucket*** h;      // The LSH hash tables
+
   bool use_u_functions; // flag to optimize computation of hashes
+  vector<vector<Uns32T> > uu; // Storage for m patial hash evaluations ( g_j = [u_a,u_b] )
+
+  Uns32T maxp; // highest pointID stored in database
   Uns32T bucketCount;  // count of number of point buckets allocated
   Uns32T pointCount;    // count of number of points inserted
 
-  void __initialize_data_structures();
-  void __bucket_insert_point(bucket*);
-  void __sbucket_insert_point(sbucket*);
-  Uns32T __computeProductModDefaultPrime(Uns32T*,Uns32T*,IntT);
-  Uns32T __randr();
-  bucket** __get_bucket(int j);
-  void __generate_hash_keys(Uns32T*,Uns32T*,Uns32T*);
-  void error(const char* a, const char* b = "", const char *sysFunc = 0);
+  Uns32T t1;       // first hash table key
+  Uns32T t2;       // second hash table key
+  Uns32T P;        // hash table prime number
 
- public:
   Uns32T N; // num rows per table
   Uns32T C; // num collision per row
   Uns32T k; // num projections per hash function
@@ -211,37 +212,52 @@ class H{
   Uns32T L; // L = m*(m-1)/2, conversely, m = (1 + sqrt(1 + 8.0*L)) / 2.0
   Uns32T d; // dimensions
   Uns32T p; // current point
+  float w;     // width of hash slots (relative to normalized feature space)
+  float radius;// scaling coefficient for data (1./radius)
 
-  H(){;}
-  H(Uns32T k, Uns32T m, Uns32T d, Uns32T N, Uns32T C);
+  void initialize_data_structures();
+  void initialize_lsh_functions();
+  void initialize_partial_functions();
+  void __bucket_insert_point(bucket*);
+  void __sbucket_insert_point(sbucket*);
+  Uns32T computeProductModDefaultPrime(Uns32T*,Uns32T*,IntT);
+  Uns32T randr();
+  float randn();
+  float ranf();
+  bucket** get_bucket(int j);
+  void error(const char* a, const char* b = "", const char *sysFunc = 0);
+
+ public:
+
+  H();
+  H(Uns32T k, Uns32T m, Uns32T d, Uns32T N, Uns32T C, float w, float r);
   ~H();
 
+  float get_w(){return w;}
+  float get_radius(){return radius;}  
+  Uns32T get_numRows(){return N;}
+  Uns32T get_numCols(){return C;}
+  Uns32T get_numFuns(){return k;}
+  Uns32T get_numTables(){return L;}
+  Uns32T get_dataDim(){return d;}
+  Uns32T get_maxp(){return maxp;}  
 
   Uns32T bucket_insert_point(bucket**);
 
-  Uns32T get_t1(){return t1;}
-  Uns32T get_t2(){return t2;}
-
+  // Interface to hash functions
+  void compute_hash_functions(vector<float>& v);
+  void generate_hash_keys(Uns32T* g, Uns32T* r1, Uns32T* r2);
+  Uns32T get_t1(){return t1;} // hash-key t1
+  Uns32T get_t2(){return t2;} // hash-key t2
 };
 
-
+// Typedef for point-reporting callback function. Used to collect points during LSH retrieval
 typedef void (*ReporterCallbackPtr)(void* objPtr, Uns32T pointID, Uns32T queryIndex, float squaredDistance);
 
 // Interface for indexing and retrieval
 class G: public H{
  private:
-  float *** A; // m x k x d random projectors from R^d->R^k
-  float ** b;  // m x k uniform additive constants
-  Uns32T ** g; // L x k random hash projections \in Z^k    
-  float w;     // width of hash slots (relative to normalized feature space)
-  float radius;// scaling coefficient for data (1./radius)
-  vector<vector<Uns32T> > uu; // Storage for m patial hash evaluations
-  Uns32T maxp; // highest pointID stored in database
-  void* calling_instance; // store calling object instance for member-function callback
-  void (*add_point_callback)(void*, Uns32T, Uns32T, float);
-
-  void initialize_partial_functions();
-
+  // LSH serial data structure file handling
   void get_lock(int fd, bool exclusive);
   void release_lock(int fd);
   int serial_create(char* filename, Uns32T FMT);
@@ -296,12 +312,9 @@ class G: public H{
   void serial_bucket_chain_point(SerialElementT* pe, Uns32T qpos);
   void serial_bucket_dump(SerialElementT* pe);
 
-  // Hash functions
-  void compute_hash_functions(vector<float>& v);
-  float randn();
-  float ranf();
-
-  char* db;    // pointer to serialized structure
+  // Callback Function for point reporting
+  void* calling_instance; // store calling object instance for member-function callback
+  void (*add_point_callback)(void*, Uns32T, Uns32T, float); // The callback
 
  public:
   G(char* lshFile, bool lshInCore = false); // unserialize constructor
@@ -323,8 +336,6 @@ class G: public H{
   void serialize(char* filename, Uns32T serialFormat = O2_SERIAL_FILEFORMAT1); // write hashfunctions and hashtables to disk
 
   SerialHeaderT* get_lshHeader(){return lshHeader;}
-  float get_radius(){return radius;}  
-  Uns32T get_maxp(){return maxp;}
   void serial_dump_tables(char* filename);
   float get_mean_collision_rate(){ return (float) pointCount / bucketCount ; }
 };
