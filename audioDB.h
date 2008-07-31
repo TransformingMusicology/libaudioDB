@@ -67,6 +67,12 @@
 //#define O2_DEFAULTDBSIZE (4000000000) // 4GB table size
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 
+// Bit masks for packing (trackID,pointID) into 32-bit unsigned int
+#define LSH_N_POINT_BITS 14
+#define LSH_TRACK_MASK 0xFFFFC000U // 2^18 = 262144 tracks
+#define LSH_POINT_MASK 0x00003FFFU // 2^14 = 16384 points per track
+
+// LIMIT PARAMETERS
 #define O2_DEFAULT_DATASIZE (1355U) // in MB
 #define O2_DEFAULT_NTRACKS (20000U)
 #define O2_DEFAULT_DATADIM (9U)
@@ -81,7 +87,7 @@
 #define O2_MAXNN (1000000U)
 #define O2_MAXSEQLEN (8000U)            // maximum feature vectors in a sequence
 #define O2_MAXTRACKS (10000U)           // maximum number of tracks
-#define O2_MAXTRACKLEN (1000000U)       // maximum shingles in a track
+#define O2_MAXTRACKLEN ((LSH_POINT_MASK+1)) // maximum shingles in a track
 #define O2_MAXDOTPRODUCTMEMORY (sizeof(O2_REALTYPE)*O2_MAXSEQLEN*O2_MAXSEQLEN) // 512MB
 #define O2_DISTANCE_TOLERANCE (1e-6)
 #define O2_SERIAL_MAX_TRACKBATCH (10000)
@@ -98,11 +104,6 @@
 #define O2_TRACK_QUERY (0x10U)
 #define O2_N_SEQUENCE_QUERY (0x20U)
 #define O2_ONE_TO_ONE_N_SEQUENCE_QUERY (0x40U)
-
-// Bit masks for packing (trackID,pointID) into 32-bit unsigned int
-#define LSH_N_POINT_BITS 14
-#define LSH_TRACK_MASK 0xFFFFC000 // 2^18 = 262144 tracks
-#define LSH_POINT_MASK 0x00003FFF // 2^14 = 16384 points per track
 
 // Error Codes
 #define O2_ERR_KEYNOTFOUND (0xFFFFFF00)
