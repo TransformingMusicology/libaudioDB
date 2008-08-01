@@ -375,7 +375,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     dbName=args_info.database_arg;
 
     // Whether to store LSH hash tables for query in core (FORMAT2)
-    lsh_in_core = args_info.lsh_on_disk_flag; // This flag is set to 0 if on_disk requested
+    lsh_in_core = !args_info.lsh_on_disk_flag; // This flag is set to 0 if on_disk requested
 
     lsh_param_w = args_info.lsh_w_arg;
     if(!(lsh_param_w>0 && lsh_param_w<=O2_SERIAL_MAX_BINWIDTH))
@@ -467,7 +467,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
 
     // Whether to pre-load LSH hash tables for query (default on, if flag set then off)
-    lsh_in_core = args_info.lsh_on_disk_flag;
+    lsh_in_core = !args_info.lsh_on_disk_flag;
 
     // Whether to perform exact evaluation of points returned by LSH
     lsh_exact = args_info.lsh_exact_flag;
