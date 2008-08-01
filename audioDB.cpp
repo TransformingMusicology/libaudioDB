@@ -375,7 +375,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     dbName=args_info.database_arg;
 
     // Whether to store LSH hash tables for query in core (FORMAT2)
-    lsh_in_core = args_info.lsh_inCore_flag;
+    lsh_in_core = args_info.lsh_on_disk_flag; // This flag is set to 0 if on_disk requested
 
     lsh_param_w = args_info.lsh_w_arg;
     if(!(lsh_param_w>0 && lsh_param_w<=O2_SERIAL_MAX_BINWIDTH))
@@ -397,7 +397,9 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     if(!(lsh_param_b>0 && lsh_param_b<=O2_SERIAL_MAX_TRACKBATCH))
       error("Indexing parameter b out of range (1 <= b <= 10000)");
     
-    lsh_param_ncols = args_info.lsh_ncols_arg;
+    lsh_param_ncols = args_info.lsh_ncols_arg;    
+    if(lsh_in_core) // We don't want to block rows with FORMAT2 indexing
+      lsh_param_ncols = O2_SERIAL_MAX_COLS;
     if( !(lsh_param_ncols>0 && lsh_param_ncols<=O2_SERIAL_MAX_COLS))
       error("Indexing parameter ncols out of range (1 <= ncols <= 1000");
 
@@ -464,8 +466,8 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
         error("queryPoint out of range: 0 <= queryPoint <= 10000");
     }
 
-    // Whether to pre-load LSH hash tables for query
-    lsh_in_core = args_info.lsh_inCore_flag;
+    // Whether to pre-load LSH hash tables for query (default on, if flag set then off)
+    lsh_in_core = args_info.lsh_on_disk_flag;
 
     // Whether to perform exact evaluation of points returned by LSH
     lsh_exact = args_info.lsh_exact_flag;

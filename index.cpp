@@ -122,6 +122,7 @@ void audioDB::index_index_db(const char* dbName){
   printf("INDEX: lsh_k %d\n", lsh_param_k);
   printf("INDEX: lsh_m %d\n", lsh_param_m);
   printf("INDEX: lsh_N %d\n", lsh_param_N);
+  printf("INDEX: lsh_C %d\n", lsh_param_ncols);
   printf("INDEX: lsh_b %d\n", lsh_param_b);
   printf("INDEX: normalized? %s\n", normalizedDistance?"true":"false"); 
   fflush(stdout);

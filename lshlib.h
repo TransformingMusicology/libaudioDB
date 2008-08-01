@@ -59,10 +59,11 @@
 #define O2_SERIAL_ELEMENT_SIZE sizeof(SerialElementT)
 #define O2_SERIAL_MAX_TABLES (200)
 #define O2_SERIAL_MAX_ROWS (1000000)
-#define O2_SERIAL_MAX_COLS (1000)
+#define O2_SERIAL_MAX_COLS (100000)
 #define O2_SERIAL_MAX_DIM (2000)
 #define O2_SERIAL_MAX_FUNS (100)
 #define O2_SERIAL_MAX_BINWIDTH (200)
+#define O2_SERIAL_MAXFILESIZE (4000000000UL)
 
 // Flags for Serial Header
 #define O2_SERIAL_FILEFORMAT1 (0x1U)       // Optimize for on-disk search
@@ -118,12 +119,11 @@ public:
   Uns32T numFuns;     // number of independent hash functions
   float radius;       // 32-bit floating point radius
   Uns32T maxp;        // number of unique IDs in the database
-  Uns32T value_14;    // spare value
-  Uns32T value_15;    // spare value
-  Uns32T value_16;    // spare value
+  unsigned long long size_long; // long version of size
+  Uns32T pointCount;     // number of points in the database
 
   SerialHeader();
-  SerialHeader(float W, Uns32T L, Uns32T N, Uns32T C, Uns32T k, Uns32T d, float radius, Uns32T p, Uns32T FMT);
+  SerialHeader(float W, Uns32T L, Uns32T N, Uns32T C, Uns32T k, Uns32T d, float radius, Uns32T p, Uns32T FMT, Uns32T pointCount);
 
   float get_binWidth(){return binWidth;}  
   Uns32T get_numTables(){return numTables;}
@@ -132,10 +132,11 @@ public:
   Uns32T get_elementSize(){return elementSize;}
   Uns32T get_version(){return version;}
   Uns32T get_flags(){return flags;}
-  Uns32T get_size(){return size;}
+  unsigned long long get_size(){return size_long;}
   Uns32T get_dataDim(){return dataDim;}
   Uns32T get_numFuns(){return numFuns;}
   Uns32T get_maxp(){return maxp;}
+  Uns32T get_pointCount(){return pointCount;}
 };
 
 #define IFLAG 0xFFFFFFFF
@@ -200,6 +201,7 @@ class H{
   Uns32T maxp; // highest pointID stored in database
   Uns32T bucketCount;  // count of number of point buckets allocated
   Uns32T pointCount;    // count of number of points inserted
+  Uns32T collisionCount; // number of points collided in a hash-table row
 
   Uns32T t1;       // first hash table key
   Uns32T t2;       // second hash table key

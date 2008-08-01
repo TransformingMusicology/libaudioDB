@@ -2,7 +2,7 @@
 
 //#define __LSH_DUMP_CORE_TABLES__
 //#define USE_U_FUNCTIONS
-//#define LSH_BLOCK_FULL_ROWS
+#define LSH_BLOCK_FULL_ROWS
 
 void err(char*s){cout << s << endl;exit(2);}
 
@@ -53,12 +53,6 @@ H::H(Uns32T kk, Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float ww, float rr):
     k++; // make sure k is even
     cout << "warning: setting k even" << endl;
   }
-
-  cout << "file size: ~" << (((unsigned long long)L*N*C*sizeof(SerialElementT))/1000000UL) << "MB" << endl;
-  if(((unsigned long long)L*N*C*sizeof(SerialElementT))>4000000000UL)
-    error("Maximum size of LSH file exceded: 12*L*N*C > 4000MB");
-  else if(((unsigned long long)N*C*sizeof(SerialElementT))>1000000000UL)
-    cout << "warning: hash tables exceed 1000MB." << endl;
   
   // We have the necessary parameters, so construct hashfunction datastructures
   initialize_lsh_functions();
@@ -338,7 +332,7 @@ inline Uns32T H::computeProductModDefaultPrime(Uns32T *a, Uns32T *b, IntT size){
 }
 
 Uns32T H::bucket_insert_point(bucket **pp){
-  Uns32T collisionCount = 0;
+  collisionCount = 0;
   if(!*pp){
     *pp = new bucket();
 #ifdef LSH_BLOCK_FULL_ROWS
@@ -355,8 +349,8 @@ Uns32T H::bucket_insert_point(bucket **pp){
     __bucket_insert_point((*pp)->next); // First bucket holds collision count
   }
 #else
-    pointCount++;
-    __bucket_insert_point(*pp); // No collision count storage
+  pointCount++;
+  __bucket_insert_point(*pp); // No collision count storage
 #endif
   return collisionCount;
 }
@@ -452,8 +446,9 @@ G::~G(){
 Uns32T G::insert_point(vector<float>& v, Uns32T pp){
   Uns32T collisionCount = 0;
   H::p = pp;
-  if(pp>H::maxp)
-    H::maxp=pp; // Store highest pointID in database
+  if(pp<=H::maxp)
+    error("points must be indexed in strict ascending order", "LSH::insert_point(vector<float>&, Uns32T pointID)");
+  H::maxp=pp; // Store highest pointID in database
   H::compute_hash_functions( v );
   for(Uns32T j = 0 ; j < H::L ; j++ ){ // insertion
     H::generate_hash_keys( *( H::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
@@ -574,22 +569,30 @@ void G::retrieve_point_set(vector<vector<float> >& vv, ReporterCallbackPtr add_p
 
 // Serial header constructors
 SerialHeader::SerialHeader(){;}
-SerialHeader::SerialHeader(float W, Uns32T L, Uns32T N, Uns32T C, Uns32T k, Uns32T d, float r, Uns32T p, Uns32T FMT):
+SerialHeader::SerialHeader(float W, Uns32T L, Uns32T N, Uns32T C, Uns32T k, Uns32T d, float r, Uns32T p, Uns32T FMT, Uns32T pc):
   lshMagic(O2_SERIAL_MAGIC),
   binWidth(W),
   numTables(L),
   numRows(N),
   numCols(C),
   elementSize(O2_SERIAL_ELEMENT_SIZE),
-  version(O2_SERIAL_VERSION),
-  size(L * align_up(N * C * O2_SERIAL_ELEMENT_SIZE, get_page_logn())   // hash tables
-       + align_up(O2_SERIAL_HEADER_SIZE + // header + hash functions
-		  L*k*( sizeof(float)*d+2*sizeof(Uns32T)+sizeof(float)),get_page_logn())),
+  version(O2_SERIAL_VERSION),  
+  size(0), // we are deprecating this value
   flags(FMT),
   dataDim(d),
   numFuns(k),
   radius(r),
-  maxp(p){;} // header
+  maxp(p),
+  size_long((unsigned long long)L * align_up((unsigned long long)N * C * O2_SERIAL_ELEMENT_SIZE, get_page_logn())   // hash tables
+	    + align_up(O2_SERIAL_HEADER_SIZE + // header + hash functions
+		  (unsigned long long)L*k*( sizeof(float)*d+2*sizeof(Uns32T)+sizeof(float)),get_page_logn())),
+  pointCount(pc){
+  
+  if(FMT==O2_SERIAL_FILEFORMAT2)
+    size_long = (unsigned long long)align_up(O2_SERIAL_HEADER_SIZE 
+	     + (unsigned long long)L*k*(sizeof(float)*d+2+sizeof(Uns32T)
+	      +sizeof(float)) + (unsigned long long)pc*16UL,get_page_logn());
+} // header
 
 float* G::get_serial_hashfunction_base(char* db){
   if(db&&lshHeader)
@@ -620,7 +623,7 @@ void G::serialize(char* filename, Uns32T serialFormat){
   // Check requested serialFormat
   if(!(serialFormat==O2_SERIAL_FILEFORMAT1 || serialFormat==O2_SERIAL_FILEFORMAT2))
     error("Unrecognized serial file format request: ", "serialize()");
-
+ 
   // Test to see if file exists
   if((dbfid = open (filename, O_RDONLY)) < 0)
     // If it doesn't, then create the file (CREATE)
@@ -676,12 +679,12 @@ int G::serial_can_merge(Uns32T format){
   if( (format==O2_SERIAL_FILEFORMAT2 && !that->flags&O2_SERIAL_FILEFORMAT2) 
       || (format!=O2_SERIAL_FILEFORMAT2 && that->flags&O2_SERIAL_FILEFORMAT2)
       || !( this->w == that->binWidth &&
-	 this->L == that->numTables &&
-	 this->N == that->numRows &&
-	 this->k == that->numFuns &&
-	 this->d == that->dataDim &&
-	 sizeof(SerialElementT) == that->elementSize &&
-	 this->radius == that->radius)){
+	    this->L == that->numTables &&
+	    this->N == that->numRows &&
+	    this->k == that->numFuns &&
+	    this->d == that->dataDim &&
+	    sizeof(SerialElementT) == that->elementSize &&
+	    this->radius == that->radius)){
     serial_print_header(format);
     return 0;
   }
@@ -974,8 +977,12 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
   get_lock(dbfid, 1);
   
   // Make header first to get size of serialized database
-  lshHeader = new SerialHeaderT(binWidth, numTables, numRows, numCols, numFuns, dim, radius, maxp, FMT);  
-  
+  lshHeader = new SerialHeaderT(binWidth, numTables, numRows, numCols, numFuns, dim, radius, maxp, FMT, pointCount);  
+
+  cout << "file size: <=" << lshHeader->get_size()/1024UL << "KB" << endl;
+  if(lshHeader->get_size()>O2_SERIAL_MAXFILESIZE)
+    error("Maximum size of LSH file exceded: > 4000MB");
+
   // go to the location corresponding to the last byte
   if (lseek (dbfid, lshHeader->get_size() - 1, SEEK_SET) == -1)
     error("lseek error in db file", "", "lseek");
@@ -985,11 +992,11 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
     error("write error", "", "write");
   
   char* db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);
-
+  
   memcpy (db, lshHeader, O2_SERIAL_HEADER_SIZE);
-
+  
   serial_munmap(db, O2_SERIAL_HEADER_SIZE);
-
+  
   close(dbfid);
 
   std::cout << "done initializing tables." << endl;
@@ -1069,6 +1076,7 @@ int G::unserialize_lsh_header(char* filename){
   H::w = lshHeader->binWidth;
   H::radius = lshHeader->radius;
   H::maxp = lshHeader->maxp;
+  H::pointCount = lshHeader->pointCount;
 
   return dbfid;
 }
