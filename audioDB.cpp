@@ -511,8 +511,10 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
     std::cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
     std::cout << "bytes available:" << dbH->timesTableOffset-(dbH->dataOffset+dbH->length) << " (" <<
       (100.0*(dbH->timesTableOffset-(dbH->dataOffset+dbH->length)))/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
-    std::cout << "flags:" << dbH->flags << std::endl;
-    
+    std::cout << "flags:" << " l2norm[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_L2NORM)
+	      << "] minmax[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_MINMAX)
+	      << "] power[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_POWER)
+	      << "] times[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_TIMES) << "]" << endl;    
     std::cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << std::endl;    
   } else {
     adbStatusResponse->result.numFiles = dbH->numFiles;

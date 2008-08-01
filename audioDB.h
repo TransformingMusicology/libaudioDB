@@ -97,6 +97,7 @@
 #define O2_FLAG_MINMAX (0x2U)
 #define O2_FLAG_POWER (0x4U)
 #define O2_FLAG_TIMES (0x20U)
+#define DISPLAY_FLAG(x) (x?"on":"off")
 
 // Query types
 #define O2_POINT_QUERY (0x4U)
