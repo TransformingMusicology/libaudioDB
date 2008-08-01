@@ -446,7 +446,7 @@ G::~G(){
 Uns32T G::insert_point(vector<float>& v, Uns32T pp){
   Uns32T collisionCount = 0;
   H::p = pp;
-  if(pp<=H::maxp)
+  if(H::maxp && pp<=H::maxp)
     error("points must be indexed in strict ascending order", "LSH::insert_point(vector<float>&, Uns32T pointID)");
   H::maxp=pp; // Store highest pointID in database
   H::compute_hash_functions( v );
