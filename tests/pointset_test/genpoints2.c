@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
   // Generate *count* Gaussian Random vectors in R^*dim*
   // sitting on the *rdashed*-sphere
 
-  srandom(time());
+  srandom(time(NULL));
 
   int i,j;
   for (i = 0; i < count + 1; i++) {
