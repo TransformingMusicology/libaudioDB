@@ -210,8 +210,14 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   }
   char *thisTimesFileName = new char[MAXSTR];
   char *thisPowerFileName = new char[MAXSTR];
-  
-  do{
+
+  std::set<std::string> s;
+
+  for (unsigned k = 0; k < dbH->numFiles; k++) {
+    s.insert(fileTable + k*O2_FILETABLE_ENTRY_SIZE);
+  }
+
+  do {
     filesIn->getline(thisFile,MAXSTR);
     if(key && key!=inFile) {
       keysIn->getline(thisKey,MAXSTR);
@@ -238,18 +244,10 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
       error("batchinsert failed: no more room in database", thisFile);
     }
     
-    // Linear scan of filenames check for pre-existing feature
-    unsigned alreadyInserted=0;
-  
-    for(unsigned k=0; k<dbH->numFiles; k++)
-      if(strncmp(fileTable + k*O2_FILETABLE_ENTRY_SIZE, thisKey, strlen(thisKey)+1)==0){
-	alreadyInserted=1;
-	break;
-      }
-  
-    if(alreadyInserted) {
+    if(s.count(thisKey)) {
       VERB_LOG(0, "key already exists in database: %s\n", thisKey);
     } else {
+      s.insert(thisKey);
       // Make a track index table of features to file indexes
       unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
       if(!numVectors) {

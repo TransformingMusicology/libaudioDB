@@ -10,6 +10,8 @@
 #include <string.h>
 #include <iostream>
 #include <fstream>
+#include <set>
+#include <string>
 #include <math.h>
 #include <sys/time.h>
 #include <assert.h>
