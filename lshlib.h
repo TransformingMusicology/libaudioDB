@@ -70,9 +70,9 @@
 #define O2_SERIAL_FILEFORMAT2 (0x2U)       // Optimize for in-core search
 
 // Flags for serialization fileformat2: use high 3 bits of Uns32T
-#define O2_SERIAL_FLAGS_T1_BIT (0x80000000U)
-#define O2_SERIAL_FLAGS_T2_BIT (0x40000000U)
-#define O2_SERIAL_FLAGS_END_BIT (0x20000000U)
+#define O2_SERIAL_TOKEN_T1 (0xFFFFFFFC)
+#define O2_SERIAL_TOKEN_T2 (0xFFFFFFFDU)
+#define O2_SERIAL_TOKEN_ENDTABLE (0xFFFFFFFEU)
 
 unsigned align_up(unsigned x, unsigned w);
 

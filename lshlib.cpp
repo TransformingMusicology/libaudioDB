@@ -548,15 +548,16 @@ void G::retrieve_point_set(vector<vector<float> >& vv, ReporterCallbackPtr add_p
 // State machine controlled by regular expression.
 // legend:
 //
-// O2_SERIAL_FLAGS_T1_BIT = 0x80000000U
-// O2_SERIAL_FLAGS_T2_BIT = 0x40000000U
-// O2_SERIAL_FLAGS_END_BIT = 0x20000000U
+// O2_SERIAL_TOKEN_T1 = 0xFFFFFFFCU
+// O2_SERIAL_TOKEN_T2 = 0xFFFFFFFDU
+// O2_SERIAL_TOKEN_ENDTABLE = 0xFFFFFFFEU
 //
-// T1(t1) - T1 hash token containing t1 hash key with O2_SERIAL_FLAGS_T1_BIT set (t1 range 0..2^29-1) 
-// T2 - T2 hash token with O2_SERIAL_FLAGS_T2_BIT set
+// T1 - T1 hash token 
+// t1 - t1 hash key (t1 range 0..2^29-1) 
+// T2 - T2 token
 // t2 - t2 hash key (range 1..2^32-6)
 // p  - point identifier (range 0..2^32-1)
-// E  - end hash table token with O2_SERIAL_FLAGS_END_BIT set
+// E  - end hash table token
 // {...} required arguments
 // [...] optional arguments
 // *  - match zero or more occurences
@@ -564,7 +565,7 @@ void G::retrieve_point_set(vector<vector<float> >& vv, ReporterCallbackPtr add_p
 // {...}^L - repeat argument L times
 //
 // FORMAT2 Regular expression:
-// { [T1(t1) T2 t2 p+ [T2 t2 p+]* ]* E. }^L
+// { [T1 t1 [T2 t2 p+]+ ]* E }^L
 //
 
 // Serial header constructors
@@ -873,7 +874,7 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
   if( merge && !serial_can_merge(O2_SERIAL_FILEFORMAT2) )
     error("Cannot merge core and serial LSH, data structure dimensions mismatch.");
 
-  // We must pereform FORMAT1 merges in core
+  // We must pereform FORMAT2 merges in core
   if(merge)
     unserialize_lsh_hashtables_format2(fid);
 
@@ -891,7 +892,24 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
     for( y = 0 ;  y < H::N ; y++ ){
       colCount=0;
       if(bucket* bPtr = h[x][y]){
-	t1 = y | O2_SERIAL_FLAGS_T1_BIT;
+	// Check for empty row (even though row was allocated)
+#ifdef LSH_BLOCK_FULL_ROWS
+	if(bPtr->next->t2==IFLAG){
+	  close(fid);
+	  error("b->next->t2==IFLAG","serialize_lsh_hashtables_format2()");
+	}
+#else
+	if(bPtr->t2==IFLAG){
+	  close(fid);
+	  error("b->t2==IFLAG","serialize_lsh_hashtables_format2()");
+	}
+#endif
+	t1 = O2_SERIAL_TOKEN_T1;
+	if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
+	  close(fid);
+	  error("write error in serial_write_hashtable_format2() [T1]");
+	}
+	t1 = y;
 	if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
 	  close(fid);
 	  error("write error in serial_write_hashtable_format2() [t1]");
@@ -912,7 +930,7 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
       }
     }
     // Write END of table marker
-    t1 = O2_SERIAL_FLAGS_END_BIT;
+    t1 = O2_SERIAL_TOKEN_ENDTABLE;
     if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
       close(fid);
       error("write error in serial_write_hashtable_format2() [end]");
@@ -930,7 +948,11 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
 
 void G::serial_write_hashtable_row_format2(int fid, bucket* b, Uns32T& colCount){
   while(b && b->t2!=IFLAG){
-    t2 = O2_SERIAL_FLAGS_T2_BIT;
+    if(!b->snext){
+      close(fid);
+      error("Empty collision chain in serial_write_hashtable_row_format2()");
+    }
+    t2 = O2_SERIAL_TOKEN_T2;
     if( write(fid, &t2, sizeof(Uns32T)) != sizeof(Uns32T) ){
       close(fid);
       error("write error in serial_write_hashtable_row_format2()");
@@ -1180,16 +1202,20 @@ void G::unserialize_lsh_hashtables_format2(int fid){
       close(fid);
       error("Read error","unserialize_lsh_hashtables_format2()");
     }
-    if(H::t1&O2_SERIAL_FLAGS_END_BIT)
+    if(H::t1==O2_SERIAL_TOKEN_ENDTABLE)
       x++; // End of table
     else
       while(y < H::N){
-	// Read a row and move file pointer to beginning of next row or table
-	if(!(H::t1&O2_SERIAL_FLAGS_T1_BIT)){
+	// Read a row and move file pointer to beginning of next row or _bittable
+	if(!(H::t1==O2_SERIAL_TOKEN_T1)){
 	  close(fid);
-	  error("State matchine error t1","unserialize_lsh_hashtables_format2()");
+	  error("State matchine error T1","unserialize_lsh_hashtables_format2()");
 	}
-	y = H::t1 ^ O2_SERIAL_FLAGS_T1_BIT;
+	if(read(fid, &(H::t1), sizeof(Uns32T))!=sizeof(Uns32T)){
+	  close(fid);
+	  error("Read error: t1","unserialize_lsh_hashtables_format2()");
+	}
+	y = H::t1;
 	if(y>=H::N){
 	  close(fid);
 	  error("Unserialized hashtable row pointer out of range","unserialize_lsh_hashtables_format2()");
@@ -1201,21 +1227,21 @@ void G::unserialize_lsh_hashtables_format2(int fid){
 	dump_hashtable_row(h[x][y]);
 #endif
 	// Check that token is valid
-	if( !(token&O2_SERIAL_FLAGS_T1_BIT || token&O2_SERIAL_FLAGS_END_BIT) ){
+	if( !(token==O2_SERIAL_TOKEN_T1 || token==O2_SERIAL_TOKEN_ENDTABLE) ){
 	  close(fid);
 	  error("State machine error end of row/table", "unserialize_lsh_hashtables_format2()");
 	}
 	// Check for end of table flag
-	if(token&O2_SERIAL_FLAGS_END_BIT){
+	if(token==O2_SERIAL_TOKEN_ENDTABLE){
 	  x++;
 	  break;
 	}
 	// Check for new row flag
-	if(token&O2_SERIAL_FLAGS_T1_BIT)
+	if(token==O2_SERIAL_TOKEN_T1)
 	  H::t1 = token;
       }
   }
-} 
+}
  
 Uns32T G::unserialize_hashtable_row_format2(int fid, bucket** b){
   bool pointFound = false;
@@ -1223,15 +1249,17 @@ Uns32T G::unserialize_hashtable_row_format2(int fid, bucket** b){
     close(fid);
     error("Read error T2 token","unserialize_hashtable_row_format2");
   }
-  if( !(H::t2==O2_SERIAL_FLAGS_END_BIT || H::t2==O2_SERIAL_FLAGS_T2_BIT)){
+  if( !(H::t2==O2_SERIAL_TOKEN_ENDTABLE || H::t2==O2_SERIAL_TOKEN_T2)){
     close(fid);
     error("State machine error: expected E or T2");
   }
-  while(!(H::t2==O2_SERIAL_FLAGS_END_BIT || H::t2&O2_SERIAL_FLAGS_T1_BIT)){
+  while(!(H::t2==O2_SERIAL_TOKEN_ENDTABLE || H::t2==O2_SERIAL_TOKEN_T1)){
     pointFound=false;
     // Check for T2 token
-    if(H::t2!=O2_SERIAL_FLAGS_T2_BIT)
+    if(H::t2!=O2_SERIAL_TOKEN_T2){
+      close(fid);
       error("State machine error T2 token", "unserialize_hashtable_row_format2()");
+    }
     // Read t2 value
     if(read(fid, &(H::t2), sizeof(Uns32T)) != sizeof(Uns32T)){
       close(fid);
@@ -1241,7 +1269,7 @@ Uns32T G::unserialize_hashtable_row_format2(int fid, bucket** b){
       close(fid);
       error("Read error H::p","unserialize_hashtable_row_format2");
     }
-    while(!(H::p==O2_SERIAL_FLAGS_END_BIT || H::p&O2_SERIAL_FLAGS_T1_BIT || H::p==O2_SERIAL_FLAGS_T2_BIT )){
+    while(!(H::p==O2_SERIAL_TOKEN_ENDTABLE || H::p==O2_SERIAL_TOKEN_T1 || H::p==O2_SERIAL_TOKEN_T2 )){
       pointFound=true;
       bucket_insert_point(b);
       if(read(fid, &(H::p), sizeof(Uns32T)) != sizeof(Uns32T)){
@@ -1249,9 +1277,9 @@ Uns32T G::unserialize_hashtable_row_format2(int fid, bucket** b){
 	error("Read error H::p","unserialize_hashtable_row_format2");
       }
     }
-    H::t2 = H::p; // Copy last found token to t2
     if(!pointFound)
       error("State machine error: point", "unserialize_hashtable_row_format2()");    
+    H::t2 = H::p; // Copy last found token to t2
   }  
   return H::t2; // holds current token
 }
