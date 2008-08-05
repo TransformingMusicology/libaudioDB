@@ -331,7 +331,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
       if(!args_info.featureList_given)
 	error("BATCHINSERT: '-K keyList' argument depends on '-F featureList'");
       else
-	key=args_info.key_arg;     // INCONSISTENT NO CHECK
+	key=args_info.keyList_arg;     // INCONSISTENT NO CHECK
 
     /* TO DO: REPLACE WITH
       if(args_info.keyList_given){
