@@ -226,7 +226,20 @@ void audioDB::index_insert_tracks(Uns32T start_track, Uns32T end_track,
 
 int audioDB::index_insert_track(Uns32T trackID, double** fvpp, double** snpp, double** sppp){
   // Loop over the current input track's vectors
-  Uns32T numVecs = (trackTable[trackID]>O2_MAXTRACKLEN?O2_MAXTRACKLEN:trackTable[trackID]) - sequenceLength + 1 ;
+  Uns32T numVecs = 0;
+  if (trackTable[trackID] > O2_MAXTRACKLEN) {
+    if (O2_MAXTRACKLEN < sequenceLength - 1) {
+      numVecs = 0;
+    } else {
+      numVecs = O2_MAXTRACKLEN - sequenceLength + 1;
+    }
+  } else {
+    if (trackTable[trackID] < sequenceLength - 1) {
+      numVecs = 0;
+    } else {
+      numVecs = trackTable[trackID] - sequenceLength + 1;
+    }
+  }
   vv = index_initialize_shingles(numVecs);
 
   for( Uns32T pointID = 0 ; pointID < numVecs; pointID++ )
