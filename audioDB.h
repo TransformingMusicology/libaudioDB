@@ -49,6 +49,7 @@
 #define COM_SEQLEN "--sequencelength"
 #define COM_SEQHOP "--sequencehop"
 #define COM_POINTNN "--pointnn"
+#define COM_RADIUS "--radius"
 #define COM_TRACKNN "--resultlength"
 #define COM_QPOINT "--qpoint"
 #define COM_FEATURES "--features"
@@ -296,7 +297,8 @@ class audioDB{
   unsigned random_track(unsigned *propTable, unsigned total);
   void sample(const char *dbName);
   void ws_status(const char*dbName, char* hostport);
-  void ws_query(const char*dbName, const char *trackKey, const char* hostport);
+  void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
+  void ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
   void power_flag(const char *dbName);
   bool powers_acceptable(double p1, double p2);

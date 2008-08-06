@@ -49,16 +49,16 @@ int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__s
 struct adb__sequenceQueryParms {
   xsd__string keyList;
   xsd__string timesFileName;
-  xsd__string powerFileName;
-  xsd__int qPos;
+  xsd__int queryPoint;
   xsd__int pointNN;
-  xsd__int segNN;
-  xsd__int segLen;
+  xsd__int trackNN;
+  xsd__int sequenceLength;
+  xsd__double radius;
   xsd__double relative_threshold;
   xsd__double absolute_threshold;
 };
 
 // Perform a sequence query
-int adb__sequenceQuery(xsd__string dbName, xsd__string qKey, 
+int adb__sequenceQuery_by_key(xsd__string dbName, xsd__string qKey, xsd__int qType,
 		       struct adb__sequenceQueryParms *parms, 
 		       struct adb__queryResponse &adbQueryResponse);

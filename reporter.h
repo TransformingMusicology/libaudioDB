@@ -379,7 +379,6 @@ triple& make_triple(unsigned int a, unsigned int b, unsigned int c){
   return *t;
 }
 
-
 // track Sequence Query Radius Reporter
 // only return tracks and retrieved point counts
 class trackSequenceQueryRadReporter : public Reporter { 
@@ -469,8 +468,28 @@ void trackSequenceQueryRadReporter::report(char *fileTable, void *adbQueryRespon
 	std::cout << r.trackID << " ";
       std::cout << r.count << std::endl;
     }
-  } else {
-    // FIXME
+  } 
+ else {
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+    unsigned int k = 0;
+    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
+      r = *rit;
+      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
+      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = 0;
+      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = 0;
+      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = 0;
+      if(fileTable)
+	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+      else
+	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+    }
   }
 }
 
@@ -533,15 +552,15 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
     if (it == set->end()) {
       set->insert(pair);
       count[trackID]++;
-      if (!isnan(dist)) {
-	r.trackID = trackID;
-	r.qpos = qpos;
-	r.dist = dist;
-	r.spos = spos;
-	point_queues[trackID].push(r);
-	if(point_queues[trackID].size() > pointNN)
-	  point_queues[trackID].pop();
-      }
+    }
+    if (!isnan(dist)) {
+      r.trackID = trackID;
+      r.qpos = qpos;
+      r.dist = dist;
+      r.spos = spos;
+      point_queues[trackID].push(r);
+      if(point_queues[trackID].size() > pointNN)
+	point_queues[trackID].pop();
     }
   }
 }
@@ -552,25 +571,46 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
   // tiebreak behaviour as before.
   Radresult r;
   NNresult rk;
+  std::vector<Radresult> v;
+  unsigned int size;
 
-  for (int i = numFiles-1; i >= 0; i--) {
-    r.trackID = i;
-    r.count = count[i];
-    if(r.count > 0) {
-      cout.flush();
-      result.push(r);
-      if (result.size() > trackNN) {
-        result.pop();
+  if(pointNN>1){
+    for (int i = numFiles-1; i >= 0; i--) {
+      r.trackID = i;
+      r.count = count[i];
+      if(r.count > 0) {
+	cout.flush();
+	result.push(r);
+	if (result.size() > trackNN) {
+	  result.pop();
+	}
       }
     }
+    
+    size = result.size();
+    for(unsigned int k = 0; k < size; k++) {
+      r = result.top();
+      v.push_back(r);
+      result.pop();
+    }
   }
-
-  std::vector<Radresult> v;
-  unsigned int size = result.size();
-  for(unsigned int k = 0; k < size; k++) {
-    r = result.top();
-    v.push_back(r);
-    result.pop();
+  else{
+    // Instantiate a 1-NN trackAveragingNN reporter
+    trackSequenceQueryNNReporter<std::less <NNresult> >* rep = new trackSequenceQueryNNReporter<std::less <NNresult> >(1, trackNN, numFiles);
+    // Add all the points we've got to the reporter
+    for(unsigned int i=0; i<numFiles; i++){
+      int qsize = point_queues[i].size();
+      while(qsize--){
+	rk = point_queues[i].top();
+	rep->add_point(i, rk.qpos, rk.spos, rk.dist);
+	point_queues[i].pop();
+      }	
+    }
+    // Report
+    rep->report(fileTable, adbQueryResponse);
+    // Exit
+    delete[] point_queues;
+    return;
   }
 
 
@@ -599,9 +639,40 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
 	point_queue.pop();
       }
     }
-  } else {
-    // FIXME
   }
+ else {
+   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
+    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
+    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+    unsigned int k = 0;
+    // Loop over returned tracks
+    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
+      r = *rit;
+      // Reverse the order of the points stored in point_queues
+      unsigned int qsize=point_queues[r.trackID].size();
+      while(qsize--){
+	point_queue.push(point_queues[r.trackID].top());
+	point_queues[r.trackID].pop();
+      }
+      qsize=point_queue.size();
+      rk = point_queue.top(); // Take one point from the top of the queue
+      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
+      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
+      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
+      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
+      if(fileTable)
+	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+      else
+	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+      while(qsize--) // pop the rest of the points
+	point_queue.pop();
+    }
+ }
   delete[] point_queues;
 }
 

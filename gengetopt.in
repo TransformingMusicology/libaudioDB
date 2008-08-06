@@ -67,7 +67,7 @@ option "lsh_k" - "even number of independent hash functions to employ with LSH" 
 option "lsh_m" - "number of hash tables is m(m-1)/2" int typestr="size" default="5" dependon="INDEX" optional
 option "lsh_N" - "number of rows per hash tables" int typestr="size" default="100000" dependon="INDEX" optional
 option "lsh_b" - "number of tracks per indexing iteration" int typestr="size" default="500" dependon="INDEX" optional
-option "lsh_ncols" - "number of columns (collisions) to allocate in LSH serialization" int typestr="size" default="250" dependon="INDEX" optional
+option "lsh_ncols" - "number of columns (collisions) to allocate for FORMAT1 LSH serialization" int typestr="size" default="250" dependon="INDEX" optional hidden
 option "lsh_exact" - "use exact evaluation of points retrieved by LSH." flag off dependon="QUERY" optional
 option "lsh_on_disk" - "Construct LSH hash tables for on-disk query (INDEX/QUERY)" flag off optional
 option "lsh_use_u_functions" - "use m independent hash functions combinatorically to approximate L independent hash functions." flag off optional

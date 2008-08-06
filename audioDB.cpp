@@ -45,8 +45,12 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     batchinsert(dbName, inFile);
 
   else if(O2_ACTION(COM_QUERY))
-    if(isClient)
-      ws_query(dbName, inFile, (char*)hostport);
+    if(isClient){
+      if(query_from_key)
+	ws_query_by_key(dbName, key, (char*)hostport);	
+      else
+	ws_query(dbName, inFile, (char*)hostport);
+    }
     else
       query(dbName, inFile);
 
@@ -199,7 +203,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
 
   if(args_info.radius_given) {
     radius = args_info.radius_arg;
-    if(radius <= 0 || radius > 1000000000) {
+    if(radius < 0 || radius > 1000000000) {
       error("radius out of range");
     } else {
       VERB_LOG(3, "Setting radius to %f\n", radius);
