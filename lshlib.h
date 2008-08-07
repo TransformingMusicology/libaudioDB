@@ -74,6 +74,8 @@
 #define O2_SERIAL_TOKEN_T2 (0xFFFFFFFDU)
 #define O2_SERIAL_TOKEN_ENDTABLE (0xFFFFFFFEU)
 
+#define O2_INDEX_MAXSTR (512)
+
 unsigned align_up(unsigned x, unsigned w);
 
 #define O2_SERIAL_FUNCTIONS_SIZE (align_up(sizeof(float) * O2_SERIAL_MAX_TABLES * O2_SERIAL_MAX_FUNS * O2_SERIAL_MAX_DIM \

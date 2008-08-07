@@ -418,13 +418,14 @@ G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float rr):
 // Optionally load the LSH tables into head-allocated lists in core 
 G::G(char* filename, bool lshInCoreFlag):
   H(), // default base-class constructor call delays data-structure initialization 
-  indexName(filename),
+  indexName(0),
   lshHeader(0),
   calling_instance(0),
   add_point_callback(0)
 {
   int dbfid = unserialize_lsh_header(filename);
-
+  indexName = new char[O2_INDEX_MAXSTR];
+  strncpy(indexName, filename, O2_INDEX_MAXSTR); // COPY THE CONTENTS TO THE NEW POINTER
   H::initialize_lsh_functions(); // Base-class data-structure initialization
   unserialize_lsh_functions(dbfid); // populate with on-disk hashfunction values
 
