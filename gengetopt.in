@@ -80,7 +80,7 @@ section "Web Services" sectiondesc="These commands enable the database process t
 
 option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
 option "client" c "run as a client using named host service." string typestr="hostname:port" optional
-
+option "load_index" - "make web service with memory-resident hashtables" flag off dependon="radius" optional
 
 text "
 Copyright (c) 2007 Michael Casey, Christophe Rhodes

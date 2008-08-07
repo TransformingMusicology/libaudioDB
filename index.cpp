@@ -52,6 +52,19 @@ int audioDB::index_exists(const char* dbName, double radius, Uns32T sequenceLeng
     return true;
 }
 
+LSH* audioDB::index_allocate(char* indexName, bool load_hashTables){
+  LSH* gIndx=SERVER_LSH_INDEX_SINGLETON;
+  if(isServer && gIndx && (strncmp(gIndx->get_indexName(), indexName, MAXSTR)==0) )
+    audioDB::lsh = gIndx; // Use the global SERVER resident index
+  else{
+    if(audioDB::lsh)
+      delete audioDB::lsh;
+    audioDB::lsh = new LSH(indexName, load_hashTables);
+  }
+  assert(audioDB::lsh);  
+  return audioDB::lsh;
+}
+
 vector<vector<float> >* audioDB::index_initialize_shingles(Uns32T sz){
   if(vv)
     delete vv;
@@ -152,6 +165,7 @@ void audioDB::index_index_db(const char* dbName){
     
     // Clean up
     delete lsh;
+    lsh = 0;
     close(lshfid);
   }
   
@@ -165,6 +179,7 @@ void audioDB::index_index_db(const char* dbName){
     assert(lsh);
     Uns32T maxs = index_to_trackID(lsh->get_maxp())+1;
     delete lsh;
+    lsh = 0;
 
     // This allows for updating index after more tracks are inserted into audioDB
     for(Uns32T startTrack = maxs; startTrack < dbH->numFiles; startTrack+=lsh_param_b){
@@ -183,6 +198,7 @@ void audioDB::index_index_db(const char* dbName){
       // Serialize to file
       lsh->serialize(newIndexName, lsh_in_core?O2_SERIAL_FILEFORMAT2:O2_SERIAL_FILEFORMAT1); // Serialize core LSH heap to disk
       delete lsh;
+      lsh = 0;
     }    
     
     close(lshfid);    
@@ -362,32 +378,31 @@ int audioDB::index_init_query(const char* dbName){
     return false;  
   }
 
-  printf("INDEX: initializing header\n");
-  
-  lsh = new LSH(indexName, false); // Get the header only here
-  assert(lsh);
+  lsh = index_allocate(indexName, false); // Get the header only here
   sequenceLength = lsh->get_lshHeader()->dataDim / dbH->dim; // shingleDim / vectorDim
   
-
-  if( fabs(radius - lsh->get_radius())>fabs(O2_DISTANCE_TOLERANCE))
-    printf("*** Warning: adb_radius (%f) != lsh_radius (%f) ***\n", radius, lsh->get_radius());
-
-  printf("INDEX: dim %d\n", dbH->dim);
-  printf("INDEX: R %f\n", lsh->get_radius());
-  printf("INDEX: seqlen %d\n", sequenceLength);
-  printf("INDEX: w %f\n", lsh->get_lshHeader()->get_binWidth());
-  printf("INDEX: k %d\n", lsh->get_lshHeader()->get_numFuns());
-  printf("INDEX: L (m*(m-1))/2 %d\n", lsh->get_lshHeader()->get_numTables());
-  printf("INDEX: N %d\n", lsh->get_lshHeader()->get_numRows());
-  printf("INDEX: s %d\n", index_to_trackID(lsh->get_maxp()));
-  printf("INDEX: Opened LSH index file %s\n", indexName);
-  fflush(stdout);
+  if(!SERVER_LSH_INDEX_SINGLETON){  
+    if( fabs(radius - lsh->get_radius())>fabs(O2_DISTANCE_TOLERANCE))
+      printf("*** Warning: adb_radius (%f) != lsh_radius (%f) ***\n", radius, lsh->get_radius());
+    printf("INDEX: dim %d\n", dbH->dim);
+    printf("INDEX: R %f\n", lsh->get_radius());
+    printf("INDEX: seqlen %d\n", sequenceLength);
+    printf("INDEX: w %f\n", lsh->get_lshHeader()->get_binWidth());
+    printf("INDEX: k %d\n", lsh->get_lshHeader()->get_numFuns());
+    printf("INDEX: L (m*(m-1))/2 %d\n", lsh->get_lshHeader()->get_numTables());
+    printf("INDEX: N %d\n", lsh->get_lshHeader()->get_numRows());
+    printf("INDEX: s %d\n", index_to_trackID(lsh->get_maxp()));
+    printf("INDEX: Opened LSH index file %s\n", indexName);
+    fflush(stdout);
+  }
 
   // Check to see if we are loading hash tables into core, and do so if true
   if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core){
-    printf("INDEX: loading hash tables into core %s\n", (lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2)?"FORMAT2":"FORMAT1");
-    delete lsh;
-    lsh = new LSH(indexName, true);
+    if(SERVER_LSH_INDEX_SINGLETON)
+      fprintf(stderr,"INDEX: using persistent hash tables: %s\n", lsh->get_indexName());
+    else
+      printf("INDEX: loading hash tables into core %s\n", (lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2)?"FORMAT2":"FORMAT1");
+    lsh = index_allocate(indexName, true);
   }
   
   delete[] indexName;

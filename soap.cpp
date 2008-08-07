@@ -28,6 +28,7 @@ void audioDB::ws_status(const char*dbName, char* hostport){
   soap_done(&soap);
 }
 
+// WS_QUERY (CLIENT SIDE)
 void audioDB::ws_query(const char*dbName, const char *featureFileName, const char* hostport){
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
@@ -49,6 +50,7 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
   soap_done(&soap);
 }
 
+// WS_QUERY_BY_KEY (CLIENT SIDE)
 void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport){
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
@@ -95,9 +97,8 @@ int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbS
     return SOAP_FAULT;
   }
 }
-
+ 
 // Literal translation of command line to web service
-
 int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int trackNN, xsd__int seqLen, adb__queryResponse &adbQueryResponse){
   char queryType[256];
   for(int k=0; k<256; k++)
@@ -246,6 +247,18 @@ void audioDB::startServer(){
   else
     {
       fprintf(stderr, "Socket connection successful: master socket = %d\n", m);
+      // Make a global Web Services LSH Index (SINGLETON)
+      if(WS_load_index && dbName && index_exists(dbName, radius, sequenceLength)){
+	char* indexName = index_get_name(dbName, radius, sequenceLength);
+	fprintf(stderr, "Loading LSH hashtables: %s...\n", indexName);
+	lsh = new LSH(indexName, true);
+	assert(lsh);
+	SERVER_LSH_INDEX_SINGLETON = lsh;
+	fprintf(stderr, "LSH INDEX READY\n");
+	fflush(stderr);
+	delete[] indexName;
+      }
+
       for (int i = 1; ; i++)
 	{
 	  s = soap_accept(&soap);

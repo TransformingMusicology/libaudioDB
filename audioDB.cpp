@@ -1,5 +1,7 @@
 #include "audioDB.h"
 
+LSH* SERVER_LSH_INDEX_SINGLETON;
+
 PointPair::PointPair(Uns32T a, Uns32T b, Uns32T c):trackID(a),qpos(b),spos(c){};
 
 bool operator<(const PointPair& a, const PointPair& b){
@@ -137,6 +139,8 @@ void audioDB::cleanup() {
     close(infid);
   if(dbH)
     delete dbH;
+  if(lsh!=SERVER_LSH_INDEX_SINGLETON)
+    delete lsh;
 }
 
 audioDB::~audioDB(){
@@ -246,6 +250,17 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
     sigaction(SIGHUP, &sa, NULL);
 #endif
+    if(args_info.load_index_given){
+      if(!args_info.database_given)
+	error("load_index requires a --database argument");
+      else
+	dbName=args_info.database_arg;
+      if(!args_info.radius_given)
+	error("load_index requires a --radius argument");
+      if(!args_info.sequencelength_given)
+	error("load_index requires a --sequenceLength argument");
+      WS_load_index = true;
+    }
     return 0;
   }
 
@@ -603,6 +618,9 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
   VERB_LOG(2, " done.");
 }
 
+// This entry point is visited once per instance
+// so it is a good place to set any global state variables
 int main(const unsigned argc, char* const argv[]){
+  SERVER_LSH_INDEX_SINGLETON = 0; // Initialize global variables
   audioDB(argc, argv);
 }

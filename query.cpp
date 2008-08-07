@@ -45,10 +45,8 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
     } else {
       if(index_exists(dbName, radius, sequenceLength)){
 	char* indexName = index_get_name(dbName, radius, sequenceLength);
-	lsh = new LSH(indexName);
-	assert(lsh);
+	lsh = index_allocate(indexName, false);
 	reporter = new trackSequenceQueryRadReporter(trackNN, index_to_trackID(lsh->get_maxp())+1);
-	delete lsh;
 	delete[] indexName;
       }
       else
@@ -63,10 +61,8 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
     } else {
       if(index_exists(dbName, radius, sequenceLength)){
 	char* indexName = index_get_name(dbName, radius, sequenceLength);
-	lsh = new LSH(indexName);
-	assert(lsh);
+	lsh = index_allocate(indexName, false);
 	reporter = new trackSequenceQueryRadNNReporter(pointNN,trackNN, index_to_trackID(lsh->get_maxp())+1);
-	delete lsh;
 	delete[] indexName;
       }
       else

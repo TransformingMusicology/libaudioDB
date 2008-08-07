@@ -137,6 +137,8 @@
     fflush(stderr); \
   }
 
+extern LSH* SERVER_LSH_INDEX_SINGLETON;
+
 typedef struct dbTableHeader {
   uint32_t magic;
   uint32_t version;
@@ -165,8 +167,7 @@ class PointPair{
 
 bool operator<(const PointPair& a, const PointPair& b);
 
-class audioDB{
-  
+class audioDB{  
  private:
   gengetopt_args_info args_info;
   unsigned dim;
@@ -286,7 +287,6 @@ class audioDB{
   void get_lock(int fd, bool exclusive);
   void release_lock(int fd);
   void create(const char* dbName);
-  void drop();
   bool enough_per_file_space_free();
   bool enough_data_space_free(off_t size);
   void insert_data_vectors(off_t offset, void *buffer, size_t size);
@@ -296,9 +296,6 @@ class audioDB{
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
   unsigned random_track(unsigned *propTable, unsigned total);
   void sample(const char *dbName);
-  void ws_status(const char*dbName, char* hostport);
-  void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
-  void ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport);
   void l2norm(const char* dbName);
   void power_flag(const char *dbName);
   bool powers_acceptable(double p1, double p2);
@@ -309,6 +306,7 @@ class audioDB{
   bool lsh_in_core;     // load LSH tables for query into core (true) or keep on disk (false)
   bool lsh_use_u_functions;
   bool lsh_exact;      // flag to indicate use exact evaluation of points returned by LSH
+  bool WS_load_index; // flag to indicate that we want to make a Web Services index memory resident
   double lsh_param_w; // Width of LSH hash-function bins
   Uns32T lsh_param_k; // Number of independent hash functions
   Uns32T lsh_param_m; // Combinatorial parameter for m(m-1)/2 hash tables
@@ -340,9 +338,13 @@ class audioDB{
   static Uns32T index_from_trackInfo(Uns32T, Uns32T); // Convert audioDB trackID and trackPos to an lsh point index
   void initialize_exact_evalutation_queue();
   void index_insert_exact_evaluation_queue(Uns32T trackID, Uns32T qpos, Uns32T spos);
+  LSH* index_allocate(char* indexName, bool load_hashTables);
 
   // Web Services
   void startServer();
+  void ws_status(const char*dbName, char* hostport);
+  void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
+  void ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport);
   
 };
 
@@ -413,6 +415,7 @@ class audioDB{
     lsh_in_core(false),				\
     lsh_use_u_functions(false),                 \
     lsh_exact(false),                           \
+    WS_load_index(false),                       \
     lsh_param_k(0),				\
     lsh_param_m(0),				\
     lsh_param_N(0),				\

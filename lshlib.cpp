@@ -404,6 +404,7 @@ inline bucket** H::get_bucket(int j){
 // Interface to Locality Sensitive Hashing G
 G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float rr):
   H(kk,mm,dd,NN,CC,ww,rr), // constructor to initialize data structures
+  indexName(0),
   lshHeader(0),
   calling_instance(0),
   add_point_callback(0)
@@ -417,6 +418,7 @@ G::G(float ww, Uns32T kk,Uns32T mm, Uns32T dd, Uns32T NN, Uns32T CC, float rr):
 // Optionally load the LSH tables into head-allocated lists in core 
 G::G(char* filename, bool lshInCoreFlag):
   H(), // default base-class constructor call delays data-structure initialization 
+  indexName(filename),
   lshHeader(0),
   calling_instance(0),
   add_point_callback(0)

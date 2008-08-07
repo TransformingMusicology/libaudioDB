@@ -59,7 +59,3 @@ void audioDB::create(const char* dbName){
   VERB_LOG(0, "%s %s\n", COM_CREATE, dbName);
 }
 
-void audioDB::drop(){
-  // FIXME: drop something?  Should we even allow this?
-}
-

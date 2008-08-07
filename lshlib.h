@@ -259,6 +259,8 @@ typedef void (*ReporterCallbackPtr)(void* objPtr, Uns32T pointID, Uns32T queryIn
 // Interface for indexing and retrieval
 class G: public H{
  private:
+  char* indexName;
+
   // LSH serial data structure file handling
   void get_lock(int fd, bool exclusive);
   void release_lock(int fd);
@@ -340,6 +342,7 @@ class G: public H{
   SerialHeaderT* get_lshHeader(){return lshHeader;}
   void serial_dump_tables(char* filename);
   float get_mean_collision_rate(){ return (float) pointCount / bucketCount ; }
+  char* get_indexName(){return indexName;}
 };
 
 typedef class G LSH;
