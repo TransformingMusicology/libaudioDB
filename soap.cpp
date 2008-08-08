@@ -65,6 +65,8 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
   asqp.radius = radius;
   asqp.relative_threshold = relative_threshold;
   asqp.absolute_threshold = absolute_threshold;
+  asqp.usingQueryPoint = usingQueryPoint;
+  asqp.lsh_exact = lsh_exact;
 
   soap_init(&soap);  
   if(queryType==O2_SEQUENCE_QUERY || queryType==O2_N_SEQUENCE_QUERY){
@@ -194,7 +196,7 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
   // at the moment, until we figure out how to better serve results
   snprintf(qtypeStr, 256, "nsequence");
 
-  const char *argv[] = {
+  const char *argv[]={
     "./audioDB",
     COM_QUERY,
     qtypeStr,
@@ -204,8 +206,8 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
     ENSURE_STRING(qKey),
     COM_KEYLIST,
     ENSURE_STRING(parms->keyList),
-    COM_QPOINT, 
-    qPosStr,
+    parms->usingQueryPoint?COM_QPOINT:COM_EXHAUSTIVE, 
+    parms->usingQueryPoint?qPosStr:"",
     COM_POINTNN,
     pointNNStr,
     COM_TRACKNN,
@@ -215,11 +217,13 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
     COM_SEQLEN,
     seqLenStr,
     COM_ABSOLUTE_THRESH,
-    absolute_thresholdStr
+    absolute_thresholdStr,
+    parms->lsh_exact?COM_LSH_EXACT:""
   };
 
-  const unsigned argc = 21;
-
+  const unsigned argc = 22;
+  
+ 
   try {
     audioDB(argc, (char* const*)argv, &adbQueryResponse);
     return SOAP_OK;

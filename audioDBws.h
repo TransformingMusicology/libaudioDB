@@ -56,6 +56,8 @@ struct adb__sequenceQueryParms {
   xsd__double radius;
   xsd__double relative_threshold;
   xsd__double absolute_threshold;
+  xsd__int usingQueryPoint;
+  xsd__int lsh_exact;
 };
 
 // Perform a sequence query

@@ -59,6 +59,8 @@
 #define COM_QUERYPOWER "--power"
 #define COM_RELATIVE_THRESH "--relative-threshold"
 #define COM_ABSOLUTE_THRESH "--absolute-threshold"
+#define COM_EXHAUSTIVE "--exhaustive"
+#define COM_LSH_EXACT "--lsh_exact"
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
