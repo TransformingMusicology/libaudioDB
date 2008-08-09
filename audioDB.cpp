@@ -88,7 +88,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
     processArgs(argc, argv);
     assert(O2_ACTION(COM_QUERY));
     query(dbName, inFile, adbQueryResponse);
-    cleanup();
+    unmap_tables();
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -102,11 +102,29 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
     processArgs(argc, argv);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
-    cleanup();
   } catch(char *err) {
     cleanup();
     throw(err);
   }
+}
+
+void audioDB::unmap_tables(){
+  if(indata)
+    munmap(indata,statbuf.st_size);
+  if(db)
+    munmap(db,getpagesize());
+  if(fileTable)
+    munmap(fileTable, fileTableLength);
+  if(trackTable)
+    munmap(trackTable, trackTableLength);
+  if(dataBuf)
+    munmap(dataBuf, dataBufLength);
+  if(timesTable)
+    munmap(timesTable, timesTableLength);
+  if(l2normTable)
+    munmap(l2normTable, l2normTableLength);
+  if(trackOffsetTable)
+    delete trackOffsetTable;
 }
 
 void audioDB::cleanup() {
