@@ -284,7 +284,6 @@ class audioDB{
   audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse);
   audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse);
   void cleanup();
-  void unmap_tables();
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
   void get_lock(int fd, bool exclusive);

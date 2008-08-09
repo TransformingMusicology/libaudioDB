@@ -252,6 +252,9 @@ void audioDB::startServer(){
     {
       fprintf(stderr, "Socket connection successful: master socket = %d\n", m);
       // Make a global Web Services LSH Index (SINGLETON)
+      if(WS_load_index && dbName && !index_exists(dbName, radius, sequenceLength)){
+        error("Can't find requested index file:", index_get_name(dbName,radius,sequenceLength));
+      }
       if(WS_load_index && dbName && index_exists(dbName, radius, sequenceLength)){
 	char* indexName = index_get_name(dbName, radius, sequenceLength);
 	fprintf(stderr, "Loading LSH hashtables: %s...\n", indexName);
