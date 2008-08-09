@@ -285,9 +285,11 @@ int audioDB::index_insert_track(Uns32T trackID, double** fvpp, double** snpp, do
 Uns32T audioDB::index_insert_shingles(vector<vector<float> >* vv, Uns32T trackID, double* spp){
   Uns32T collisionCount = 0;
   cout << "[" << trackID << "]" << fileTable+trackID*O2_FILETABLE_ENTRY_SIZE;
-  for( Uns32T pointID=0 ; pointID < (*vv).size(); pointID++)
-    if(!use_absolute_threshold || (use_absolute_threshold && (*spp++ >= absolute_threshold)))
+  for( Uns32T pointID=0 ; pointID < (*vv).size(); pointID+=sequenceHop)
+    if(!use_absolute_threshold || (use_absolute_threshold && (*spp >= absolute_threshold))){
       collisionCount += lsh->insert_point((*vv)[pointID], index_from_trackInfo(trackID, pointID));
+      spp+=sequenceHop;
+    }
   return collisionCount;
 }
 
@@ -381,7 +383,7 @@ int audioDB::index_init_query(const char* dbName){
   lsh = index_allocate(indexName, false); // Get the header only here
   sequenceLength = lsh->get_lshHeader()->dataDim / dbH->dim; // shingleDim / vectorDim
   
-  if(!SERVER_LSH_INDEX_SINGLETON){  
+  if(lsh!=SERVER_LSH_INDEX_SINGLETON){  
     if( fabs(radius - lsh->get_radius())>fabs(O2_DISTANCE_TOLERANCE))
       printf("*** Warning: adb_radius (%f) != lsh_radius (%f) ***\n", radius, lsh->get_radius());
     printf("INDEX: dim %d\n", dbH->dim);

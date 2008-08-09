@@ -56,7 +56,7 @@ option "expandfactor" x "time compress/expand factor of result length to query l
 option "rotate"       o "rotate query vectors for rotationally invariant search." flag off optional hidden
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional
 option "sequencelength" l "length of sequences for sequence search." int typestr="length" default="16" optional
-option "sequencehop"  h "hop size of sequence window for sequence search." int typestr="hop" default="1" dependon="QUERY" optional
+option "sequencehop"  h "hop size of sequence window for sequence search." int typestr="hop" default="1" optional
 option "absolute-threshold" - "absolute power threshold for consideration of query or target sequence (in Bels)" double optional
 option "relative-threshold" - "relative power threshold between query and target sequence (in Bels)" double dependon="QUERY" optional
 

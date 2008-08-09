@@ -88,6 +88,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
     processArgs(argc, argv);
     assert(O2_ACTION(COM_QUERY));
     query(dbName, inFile, adbQueryResponse);
+    cleanup();
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -101,6 +102,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
     processArgs(argc, argv);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
+    cleanup();
   } catch(char *err) {
     cleanup();
     throw(err);
