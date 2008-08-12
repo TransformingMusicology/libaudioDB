@@ -525,7 +525,7 @@ void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, dou
 	  dist = qnPtr[usingQueryPoint?0:pp.qpos]*qnPtr[usingQueryPoint?0:pp.qpos]+sNorm[trackIndexOffset+pp.spos]*sNorm[trackIndexOffset+pp.spos] - 2*dist;
       // else
       // dist = dist;      
-      if((!radius) || dist <= (radius+O2_DISTANCE_TOLERANCE)) 
+      if((!radius) || dist <= (O2_LSH_EXACT_MULT*radius+O2_DISTANCE_TOLERANCE)) 
 	reporter->add_point(pp.trackID, pp.qpos, pp.spos, dist);
     }
     exact_evaluation_queue->pop();

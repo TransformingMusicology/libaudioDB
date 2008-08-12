@@ -62,6 +62,13 @@
 #define COM_EXHAUSTIVE "--exhaustive"
 #define COM_LSH_EXACT "--lsh_exact"
 
+// Because LSH returns NN with P(1)<1 we want to return exact
+// points above this boundary. 
+// Because we work in Radius^2 units,
+// The sqrt of this number is the multiplier on the radius
+
+#define O2_LSH_EXACT_MULT 9
+
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
 #define O2_FORMAT_VERSION (4U)
@@ -378,6 +385,7 @@ class audioDB{
     dataBuf(0),					\
     l2normTable(0),				\
     timesTable(0),				\
+    powerTable(0),                              \
     fileTableLength(0),				\
     trackTableLength(0),			\
     dataBufLength(0),				\

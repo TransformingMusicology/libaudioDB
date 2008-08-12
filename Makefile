@@ -14,7 +14,7 @@ endif
 
 ifeq ($(shell uname),Darwin)
 ifeq ($(shell sysctl -n hw.optional.x86_64),1)
-override CFLAGS+=-arch x86_64
+#override CFLAGS+=-arch x86_64
 endif
 endif
 

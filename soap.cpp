@@ -54,23 +54,38 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
 void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport){
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
-  adb__sequenceQueryParms asqp;
-  
-  asqp.keyList = (char*)trackFileName;
-  asqp.timesFileName = (char*)timesFileName;
-  asqp.queryPoint = queryPoint;
-  asqp.pointNN = pointNN;
-  asqp.trackNN = trackNN;
-  asqp.sequenceLength = sequenceLength;
-  asqp.radius = radius;
-  asqp.relative_threshold = relative_threshold;
-  asqp.absolute_threshold = absolute_threshold;
-  asqp.usingQueryPoint = usingQueryPoint;
-  asqp.lsh_exact = lsh_exact;
+  /*  JUST TRY TO USE A DATA STRUCTURE WITH PHP
+      adb__sequenceQueryParms asqp;
+      asqp.keyList = (char*)trackFileName;
+      asqp.timesFileName = (char*)timesFileName;
+      asqp.queryPoint = queryPoint;
+      asqp.pointNN = pointNN;
+      asqp.trackNN = trackNN;
+      asqp.sequenceLength = sequenceLength;
+      asqp.radius = radius;
+      asqp.relative_threshold = relative_threshold;
+      asqp.absolute_threshold = absolute_threshold;
+      asqp.usingQueryPoint = usingQueryPoint;
+      asqp.lsh_exact = lsh_exact;
+  */
 
   soap_init(&soap);  
   if(queryType==O2_SEQUENCE_QUERY || queryType==O2_N_SEQUENCE_QUERY){
-    if(soap_call_adb__sequenceQuery_by_key(&soap,hostport,NULL,(char*)dbName,(char*)trackKey,queryType,&asqp,adbQueryResponse)==SOAP_OK){
+    if(soap_call_adb__sequenceQueryByKey(&soap,hostport,NULL,
+					   (char*)dbName,
+					   (char*)trackKey,
+					   queryType,
+					   (char*)trackFileName,
+					   (char*)timesFileName,
+					   queryPoint,
+					   pointNN,
+					   trackNN,
+					   sequenceLength,
+					   radius,
+					   absolute_threshold,
+					   usingQueryPoint,
+					   lsh_exact,
+					 adbQueryResponse)==SOAP_OK){
       //std::std::cerr << "result list length:" << adbQueryResponse.result.__sizeRlist << std::std::endl;
       for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++)
 	std::cout << adbQueryResponse.result.Rlist[i] << " " << adbQueryResponse.result.Dist[i] 
@@ -162,17 +177,25 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
   }
 }
 
-// A sequence query using radius and a query key
-int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string qKey, int qType,
-		       adb__sequenceQueryParms* parms,
-		       adb__queryResponse& adbQueryResponse) {
-
+int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
+			    xsd__string trackKey,
+			    xsd__int queryType,
+			    xsd__string trackFileName,
+			    xsd__string timesFileName,
+			    xsd__int queryPoint,
+			    xsd__int pointNN,
+			    xsd__int trackNN,
+			    xsd__int sequenceLength,
+			    xsd__double radius,
+			    xsd__double absolute_threshold,
+			    xsd__int usingQueryPoint,
+			    xsd__int lsh_exact,
+			    struct adb__queryResponse& adbQueryResponse){
   char radiusStr[256];
   char qPosStr[256];
   char pointNNStr[256];
   char trackNNStr[256];
   char seqLenStr[256];
-  char relative_thresholdStr[256];
   char absolute_thresholdStr[256];
   char qtypeStr[256];
 
@@ -183,19 +206,16 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
 #define DOUBLESTRINGIFY(val, str) \
   snprintf(str, 256, "%f", val);
 
-  INTSTRINGIFY(parms->queryPoint, qPosStr);
-  INTSTRINGIFY(parms->pointNN, pointNNStr);
-  INTSTRINGIFY(parms->trackNN, trackNNStr);
-  INTSTRINGIFY(parms->sequenceLength, seqLenStr);
-
-  DOUBLESTRINGIFY(parms->relative_threshold, relative_thresholdStr);
-  DOUBLESTRINGIFY(parms->absolute_threshold, absolute_thresholdStr);
-  DOUBLESTRINGIFY(parms->radius, radiusStr);  
+  INTSTRINGIFY(queryPoint, qPosStr);
+  INTSTRINGIFY(pointNN, pointNNStr);
+  INTSTRINGIFY(trackNN, trackNNStr);
+  INTSTRINGIFY(sequenceLength, seqLenStr);
+  DOUBLESTRINGIFY(absolute_threshold, absolute_thresholdStr);
+  DOUBLESTRINGIFY(radius, radiusStr);
 
   // WS queries only support 1-nearest neighbour point reporting
   // at the moment, until we figure out how to better serve results
   snprintf(qtypeStr, 256, "nsequence");
-
   const char *argv[]={
     "./audioDB",
     COM_QUERY,
@@ -203,11 +223,11 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
     COM_DATABASE,
     dbName, 
     COM_QUERYKEY,
-    ENSURE_STRING(qKey),
+    ENSURE_STRING(trackKey),
     COM_KEYLIST,
-    ENSURE_STRING(parms->keyList),
-    parms->usingQueryPoint?COM_QPOINT:COM_EXHAUSTIVE, 
-    parms->usingQueryPoint?qPosStr:"",
+    ENSURE_STRING(trackFileName),
+    usingQueryPoint?COM_QPOINT:COM_EXHAUSTIVE,
+    usingQueryPoint?qPosStr:"",
     COM_POINTNN,
     pointNNStr,
     COM_TRACKNN,
@@ -218,7 +238,7 @@ int adb__sequenceQuery_by_key(struct soap* soap, xsd__string dbName, xsd__string
     seqLenStr,
     COM_ABSOLUTE_THRESH,
     absolute_thresholdStr,
-    parms->lsh_exact?COM_LSH_EXACT:""
+    lsh_exact?COM_LSH_EXACT:""
   };
 
   const unsigned argc = 22;

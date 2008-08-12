@@ -121,6 +121,8 @@ void audioDB::cleanup() {
     munmap(dataBuf, dataBufLength);
   if(timesTable)
     munmap(timesTable, timesTableLength);
+  if(powerTable)
+    munmap(powerTable, powerTableLength);
   if(l2normTable)
     munmap(l2normTable, l2normTableLength);
   if(trackOffsetTable)
