@@ -476,7 +476,7 @@ void audioDB::set_up_db(double **snp, double **vsnp, double **spp, double **vspp
 
 void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, double meanQdur, Uns32T numVectors){ 
   unsigned int dbVectors;
-  double *sNorm, *snPtr, *sPower = 0, *spPtr = 0;
+  double *sNorm = 0, *snPtr, *sPower = 0, *spPtr = 0;
   double *meanDBdur = 0;
 
   // check pre-conditions
@@ -530,6 +530,13 @@ void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, dou
     }
     exact_evaluation_queue->pop();
   }
+  // Cleanup
+  if(sNorm)
+    delete sNorm;
+  if(sPower)
+    delete sPower;
+  if(meanDBdur)
+    delete meanDBdur;
 }
 
 // A completely unprotected dot-product method
