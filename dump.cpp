@@ -5,6 +5,10 @@ void audioDB::dump(const char* dbName){
     initTables(dbName, 0);
   }
 
+  if(dbH->flags & O2_FLAG_LARGE_ADB){
+    error("error: dump not supported for LARGE_ADB");
+  }
+
   if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
     error("error making output directory", output, "mkdir");
   }

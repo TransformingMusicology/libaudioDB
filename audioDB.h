@@ -80,16 +80,20 @@
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 
 // Bit masks for packing (trackID,pointID) into 32-bit unsigned int
-#define LSH_N_POINT_BITS 14
-#define LSH_TRACK_MASK 0xFFFFC000U // 2^18 = 262144 tracks
-#define LSH_POINT_MASK 0x00003FFFU // 2^14 = 16384 points per track
+// This can be controlled at compile time
+#define O2_DEFAULT_LSH_N_POINT_BITS 14
+
+// Override the default point bit width for large database support
+#ifndef LSH_N_POINT_BITS
+#define LSH_N_POINT_BITS O2_DEFAULT_LSH_N_POINT_BITS
+#endif
 
 // LIMIT PARAMETERS
 #define O2_DEFAULT_DATASIZE (1355U) // in MB
 #define O2_DEFAULT_NTRACKS (20000U)
 #define O2_DEFAULT_DATADIM (9U)
 #define O2_REALTYPE (double)
-#define O2_MAXFILES (20000U)
+#define O2_MAXFILES (1000000U)
 #define O2_MAXFILESTR (256U)
 #define O2_FILETABLE_ENTRY_SIZE (O2_MAXFILESTR)
 #define O2_TRACKTABLE_ENTRY_SIZE (sizeof(unsigned))
@@ -98,17 +102,21 @@
 #define O2_MAXDIM (2000U)
 #define O2_MAXNN (1000000U)
 #define O2_MAXSEQLEN (8000U)            // maximum feature vectors in a sequence
-#define O2_MAXTRACKS (10000U)           // maximum number of tracks
-#define O2_MAXTRACKLEN ((LSH_POINT_MASK+1)) // maximum shingles in a track
+#define O2_MAXTRACKS (1000000U)           // maximum number of tracks
+#define O2_MAXTRACKLEN (1<<LSH_N_POINT_BITS) // maximum shingles in a track
 #define O2_MAXDOTPRODUCTMEMORY (sizeof(O2_REALTYPE)*O2_MAXSEQLEN*O2_MAXSEQLEN) // 512MB
 #define O2_DISTANCE_TOLERANCE (1e-6)
-#define O2_SERIAL_MAX_TRACKBATCH (10000)
+#define O2_SERIAL_MAX_TRACKBATCH (1000000)
+#define O2_LARGE_ADB_SIZE (O2_DEFAULT_DATASIZE+1) // datasize at which features are kept externally (in Mbytes)
+#define O2_LARGE_ADB_NTRACKS (O2_DEFAULT_NTRACKS+1) // ntracks at which features are kept externally
+#define O2_MAX_VECTORS ( O2_MEANNUMVECTORS * O2_MAXTRACKS )
 
 // Flags
 #define O2_FLAG_L2NORM (0x1U)
 #define O2_FLAG_MINMAX (0x2U)
 #define O2_FLAG_POWER (0x4U)
 #define O2_FLAG_TIMES (0x20U)
+#define O2_FLAG_LARGE_ADB (0x40U)
 #define DISPLAY_FLAG(x) (x?"on":"off")
 
 // Query types
@@ -146,7 +154,17 @@
     fflush(stderr); \
   }
 
+// We will only use this in a 32-bit address space
+// So map the off_t down to 32-bits first
+#define INSERT_FILETABLE_STRING(TABLE, STR) \
+    strncpy(TABLE + dbH->numFiles*O2_FILETABLE_ENTRY_SIZE, STR, strlen(STR));
+
+#define SAFE_DELETE(PTR) delete PTR; PTR=0;
+#define SAFE_DELETE_ARRAY(PTR) delete[] PTR; PTR=0;
+
 extern LSH* SERVER_LSH_INDEX_SINGLETON;
+extern char* SERVER_ADB_ROOT;
+extern char* SERVER_ADB_FEATURE_ROOT;
 
 typedef struct dbTableHeader {
   uint32_t magic;
@@ -192,8 +210,10 @@ class audioDB{
   std::ifstream *timesFile;
   const char *powerFileName;
   std::ifstream *powerFile;
-  int powerfd;
+  const char* adb_root;
+  const char* adb_feature_root;
 
+  int powerfd;
   int dbfid;
   int lshfid;
   bool forWrite;
@@ -205,14 +225,18 @@ class audioDB{
 
   gsl_rng *rng;
   
-  char *fileTable;
+  char* fileTable;
   unsigned* trackTable;
-  off_t *trackOffsetTable;
+  off_t* trackOffsetTable;
   double* dataBuf;
   double* inBuf;
   double* l2normTable;
   double* timesTable;
   double* powerTable;
+
+  char* featureFileNameTable;
+  char* timesFileNameTable;
+  char* powerFileNameTable;
 
   size_t fileTableLength;
   size_t trackTableLength;
@@ -269,7 +293,7 @@ class audioDB{
 
   void initialize_arrays(int track, unsigned int numVectors, double *query, double *data_buffer, double **D, double **DD);
   void delete_arrays(int track, unsigned int numVectors, double **D, double **DD);
-  void read_data(int track, double **data_buffer_p, size_t *data_buffer_size_p);
+  void read_data(int trkfid, int track, double **data_buffer_p, size_t *data_buffer_size_p);
   void set_up_query(double **qp, double **vqp, double **qnp, double **vqnp, double **qpp, double **vqpp, double *mqdp, unsigned int *nvp);
   void set_up_query_from_key(double **qp, double **vqp, double **qnp, double **vqnp, double **qpp, double **vqpp, double *mqdp, unsigned *nvp, Uns32T queryIndex);
   void set_up_db(double **snp, double **vsnp, double **spp, double **vspp, double **mddp, unsigned int *dvp);
@@ -278,7 +302,7 @@ class audioDB{
   double dot_product_points(double* q, double* p, Uns32T  L);
   void initRNG();
   void initDBHeader(const char *dbName);
-  void initInputFile(const char *inFile);
+  void initInputFile(const char *inFile, bool loadData = true);
   void initTables(const char* dbName, const char* inFile = 0);
   void initTablesFromKey(const char* dbName, const Uns32T queryIndex);
   void unitNorm(double* X, unsigned d, unsigned n, double* qNorm);
@@ -286,6 +310,8 @@ class audioDB{
   void insertTimeStamps(unsigned n, std::ifstream* timesFile, double* timesdata);
   void insertPowerData(unsigned n, int powerfd, double *powerdata);
   unsigned getKeyPos(char* key);
+  void prefix_name(char** const name, const char* prefix);
+
  public:
   audioDB(const unsigned argc, char* const argv[]);
   audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse);
@@ -301,6 +327,7 @@ class audioDB{
   void insert_data_vectors(off_t offset, void *buffer, size_t size);
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
+  void batchinsert_large_adb(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
   unsigned random_track(unsigned *propTable, unsigned total);
@@ -322,6 +349,8 @@ class audioDB{
   Uns32T lsh_param_N; // Number of rows per hash table
   Uns32T lsh_param_b; // Batch size, in number of tracks, per indexing iteration
   Uns32T lsh_param_ncols; // Maximum number of collision in a hash-table row
+  Uns32T lsh_n_point_bits; // How many bits to use to encode point ID within a track
+
 
   // LSH vector<> containers for one in-core copy of a set of feature vectors
   vector<float>::iterator vi; // feature vector iterator
@@ -342,13 +371,14 @@ class audioDB{
   char* index_get_name(const char*dbName, double radius, Uns32T sequenceLength);
   static void index_add_point_approximate(void* instance, Uns32T pointID, Uns32T qpos, float dist); // static point reporter callback method
   static void index_add_point_exact(void* instance, Uns32T pointID, Uns32T qpos, float dist); // static point reporter callback method
-  static Uns32T index_to_trackID(Uns32T lshID);  // Convert lsh point index to audioDB trackID
-  static Uns32T index_to_trackPos(Uns32T lshID); // Convert lsh point index to audioDB trackPos (spos)
-  static Uns32T index_from_trackInfo(Uns32T, Uns32T); // Convert audioDB trackID and trackPos to an lsh point index
+  static Uns32T index_to_trackID(Uns32T lshID, Uns32T nPntBits);  // Convert lsh point index to audioDB trackID
+  static Uns32T index_to_trackPos(Uns32T lshID, Uns32T nPntBits); // Convert lsh point index to audioDB trackPos (spos)
+  static Uns32T index_from_trackInfo(Uns32T trackID, Uns32T pntID, Uns32T nPntBits); // Convert audioDB trackID and trackPos to an lsh point index
   void initialize_exact_evalutation_queue();
   void index_insert_exact_evaluation_queue(Uns32T trackID, Uns32T qpos, Uns32T spos);
   LSH* index_allocate(char* indexName, bool load_hashTables);
-
+  void init_track_aux_data(Uns32T trackID, double* fvp, double** sNormpp,double** snPtrp, double** sPowerp, double** spPtrp);
+  
   // Web Services
   void startServer();
   void ws_status(const char*dbName, char* hostport);
@@ -370,7 +400,9 @@ class audioDB{
     timesFile(0),				\
     powerFileName(0),				\
     powerFile(0),				\
-    powerfd(0),					\
+    adb_root(0),                                \
+    adb_feature_root(0),                        \
+    powerfd(0),                                 \
     dbfid(0),					\
     lshfid(0),					\
     forWrite(false),				\
@@ -386,6 +418,9 @@ class audioDB{
     l2normTable(0),				\
     timesTable(0),				\
     powerTable(0),                              \
+    featureFileNameTable(0),                    \
+    timesFileNameTable(0),                      \
+    powerFileNameTable(0),                      \
     fileTableLength(0),				\
     trackTableLength(0),			\
     dataBufLength(0),				\
@@ -431,5 +466,6 @@ class audioDB{
     lsh_param_N(0),				\
     lsh_param_b(0),				\
     lsh_param_ncols(0),                         \
+    lsh_n_point_bits(0),                        \
     vv(0)
 #endif

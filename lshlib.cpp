@@ -771,9 +771,12 @@ int G::serialize_lsh_hashtables_format1(int fid, int merge){
     // Align each hash table to page boundary
     char* dbtable = serial_mmap(fid, hashTableSize, 1, 
 				align_up(get_serial_hashtable_offset()+x*hashTableSize, get_page_logn()));
+#ifdef __CYGWIN__
+    // No madvise in CYGWIN
+#else
     if(madvise(dbtable, hashTableSize, MADV_SEQUENTIAL)<0)
       error("could not advise hashtable memory","","madvise");
-    
+#endif
     maxColCount=0;
     minColCount=O2_SERIAL_MAX_COLS;
     meanColCount=0;
@@ -1161,8 +1164,12 @@ void G::unserialize_lsh_hashtables_format1(int fid){
     // Align each hash table to page boundary
     char* dbtable = serial_mmap(fid, hashTableSize, 0, 
 				align_up(get_serial_hashtable_offset()+x*hashTableSize, get_page_logn()));
+#ifdef __CYGWIN__
+    // No madvise in CYGWIN
+#else
     if(madvise(dbtable, hashTableSize, MADV_SEQUENTIAL)<0)
       error("could not advise hashtable memory","","madvise");    
+#endif
     pt=(SerialElementT*)dbtable;
     for( y = 0 ; y < H::N ; y++ ){
       // Move disk pointer to beginning of row
@@ -1331,8 +1338,12 @@ void G::serial_retrieve_point_set(char* filename, vector<vector<float> >& vv, Re
     // memory map a single hash table for random access
     char* db = serial_mmap(dbfid, hashTableSize, 0, 
 			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
+#ifdef __CYGWIN__
+    // No madvise in CYGWIN
+#else
     if(madvise(db, hashTableSize, MADV_RANDOM)<0)
       error("could not advise local hashtable memory","","madvise");
+#endif
     SerialElementT* pe = (SerialElementT*)db ;
     for(Uns32T qpos=0; qpos<vv.size(); qpos++){
       H::compute_hash_functions(vv[qpos]);
@@ -1364,8 +1375,12 @@ void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, Rep
     // memory map a single hash table for random access
     char* db = serial_mmap(dbfid, hashTableSize, 0, 
 			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
+#ifdef __CYGWIN__
+    // No madvise in CYGWIN
+#else
     if(madvise(db, hashTableSize, MADV_RANDOM)<0)
       error("could not advise local hashtable memory","","madvise");
+#endif
     SerialElementT* pe = (SerialElementT*)db ;
     H::generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
     serial_bucket_chain_point(pe+t1*lshHeader->numCols, qpos); // Point to correct row
@@ -1384,8 +1399,12 @@ void G::serial_dump_tables(char* filename){
     // memory map a single hash table for random access
     char* db = serial_mmap(dbfid, hashTableSize, 0, 
 			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
+#ifdef __CYGWIN__
+    // No madvise in CYGWIN
+#else
     if(madvise(db, hashTableSize, MADV_SEQUENTIAL)<0)
       error("could not advise local hashtable memory","","madvise");
+#endif
     SerialElementT* pe = (SerialElementT*)db ;
     printf("*********** TABLE %d ***************\n", j);
     fflush(stdout);

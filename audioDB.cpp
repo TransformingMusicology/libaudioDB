@@ -1,19 +1,21 @@
 #include "audioDB.h"
 
 LSH* SERVER_LSH_INDEX_SINGLETON;
+char* SERVER_ADB_ROOT;
+char* SERVER_ADB_FEATURE_ROOT;
 
 PointPair::PointPair(Uns32T a, Uns32T b, Uns32T c):trackID(a),qpos(b),spos(c){};
 
 bool operator<(const PointPair& a, const PointPair& b){
-  return ( (a.qpos<b.qpos) || 
-	   ((a.qpos==b.qpos) && 
-	    ( (a.trackID<b.trackID)) || ((a.trackID==b.trackID)&&(a.spos<b.spos)) ) );	    
+  return ( (a.trackID<b.trackID) ||
+	   ( (a.trackID==b.trackID) &&  
+	     ( (a.spos<b.spos) || ( (a.spos==b.spos) && (a.qpos < b.qpos) )) ) );
 }
 
 bool operator>(const PointPair& a, const PointPair& b){
-  return ( (a.qpos>b.qpos) || 
-	   ((a.qpos==b.qpos) && 
-	    ( (a.trackID>b.trackID)) || ((a.trackID==b.trackID)&&(a.spos>b.spos)) ) );
+  return ( (a.trackID>b.trackID) ||
+	   ( (a.trackID==b.trackID) &&  
+	     ( (a.spos>b.spos) || ( (a.spos==b.spos) && (a.qpos > b.qpos) )) ) );
 }
 
 bool operator==(const PointPair& a, const PointPair& b){
@@ -33,6 +35,10 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     printf("%s\n", gengetopt_args_info_help[0]);
     error("No command found");
   }
+
+  // Perform database prefix substitution
+  if(adb_root)
+    prefix_name((char** const)&dbName, adb_root);
 
   if(O2_ACTION(COM_SERVER))
     startServer();
@@ -86,6 +92,9 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
   try {
     isServer = 1; // FIXME: Hack
     processArgs(argc, argv);
+    // Perform database prefix substitution
+    if(adb_root)
+      prefix_name((char** const)&dbName, adb_root);
     assert(O2_ACTION(COM_QUERY));
     query(dbName, inFile, adbQueryResponse);
   } catch(char *err) {
@@ -99,6 +108,9 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
   try {
     isServer = 1; // FIXME: Hack
     processArgs(argc, argv);
+    // Perform database prefix substitution
+    if(adb_root)
+      prefix_name((char** const)&dbName, adb_root);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
   } catch(char *err) {
@@ -125,6 +137,12 @@ void audioDB::cleanup() {
     munmap(powerTable, powerTableLength);
   if(l2normTable)
     munmap(l2normTable, l2normTableLength);
+  if(featureFileNameTable)
+    munmap(featureFileNameTable, fileTableLength);
+  if(timesFileNameTable)
+    munmap(timesFileNameTable, fileTableLength);
+  if(powerFileNameTable)
+    munmap(powerFileNameTable, fileTableLength);
   if(trackOffsetTable)
     delete trackOffsetTable;
   if(reporter)
@@ -237,6 +255,20 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     relative_threshold = args_info.relative_threshold_arg;
   }
 
+  if (args_info.adb_root_given){
+    adb_root = args_info.adb_root_arg;
+  }
+
+  if (args_info.adb_feature_root_given){
+    adb_feature_root = args_info.adb_feature_root_arg;
+  }
+
+  // perform dbName path prefix SERVER-side subsitution
+  if(SERVER_ADB_ROOT && !adb_root)
+    adb_root = SERVER_ADB_ROOT;
+  if(SERVER_ADB_FEATURE_ROOT && !adb_feature_root)
+    adb_feature_root = SERVER_ADB_FEATURE_ROOT;
+  
   if(args_info.SERVER_given){
     command=COM_SERVER;
     port=args_info.SERVER_arg;
@@ -527,15 +559,23 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
     std::cout << "data dim:" << dbH->dim <<std::endl;
     if(dbH->dim>0){
       std::cout << "total vectors:" << dbH->length/(sizeof(double)*dbH->dim)<<std::endl;
-      std::cout << "vectors available:" << (dbH->timesTableOffset-(dbH->dataOffset+dbH->length))/(sizeof(double)*dbH->dim) << std::endl;
+      if(dbH->flags & O2_FLAG_LARGE_ADB)
+	std::cout << "vectors available:" << O2_MAX_VECTORS - (dbH->length / (sizeof(double)*dbH->dim)) << std::endl;
+      else
+	std::cout << "vectors available:" << (dbH->timesTableOffset-(dbH->dataOffset+dbH->length))/(sizeof(double)*dbH->dim) << std::endl;
     }
-    std::cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
-    std::cout << "bytes available:" << dbH->timesTableOffset-(dbH->dataOffset+dbH->length) << " (" <<
-      (100.0*(dbH->timesTableOffset-(dbH->dataOffset+dbH->length)))/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
+    if( ! (dbH->flags & O2_FLAG_LARGE_ADB) ){
+      std::cout << "total bytes:" << dbH->length << " (" << (100.0*dbH->length)/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
+      std::cout << "bytes available:" << dbH->timesTableOffset-(dbH->dataOffset+dbH->length) << " (" <<
+	(100.0*(dbH->timesTableOffset-(dbH->dataOffset+dbH->length)))/(dbH->timesTableOffset-dbH->dataOffset) << "%)" << std::endl;
+    }
     std::cout << "flags:" << " l2norm[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_L2NORM)
 	      << "] minmax[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_MINMAX)
 	      << "] power[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_POWER)
-	      << "] times[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_TIMES) << "]" << endl;    
+	      << "] times[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_TIMES) 
+	      << "] largeADB[" << DISPLAY_FLAG(dbH->flags&O2_FLAG_LARGE_ADB)
+	      << "]" << endl;    
+              
     std::cout << "null count: " << nullCount << " small sequence count " << dudCount-nullCount << std::endl;    
   } else {
     adbStatusResponse->result.numFiles = dbH->numFiles;
@@ -550,7 +590,7 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
 void audioDB::l2norm(const char* dbName) {
   forWrite = true;
   initTables(dbName, 0);
-  if(dbH->length>0){
+  if( !(dbH->flags & O2_FLAG_LARGE_ADB ) && (dbH->length>0) ){
     /* FIXME: should probably be uint64_t */
     unsigned numVectors = dbH->length/(sizeof(double)*dbH->dim);
     CHECKED_MMAP(double *, dataBuf, dbH->dataOffset, dataBufLength);
@@ -563,8 +603,8 @@ void audioDB::l2norm(const char* dbName) {
 
 void audioDB::power_flag(const char *dbName) {
   forWrite = true;
-  initTables(dbName, 0);
-  if (dbH->length > 0) {
+  initTables(dbName, 0);  
+  if( !(dbH->flags & O2_FLAG_LARGE_ADB ) && (dbH->length>0) ){
     error("cannot turn on power storage for non-empty database", dbName);
   }
   dbH->flags |= O2_FLAG_POWER;
@@ -583,7 +623,7 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
 
   assert(l2normTable);
 
-  if( !append && (dbH->flags & O2_FLAG_L2NORM) )
+  if( !(dbH->flags & O2_FLAG_LARGE_ADB) && !append && (dbH->flags & O2_FLAG_L2NORM) )
     error("Database is already L2 normed", "automatic norm on insert is enabled");
 
   VERB_LOG(2, "norming %u vectors...", n);
@@ -624,5 +664,7 @@ void audioDB::unitNormAndInsertL2(double* X, unsigned dim, unsigned n, unsigned 
 // so it is a good place to set any global state variables
 int main(const unsigned argc, char* const argv[]){
   SERVER_LSH_INDEX_SINGLETON = 0; // Initialize global variables
+  SERVER_ADB_ROOT = 0;            // Server-side database root prefix
+  SERVER_ADB_FEATURE_ROOT = 0;    // Server-side features root prefix
   audioDB(argc, argv);
 }

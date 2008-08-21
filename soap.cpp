@@ -18,7 +18,7 @@ void audioDB::ws_status(const char*dbName, char* hostport){
     std::cout << "length = " << adbStatusResponse.result.length << std::endl;
     std::cout << "dudCount = " << adbStatusResponse.result.dudCount << std::endl;
     std::cout << "nullCount = " << adbStatusResponse.result.nullCount << std::endl;
-    std::cout << "flags = " << adbStatusResponse.result.flags << std::endl;
+    std::cout << "flags = " << (adbStatusResponse.result.flags & 0x00FFFFFF) << std::endl;
   } else {
     soap_print_fault(&soap,stderr);
   }
@@ -126,8 +126,8 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
     strncpy(queryType, "sequence", strlen("sequence"));
   else if(qType == O2_TRACK_QUERY)
     strncpy(queryType,"track", strlen("track"));
-  else
-    strncpy(queryType, "", strlen(""));
+  else if(qType == O2_N_SEQUENCE_QUERY)
+    strncpy(queryType,"nsequence", strlen("nsequence"));
 
   if(pointNN==0)
     pointNN=10;
@@ -285,6 +285,12 @@ void audioDB::startServer(){
 	fflush(stderr);
 	delete[] indexName;
       }
+      
+      // Server-side path prefix to databases and features
+      if(adb_root)
+	SERVER_ADB_ROOT = (char*)adb_root; // Server-side database root
+      if(adb_feature_root)
+	SERVER_ADB_FEATURE_ROOT = (char*)adb_feature_root; // Server-side features root
 
       for (int i = 1; ; i++)
 	{

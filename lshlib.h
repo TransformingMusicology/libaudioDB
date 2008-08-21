@@ -58,23 +58,25 @@
 #define O2_SERIAL_HEADER_SIZE sizeof(SerialHeaderT)
 #define O2_SERIAL_ELEMENT_SIZE sizeof(SerialElementT)
 #define O2_SERIAL_MAX_TABLES (200)
-#define O2_SERIAL_MAX_ROWS (1000000)
-#define O2_SERIAL_MAX_COLS (100000)
+#define O2_SERIAL_MAX_ROWS (1000000000)
+#define O2_SERIAL_MAX_COLS (1000000)
 #define O2_SERIAL_MAX_DIM (2000)
 #define O2_SERIAL_MAX_FUNS (100)
 #define O2_SERIAL_MAX_BINWIDTH (200)
 #define O2_SERIAL_MAXFILESIZE (4000000000UL)
 
 // Flags for Serial Header
-#define O2_SERIAL_FILEFORMAT1 (0x1U)       // Optimize for on-disk search
-#define O2_SERIAL_FILEFORMAT2 (0x2U)       // Optimize for in-core search
+#define O2_SERIAL_FILEFORMAT1 (0x1U)       // Optimize disk format for on-disk search
+#define O2_SERIAL_FILEFORMAT2 (0x2U)       // Optimize disk format for in-core search
+#define O2_SERIAL_COREFORMAT1 (0x4U)
+#define O2_SERIAL_COREFORMAT2 (0x8U)
 
 // Flags for serialization fileformat2: use high 3 bits of Uns32T
-#define O2_SERIAL_TOKEN_T1 (0xFFFFFFFC)
+#define O2_SERIAL_TOKEN_T1 (0xFFFFFFFCU)
 #define O2_SERIAL_TOKEN_T2 (0xFFFFFFFDU)
 #define O2_SERIAL_TOKEN_ENDTABLE (0xFFFFFFFEU)
 
-#define O2_INDEX_MAXSTR (512)
+#define O2_INDEX_MAXSTR (256)
 
 unsigned align_up(unsigned x, unsigned w);
 
@@ -320,7 +322,7 @@ class G: public H{
 
   // Callback Function for point reporting
   void* calling_instance; // store calling object instance for member-function callback
-  void (*add_point_callback)(void*, Uns32T, Uns32T, float); // The callback
+  ReporterCallbackPtr add_point_callback; // Pointer to the callback function
 
  public:
   G(char* lshFile, bool lshInCore = false); // unserialize constructor

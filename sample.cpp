@@ -56,7 +56,10 @@ unsigned audioDB::random_track(unsigned *propTable, unsigned total) {
 
 void audioDB::sample(const char *dbName) {
   initTables(dbName, 0);
-
+  if(dbH->flags & O2_FLAG_LARGE_ADB){
+    error("error: sample not yet supported for LARGE_ADB");
+  }
+    
   // build track offset table (FIXME: cut'n'pasted from query.cpp)
   off_t *trackOffsetTable = new off_t[dbH->numFiles];
   unsigned cumTrack=0;

@@ -126,10 +126,18 @@ void audioDB::initDBHeader(const char* dbName) {
     } else {
       fileTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLE_ENTRY_SIZE);
       trackTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_TRACKTABLE_ENTRY_SIZE);
-      dataBufLength = ALIGN_PAGE_UP(dbH->length);
-      timesTableLength = ALIGN_PAGE_UP(2*(dbH->length / dbH->dim));
-      powerTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
-      l2normTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+      if( dbH->flags & O2_FLAG_LARGE_ADB ){
+	dataBufLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLE_ENTRY_SIZE);
+	timesTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLE_ENTRY_SIZE);
+	powerTableLength = ALIGN_PAGE_UP(dbH->numFiles * O2_FILETABLE_ENTRY_SIZE);
+	l2normTableLength = 0;
+      }
+      else{
+	dataBufLength = ALIGN_PAGE_UP(dbH->length);
+	timesTableLength = ALIGN_PAGE_UP(2*(dbH->length / dbH->dim));
+	powerTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+	l2normTableLength = ALIGN_PAGE_UP(dbH->length / dbH->dim);
+      }
     }
     CHECKED_MMAP(char *, fileTable, dbH->fileTableOffset, fileTableLength);
     CHECKED_MMAP(unsigned *, trackTable, dbH->trackTableOffset, trackTableLength);
@@ -143,9 +151,18 @@ void audioDB::initDBHeader(const char* dbName) {
      *
      * CHECKED_MMAP(double *, dataBuf, dbH->dataOffset, dataBufLength);
      */
-    CHECKED_MMAP(double *, timesTable, dbH->timesTableOffset, timesTableLength);
-    CHECKED_MMAP(double *, powerTable, dbH->powerTableOffset, powerTableLength);
-    CHECKED_MMAP(double *, l2normTable, dbH->l2normTableOffset, l2normTableLength);
+    if( dbH->flags & O2_FLAG_LARGE_ADB ){
+      CHECKED_MMAP(char *, featureFileNameTable, dbH->dataOffset, fileTableLength);
+      if( dbH->flags & O2_FLAG_TIMES )
+	CHECKED_MMAP(char *, timesFileNameTable, dbH->timesTableOffset, fileTableLength);
+      if( dbH->flags & O2_FLAG_POWER )
+	CHECKED_MMAP(char *, powerFileNameTable, dbH->powerTableOffset, fileTableLength);
+    }
+    else{
+      CHECKED_MMAP(double *, timesTable, dbH->timesTableOffset, timesTableLength);
+      CHECKED_MMAP(double *, powerTable, dbH->powerTableOffset, powerTableLength);
+      CHECKED_MMAP(double *, l2normTable, dbH->l2normTableOffset, l2normTableLength);
+    }
   }
 
   // build track offset table
@@ -154,10 +171,15 @@ void audioDB::initDBHeader(const char* dbName) {
   for(Uns32T k = 0; k < dbH->numFiles; k++){
     trackOffsetTable[k] = cumTrack;
     cumTrack += trackTable[k] * dbH->dim;
-  }  
+  }
+
+  // Assign correct number of point bits per track in LSH indexing / retrieval
+  lsh_n_point_bits = dbH->flags >> 28;
+  if( !lsh_n_point_bits )
+    lsh_n_point_bits = O2_DEFAULT_LSH_N_POINT_BITS;
 }
 
-void audioDB::initInputFile (const char *inFile) {
+void audioDB::initInputFile (const char *inFile, bool loadData) {
   if (inFile) {
     if ((infid = open(inFile, O_RDONLY)) < 0) {
       error("can't open input file for reading", inFile, "open");
@@ -189,7 +211,7 @@ void audioDB::initInputFile (const char *inFile) {
       }
     }
     
-    if ((indata = (char *) mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0)) == (caddr_t) -1) {
+    if (loadData && ((indata = (char *) mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, infid, 0)) == (caddr_t) -1)) {
       error("mmap error for input", inFile, "mmap");
     }
   }
@@ -208,3 +230,21 @@ void audioDB::initTables(const char* dbName, const char* inFile) {
     initInputFile(inFile);
 }
 
+// If name is relative path, side effect name with prefix/name
+// Do not free original pointer
+void audioDB::prefix_name(char** const name, const char* prefix){
+  // No prefix if prefix is empty
+  if(!prefix)
+    return;
+  // Allocate new memory, keep old memory
+  assert(name && *name);
+  if (strlen(*name) + strlen(prefix) + 1 > O2_MAXFILESTR)
+    error("error: path prefix + filename too long",prefix);
+  // Do not prefix absolute path+filename
+  if(**name=='/')
+    return;
+  // OK to prefix relative path+filename
+  char* prefixedName = (char*) malloc(O2_MAXFILESTR);
+  sprintf(prefixedName, "%s/%s", prefix, *name);
+  *name = prefixedName; // side effect new name to old name
+}

@@ -292,6 +292,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
   }
   std::vector<NNresult>::reverse_iterator rit;
   std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > point_queue;      
+  NNresult rk;
 
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
@@ -309,31 +310,57 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
       }
       
       for(unsigned int k = 0; k < qsize; k++) {
-	NNresult rk = point_queue.top();
+	rk = point_queue.top();
 	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
 	point_queue.pop();
       }
     }
   } else {
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size*pointNN];
     unsigned int k = 0;
-    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
+    // Loop over returned tracks
+    for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = r.dist;
-      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = r.qpos;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = r.spos;
-      if(fileTable)
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
-      else
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+      // Reverse the order of the points stored in point_queues
+      unsigned int qsize=point_queues[r.trackID].size();
+      while(qsize--){
+	point_queue.push(point_queues[r.trackID].top());
+	point_queues[r.trackID].pop();
+      }
+      qsize=point_queue.size();
+      unsigned int numReports = pointNN;
+      while(numReports--){ // pop the rest of the points
+	if(qsize)
+	  rk = point_queue.top(); // Take one point from the top of the queue
+	else{
+	  rk.dist = 1000000000.0;
+	  rk.qpos = 0xFFFFFFFF;
+	  rk.spos = 0xFFFFFFFF;
+	}
+	  
+	((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
+	((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
+	((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
+	((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
+	if(qsize){
+	  if(fileTable)
+	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+	  else
+	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
+	  point_queue.pop();
+	  qsize--;
+	}
+	else
+	  snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "NULL");		  
+	k++;
+      }
     }
   }
   // clean up
@@ -641,17 +668,17 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
     }
   }
  else {
-   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size*pointNN;
+    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size*pointNN];
+    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size*pointNN];
     unsigned int k = 0;
     // Loop over returned tracks
-    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
+    for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
       // Reverse the order of the points stored in point_queues
       unsigned int qsize=point_queues[r.trackID].size();
@@ -660,17 +687,32 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
 	point_queues[r.trackID].pop();
       }
       qsize=point_queue.size();
-      rk = point_queue.top(); // Take one point from the top of the queue
-      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
-      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
-      if(fileTable)
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
-      else
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
-      while(qsize--) // pop the rest of the points
-	point_queue.pop();
+      unsigned int numReports = pointNN;
+      while(numReports--){ // pop the rest of the points
+	if(qsize)
+	  rk = point_queue.top(); // Take one point from the top of the queue
+	else{
+	  rk.dist = 1000000000.0;
+	  rk.qpos = 0xFFFFFFFF;
+	  rk.spos = 0xFFFFFFFF;
+	}
+	  
+	((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
+	((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
+	((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
+	((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
+	if(qsize){
+	  if(fileTable)
+	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+	  else
+	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
+	  point_queue.pop();
+	  qsize--;
+	}
+	else
+	  snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "NULL");
+	k++;
+      }
     }
  }
   delete[] point_queues;

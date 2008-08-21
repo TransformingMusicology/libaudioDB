@@ -8,6 +8,7 @@ text ""
 section "Database Operations" sectiondesc="All database operations require a database argument."
 
 option "database" d "database file required by Database commands." string typestr="filename" optional
+option "adb_root" - "path prefix for database" string typestr="path" dependon="database" optional
 
 section "Database Creation" sectiondesc="Creating a new database file."
 
@@ -23,7 +24,7 @@ option "DUMP"   D "output all entries: index key size." dependon="database" opti
 option "output" - "output directory" string dependon="DUMP" default="audioDB.dump" optional
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
 option "POWER"  P "turn on power flag for database." dependon="database" optional
-option "INDEX"  X "build an index for -d database at -R radius" dependon="database" dependon="radius" optional
+
 section "Database Information" sectiondesc="Information about databases."
 
 option "STATUS" S "output database information to stdout." dependon="database" optional
@@ -33,7 +34,7 @@ option "nsamples" - "number of pairwise samples to take." dependon="SAMPLE" int 
 section "Database Insertion" sectiondesc="The following commands insert feature files, with optional keys and timestamps.\n"
 
 option "INSERT"      I "add feature vectors to an existing database." dependon="features" optional
-option "UPDATE"      U "replace inserted vectors associated with key with new input vectors." dependon="features" dependon="key" dependon="database" optional hidden
+option "adb_feature_root" - "path prefix for feature files, times files and power files" string typestr="path" optional
 option "features" f "binary series of vectors file {int sz:ieee double[][sz]:eof}." string typestr="filename" dependon="database" optional
 option "times"    t "list of time points (ascii) for feature vectors." string typestr="filename" dependon="features" optional
 option "power"    w "binary power feature file." string typestr="filename" dependon="database" optional
@@ -62,6 +63,7 @@ option "relative-threshold" - "relative power threshold between query and target
 
 section "Locality-sensitive hashing (LSH) parameters" sectiondesc="These parameters control LSH indexing and retrieval\n"
 
+option "INDEX"  X "build an index for -d database at -R radius and -l sequenceLength" dependon="database" dependon="radius" optional
 option "lsh_w" - "width of LSH hash-function bins. " double default="4.0" dependon="INDEX" optional hidden
 option "lsh_k" - "even number of independent hash functions to employ with LSH" int typestr="size" default="8" dependon="INDEX" optional
 option "lsh_m" - "number of hash tables is m(m-1)/2" int typestr="size" default="5" dependon="INDEX" optional
@@ -79,9 +81,10 @@ option "no_unit_norming" - "do not unit norm features when querying an L2Norm da
 section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
 
 option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
-option "client" c "run as a client using named host service." string typestr="hostname:port" optional
 option "load_index" - "make web service with memory-resident hashtables" flag off dependon="radius" optional
+option "client" c "run as a client using named host service." string typestr="hostname:port" optional
+
 
 text "
-Copyright (c) 2007 Michael Casey, Christophe Rhodes
+Copyright (c) 2007-2008 Michael Casey, Christophe Rhodes
                   Goldsmiths, University of London"

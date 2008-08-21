@@ -46,7 +46,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
       if(index_exists(dbName, radius, sequenceLength)){
 	char* indexName = index_get_name(dbName, radius, sequenceLength);
 	lsh = index_allocate(indexName, false);
-	reporter = new trackSequenceQueryRadReporter(trackNN, index_to_trackID(lsh->get_maxp())+1);
+	reporter = new trackSequenceQueryRadReporter(trackNN, index_to_trackID(lsh->get_maxp(), lsh_n_point_bits)+1);
 	delete[] indexName;
       }
       else
@@ -62,7 +62,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
       if(index_exists(dbName, radius, sequenceLength)){
 	char* indexName = index_get_name(dbName, radius, sequenceLength);
 	lsh = index_allocate(indexName, false);
-	reporter = new trackSequenceQueryRadNNReporter(pointNN,trackNN, index_to_trackID(lsh->get_maxp())+1);
+	reporter = new trackSequenceQueryRadNNReporter(pointNN,trackNN, index_to_trackID(lsh->get_maxp(), lsh_n_point_bits)+1);
 	delete[] indexName;
       }
       else
@@ -220,7 +220,7 @@ void audioDB::delete_arrays(int track, unsigned int numVectors, double **D, doub
   }
 }
 
-void audioDB::read_data(int track, double **data_buffer_p, size_t *data_buffer_size_p) {
+void audioDB::read_data(int trkfid, int track, double **data_buffer_p, size_t *data_buffer_size_p) {
   if (trackTable[track] * sizeof(double) * dbH->dim > *data_buffer_size_p) {
     if(*data_buffer_p) {
       free(*data_buffer_p);
@@ -235,7 +235,7 @@ void audioDB::read_data(int track, double **data_buffer_p, size_t *data_buffer_s
     }
   }
 
-  read(dbfid, *data_buffer_p, trackTable[track] * sizeof(double) * dbH->dim);
+  read(trkfid, *data_buffer_p, trackTable[track] * sizeof(double) * dbH->dim);
 }
 
 // These names deserve some unpicking.  The names starting with a "q"
@@ -341,48 +341,70 @@ void audioDB::set_up_query_from_key(double **qp, double **vqp, double **qnp, dou
   
   VERB_LOG(1, "performing norms... ");
 
-  // Read query feature vectors from database
-  *qp = NULL;
-  lseek(dbfid, dbH->dataOffset + trackOffsetTable[queryIndex] * sizeof(double), SEEK_SET);
-  size_t allocatedSize = 0;
-  read_data(queryIndex, qp, &allocatedSize);
-  // Consistency check on allocated memory and query feature size
-  if(*nvp*sizeof(double)*dbH->dim != allocatedSize)
-    error("Query memory allocation failed consitency check","set_up_query_from_key");
-
-  Uns32T trackIndexOffset = trackOffsetTable[queryIndex]/dbH->dim; // Convert num data elements to num vectors
-  // Copy L2 norm partial-sum coefficients
-  assert(*qnp = new double[*nvp]);
-  memcpy(*qnp, l2normTable+trackIndexOffset, *nvp*sizeof(double));
-  sequence_sum(*qnp, *nvp, sequenceLength);
-  sequence_sqrt(*qnp, *nvp, sequenceLength);
-
-  if( usingPower ){
-    // Copy Power partial-sum coefficients
-    assert(*qpp = new double[*nvp]);
-    memcpy(*qpp, powerTable+trackIndexOffset, *nvp*sizeof(double));
-    sequence_sum(*qpp, *nvp, sequenceLength);
-    sequence_average(*qpp, *nvp, sequenceLength);
+  // For LARGE_ADB load query features from file
+  if( dbH->flags & O2_FLAG_LARGE_ADB ){
+    if(infid>0)
+      close(infid);
+    char* prefixedString = new char[O2_MAXFILESTR];
+    char* tmpStr = prefixedString;
+    strncpy(prefixedString, featureFileNameTable+queryIndex*O2_FILETABLE_ENTRY_SIZE, O2_MAXFILESTR);
+    prefix_name(&prefixedString, adb_feature_root);
+    if(tmpStr!=prefixedString)
+      delete[] tmpStr;
+    initInputFile(prefixedString, false); // nommap, file pointer at correct position
+    size_t allocatedSize = 0;
+    read_data(infid, queryIndex, qp, &allocatedSize); // over-writes qp and allocatedSize
+    // Consistency check on allocated memory and query feature size
+    if(*nvp*sizeof(double)*dbH->dim != allocatedSize)
+      error("Query memory allocation failed consitency check","set_up_query_from_key");
+    // Allocated and calculate auxillary sequences: l2norm and power
+    init_track_aux_data(queryIndex, *qp, qnp, vqnp, qpp, vqpp);
   }
-
-  if (usingTimes) {
-    unsigned int k;
-    *mqdp = 0.0;
-    double *querydurs = new double[*nvp];
-    double *timesdata = new double[*nvp*2];
-    assert(querydurs && timesdata);
-    memcpy(timesdata, timesTable+trackIndexOffset, *nvp*sizeof(double));    
-    for(k = 0; k < *nvp; k++) {
-      querydurs[k] = timesdata[2*k+1] - timesdata[2*k];
-      *mqdp += querydurs[k];
+  else{ // Load from self-contained ADB database
+    // Read query feature vectors from database
+    *qp = NULL;
+    lseek(dbfid, dbH->dataOffset + trackOffsetTable[queryIndex] * sizeof(double), SEEK_SET);
+    size_t allocatedSize = 0;
+    read_data(dbfid, queryIndex, qp, &allocatedSize);
+    // Consistency check on allocated memory and query feature size
+    if(*nvp*sizeof(double)*dbH->dim != allocatedSize)
+      error("Query memory allocation failed consitency check","set_up_query_from_key");
+    
+    Uns32T trackIndexOffset = trackOffsetTable[queryIndex]/dbH->dim; // Convert num data elements to num vectors
+    // Copy L2 norm partial-sum coefficients
+    assert(*qnp = new double[*nvp]);
+    memcpy(*qnp, l2normTable+trackIndexOffset, *nvp*sizeof(double));
+    sequence_sum(*qnp, *nvp, sequenceLength);
+    sequence_sqrt(*qnp, *nvp, sequenceLength);
+    
+    if( usingPower ){
+      // Copy Power partial-sum coefficients
+      assert(*qpp = new double[*nvp]);
+      memcpy(*qpp, powerTable+trackIndexOffset, *nvp*sizeof(double));
+      sequence_sum(*qpp, *nvp, sequenceLength);
+      sequence_average(*qpp, *nvp, sequenceLength);
     }
-    *mqdp /= k;
     
-    VERB_LOG(1, "mean query file duration: %f\n", *mqdp);
-    
-    delete [] querydurs;
-    delete [] timesdata;
+    if (usingTimes) {
+      unsigned int k;
+      *mqdp = 0.0;
+      double *querydurs = new double[*nvp];
+      double *timesdata = new double[*nvp*2];
+      assert(querydurs && timesdata);
+      memcpy(timesdata, timesTable+trackIndexOffset, *nvp*sizeof(double));    
+      for(k = 0; k < *nvp; k++) {
+	querydurs[k] = timesdata[2*k+1] - timesdata[2*k];
+	*mqdp += querydurs[k];
+      }
+      *mqdp /= k;
+      
+      VERB_LOG(1, "mean query file duration: %f\n", *mqdp);
+      
+      delete [] querydurs;
+      delete [] timesdata;
+    }
   }
+
   // Defaults, for exhaustive search (!usingQueryPoint)
   *vqp = *qp;
   *vqnp = *qnp;
@@ -487,7 +509,8 @@ void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, dou
   // Compute database info
   // FIXME: we more than likely don't need very much of the database
   // so make a new method to build these values per-track or, even better, per-point
-  set_up_db(&sNorm, &snPtr, &sPower, &spPtr, &meanDBdur, &dbVectors);
+  if( !( dbH->flags & O2_FLAG_LARGE_ADB) )
+    set_up_db(&sNorm, &snPtr, &sPower, &spPtr, &meanDBdur, &dbVectors);
 
   VERB_LOG(1, "matching points...");
 
@@ -495,48 +518,82 @@ void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, dou
   assert(trackNN>0 && trackNN<=O2_MAXNN);
 
   // We are guaranteed that the order of points is sorted by:
-  // qpos, trackID, spos
+  // trackID, spos, qpos
   // so we can be relatively efficient in initialization of track data.
   // Here we assume that points don't overlap, so we will use exhaustive dot
-  // product evaluation over the sequence
+  // product evaluation instead of memoization of partial sums which is used
+  // for exhaustive brute-force evaluation from smaller databases: e.g. query_loop()
   double dist;
   size_t data_buffer_size = 0;
   double *data_buffer = 0;
-  Uns32T trackOffset;
-  Uns32T trackIndexOffset;
+  Uns32T trackOffset = 0;
+  Uns32T trackIndexOffset = 0;
   Uns32T currentTrack = 0x80000000; // Initialize with a value outside of track index range
   Uns32T npairs = exact_evaluation_queue->size();
   while(npairs--){
     PointPair pp = exact_evaluation_queue->top();
-    trackOffset=trackOffsetTable[pp.trackID]; // num data elements offset
-    trackIndexOffset=trackOffset/dbH->dim;    // num vectors offset
-    if((!(usingPower) || powers_acceptable(qpPtr[usingQueryPoint?0:pp.qpos], sPower[trackIndexOffset+pp.spos])) &&
-       ((usingQueryPoint?0:pp.qpos) < numVectors-sequenceLength+1 && pp.spos < trackTable[pp.trackID]-sequenceLength+1)){
+    // Large ADB track data must be loaded here for sPower
+    if(dbH->flags & O2_FLAG_LARGE_ADB){
+      trackOffset=0;
+      trackIndexOffset=0;
       if(currentTrack!=pp.trackID){
+	char* prefixedString = new char[O2_MAXFILESTR];
+	char* tmpStr = prefixedString;
+	// On currentTrack change, allocate and load track data
 	currentTrack=pp.trackID;
-        lseek(dbfid, dbH->dataOffset + trackOffset * sizeof(double), SEEK_SET);
-	read_data(currentTrack, &data_buffer, &data_buffer_size);
+	SAFE_DELETE_ARRAY(sNorm);
+	SAFE_DELETE_ARRAY(sPower);
+	if(infid>0)
+	  close(infid);
+	// Open and check dimensions of feature file
+	strncpy(prefixedString, featureFileNameTable+pp.trackID*O2_FILETABLE_ENTRY_SIZE, O2_MAXFILESTR);
+	prefix_name((char ** const) &prefixedString, adb_feature_root);
+	if (prefixedString!=tmpStr)
+	  delete[] tmpStr;
+	initInputFile(prefixedString, false); // nommap, file pointer at correct position
+	// Load the feature vector data for current track into data_buffer
+	read_data(infid, pp.trackID, &data_buffer, &data_buffer_size);	
+	// Load power and calculate power and l2norm sequence sums
+	init_track_aux_data(pp.trackID, data_buffer, &sNorm, &snPtr, &sPower, &spPtr);
       }
-      dist = dot_product_points(query+(usingQueryPoint?0:pp.qpos*dbH->dim), data_buffer+pp.spos*dbH->dim, dbH->dim*sequenceLength);
+    }
+    else{
+      // These offsets are w.r.t. the entire database of feature vectors and auxillary variables
+      trackOffset=trackOffsetTable[pp.trackID]; // num data elements offset
+      trackIndexOffset=trackOffset/dbH->dim;    // num vectors offset
+    }    
+    Uns32T qPos = usingQueryPoint?0:pp.qpos;// index for query point
+    Uns32T sPos = trackIndexOffset+pp.spos; // index into l2norm table
+    // Test power thresholds before computing distance
+    if( ( !usingPower || powers_acceptable(qpPtr[qPos], sPower[sPos])) &&
+	( qPos<numVectors-sequenceLength+1 && pp.spos<trackTable[pp.trackID]-sequenceLength+1 ) ){
+      // Non-large ADB track data is loaded inside power test for efficiency
+      if( !(dbH->flags & O2_FLAG_LARGE_ADB) && (currentTrack!=pp.trackID) ){
+	// On currentTrack change, allocate and load track data
+	currentTrack=pp.trackID;
+	lseek(dbfid, dbH->dataOffset + trackOffset * sizeof(double), SEEK_SET);
+	read_data(dbfid, currentTrack, &data_buffer, &data_buffer_size);
+      }
+      // Compute distance
+      dist = dot_product_points(query+qPos*dbH->dim, data_buffer+pp.spos*dbH->dim, dbH->dim*sequenceLength);
+      double qn = qnPtr[qPos];
+      double sn = sNorm[sPos];
       if(normalizedDistance) 
-	dist = 2-(2/(qnPtr[usingQueryPoint?0:pp.qpos]*sNorm[trackIndexOffset+pp.spos]))*dist;
+	dist = 2 - (2/(qn*sn))*dist;
       else 
 	if(no_unit_norming)
-	  dist = qnPtr[usingQueryPoint?0:pp.qpos]*qnPtr[usingQueryPoint?0:pp.qpos]+sNorm[trackIndexOffset+pp.spos]*sNorm[trackIndexOffset+pp.spos] - 2*dist;
+	  dist = qn*qn + sn*sn - 2*dist;
       // else
       // dist = dist;      
       if((!radius) || dist <= (O2_LSH_EXACT_MULT*radius+O2_DISTANCE_TOLERANCE)) 
-	reporter->add_point(pp.trackID, pp.qpos, pp.spos, dist);
+	reporter->add_point(pp.trackID, pp.qpos, pp.spos, dist);    
     }
     exact_evaluation_queue->pop();
   }
   // Cleanup
-  if(sNorm)
-    delete sNorm;
-  if(sPower)
-    delete sPower;
-  if(meanDBdur)
-    delete meanDBdur;
+  SAFE_DELETE_ARRAY(sNorm);
+  SAFE_DELETE_ARRAY(sPower);
+  SAFE_DELETE_ARRAY(meanDBdur);
 }
 
 // A completely unprotected dot-product method
@@ -554,6 +611,9 @@ void audioDB::query_loop(const char* dbName, Uns32T queryIndex) {
   double *query, *query_data;
   double *qNorm, *qnPtr, *qPower = 0, *qpPtr = 0;
   double meanQdur;
+
+  if( dbH->flags & O2_FLAG_LARGE_ADB )
+    error("error: LARGE_ADB requires indexed query");
 
   if(query_from_key)
     set_up_query_from_key(&query_data, &query, &qNorm, &qnPtr, &qPower, &qpPtr, &meanQdur, &numVectors, queryIndex);
@@ -618,7 +678,7 @@ void audioDB::query_loop(const char* dbName, Uns32T queryIndex) {
 
     trackIndexOffset=trackOffset/dbH->dim; // numVectors offset
 
-    read_data(track, &data_buffer, &data_buffer_size);
+    read_data(dbfid, track, &data_buffer, &data_buffer_size);
     if(sequenceLength <= trackTable[track]) {  // test for short sequences
       
       VERB_LOG(7,"%u.%jd.%u | ", track, (intmax_t) trackIndexOffset, trackTable[track]);

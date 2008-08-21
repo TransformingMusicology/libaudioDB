@@ -2,6 +2,7 @@
 
 /* Make a new database.
 
+IF size(featuredata) < O2_LARGE_ADB_SIZE 
    The database consists of:
 
    * a header (see dbTableHeader struct definition);
@@ -12,6 +13,16 @@
    * timesTable: (start,end) time points for each feature vector;
    * powerTable: associated power for each feature vector;
    * l2normTable: squared l2norms for each feature vector.
+   
+ELSE the database consists of:
+   
+   * a header (see dbTableHeader struct definition);
+   * keyTable: list of keys of tracks
+   * trackTable: sizes of tracks
+   * featureTable: list of feature file names
+   * timesTable: list of times file names
+   * powerTable: list of power file names
+
 */
 
 void audioDB::create(const char* dbName){
@@ -41,10 +52,31 @@ void audioDB::create(const char* dbName){
   off_t databytes = ((off_t) datasize) * 1024 * 1024;
   off_t auxbytes = databytes / datadim;
 
-  dbH->timesTableOffset = ALIGN_PAGE_UP(dbH->dataOffset + databytes);
-  dbH->powerTableOffset = ALIGN_PAGE_UP(dbH->timesTableOffset + 2*auxbytes);
-  dbH->l2normTableOffset = ALIGN_PAGE_UP(dbH->powerTableOffset + auxbytes);
-  dbH->dbSize = ALIGN_PAGE_UP(dbH->l2normTableOffset + auxbytes);
+  // For backward-compatibility, Record the point-encoding parameter for LSH indexing in the adb header
+  // If this value is 0 then it will be set to 14
+
+#if O2_LSH_N_POINT_BITS > 15
+#error "AudioDB Compile ERROR: consistency check of O2_LSH_POINT_BITS failed (>15)"
+#endif
+  
+  dbH->flags |= LSH_N_POINT_BITS << 28;
+
+  // If database will fit in a single file the vectors are copied into the AudioDB instance
+  // Else all the vectors are left on the FileSystem and we use the dataOffset as storage
+  // for the location of the features, powers and times files (assuming that arbitrary keys are used for the fileTable)
+  if(ntracks<O2_LARGE_ADB_NTRACKS && datasize<O2_LARGE_ADB_SIZE){
+    dbH->timesTableOffset = ALIGN_PAGE_UP(dbH->dataOffset + databytes);
+    dbH->powerTableOffset = ALIGN_PAGE_UP(dbH->timesTableOffset + 2*auxbytes);
+    dbH->l2normTableOffset = ALIGN_PAGE_UP(dbH->powerTableOffset + auxbytes);
+    dbH->dbSize = ALIGN_PAGE_UP(dbH->l2normTableOffset + auxbytes);
+  }
+  else{ // Create LARGE_ADB, features and powers kept on filesystem 
+    dbH->flags |= O2_FLAG_LARGE_ADB;
+    dbH->timesTableOffset = ALIGN_PAGE_UP(dbH->dataOffset + O2_FILETABLE_ENTRY_SIZE*ntracks);
+    dbH->powerTableOffset = ALIGN_PAGE_UP(dbH->timesTableOffset + O2_FILETABLE_ENTRY_SIZE*ntracks);
+    dbH->l2normTableOffset = ALIGN_PAGE_UP(dbH->powerTableOffset + O2_FILETABLE_ENTRY_SIZE*ntracks);
+    dbH->dbSize = dbH->l2normTableOffset;
+  } 
 
   write(dbfid, dbH, O2_HEADERSIZE);
 
