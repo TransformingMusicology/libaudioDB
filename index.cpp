@@ -146,18 +146,16 @@ void audioDB::index_index_db(const char* dbName){
   // Set unit norming flag override
   audioDB::normalizedDistance = !audioDB::no_unit_norming;
 
-  printf("INDEX: dim %d\n", (int)dbH->dim);
-  printf("INDEX: R %f\n", radius);
-  printf("INDEX: seqlen %d\n", sequenceLength);
-  printf("INDEX: lsh_w %f\n", lsh_param_w);
-  printf("INDEX: lsh_k %d\n", lsh_param_k);
-  printf("INDEX: lsh_m %d\n", lsh_param_m);
-  printf("INDEX: lsh_N %d\n", lsh_param_N);
-  printf("INDEX: lsh_C %d\n", lsh_param_ncols);
-  printf("INDEX: lsh_b %d\n", lsh_param_b);
-  printf("INDEX: normalized? %s\n", normalizedDistance?"true":"false"); 
-  fflush(stdout);
-
+  VERB_LOG(1, "INDEX: dim %d\n", (int)dbH->dim);
+  VERB_LOG(1, "INDEX: R %f\n", radius);
+  VERB_LOG(1, "INDEX: seqlen %d\n", sequenceLength);
+  VERB_LOG(1, "INDEX: lsh_w %f\n", lsh_param_w);
+  VERB_LOG(1, "INDEX: lsh_k %d\n", lsh_param_k);
+  VERB_LOG(1, "INDEX: lsh_m %d\n", lsh_param_m);
+  VERB_LOG(1, "INDEX: lsh_N %d\n", lsh_param_N);
+  VERB_LOG(1, "INDEX: lsh_C %d\n", lsh_param_ncols);
+  VERB_LOG(1, "INDEX: lsh_b %d\n", lsh_param_b);
+  VERB_LOG(1, "INDEX: normalized? %s\n", normalizedDistance?"true":"false"); 
 
   if((lshfid = open(newIndexName,O_RDONLY))<0){
     printf("INDEX: constructing new LSH index\n");  
@@ -485,16 +483,15 @@ int audioDB::index_init_query(const char* dbName){
   if(lsh!=SERVER_LSH_INDEX_SINGLETON){  
     if( fabs(radius - lsh->get_radius())>fabs(O2_DISTANCE_TOLERANCE))
       printf("*** Warning: adb_radius (%f) != lsh_radius (%f) ***\n", radius, lsh->get_radius());
-    printf("INDEX: dim %d\n", (int)dbH->dim);
-    printf("INDEX: R %f\n", lsh->get_radius());
-    printf("INDEX: seqlen %d\n", sequenceLength);
-    printf("INDEX: w %f\n", lsh->get_lshHeader()->get_binWidth());
-    printf("INDEX: k %d\n", lsh->get_lshHeader()->get_numFuns());
-    printf("INDEX: L (m*(m-1))/2 %d\n", lsh->get_lshHeader()->get_numTables());
-    printf("INDEX: N %d\n", lsh->get_lshHeader()->get_numRows());
-    printf("INDEX: s %d\n", index_to_trackID(lsh->get_maxp(), lsh_n_point_bits));
-    printf("INDEX: Opened LSH index file %s\n", indexName);
-    fflush(stdout);
+    VERB_LOG(1,"INDEX: dim %d\n", (int)dbH->dim);
+    VERB_LOG(1,"INDEX: R %f\n", lsh->get_radius());
+    VERB_LOG(1,"INDEX: seqlen %d\n", sequenceLength);
+    VERB_LOG(1,"INDEX: w %f\n", lsh->get_lshHeader()->get_binWidth());
+    VERB_LOG(1,"INDEX: k %d\n", lsh->get_lshHeader()->get_numFuns());
+    VERB_LOG(1,"INDEX: L (m*(m-1))/2 %d\n", lsh->get_lshHeader()->get_numTables());
+    VERB_LOG(1,"INDEX: N %d\n", lsh->get_lshHeader()->get_numRows());
+    VERB_LOG(1,"INDEX: s %d\n", index_to_trackID(lsh->get_maxp(), lsh_n_point_bits));
+    VERB_LOG(1,"INDEX: Opened LSH index file %s\n", indexName);
   }
 
   // Check to see if we are loading hash tables into core, and do so if true
@@ -502,7 +499,7 @@ int audioDB::index_init_query(const char* dbName){
     if(SERVER_LSH_INDEX_SINGLETON)
       fprintf(stderr,"INDEX: using persistent hash tables: %s\n", lsh->get_indexName());
     else
-      printf("INDEX: loading hash tables into core %s\n", (lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2)?"FORMAT2":"FORMAT1");
+      VERB_LOG(1,"INDEX: loading hash tables into core %s\n", (lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2)?"FORMAT2":"FORMAT1");
     lsh = index_allocate(indexName, true);
   }
   
@@ -581,14 +578,14 @@ int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
   // query vector index
   Uns32T Nq = (numVectors>O2_MAXTRACKLEN?O2_MAXTRACKLEN:numVectors) - sequenceLength + 1;
   vv = index_initialize_shingles(Nq); // allocate memory to copy query vectors to shingles
-  cout << "Nq=" << Nq;   cout.flush();
+  VERB_LOG(1, "Nq=%d", Nq);
   // Construct shingles from query features  
   for( Uns32T pointID = 0 ; pointID < Nq ; pointID++ ) 
     index_make_shingle(vv, pointID, query, dbH->dim, sequenceLength);
   
   // Normalize query vectors
   Uns32T numVecsAboveThreshold = index_norm_shingles( vv, qnPtr, qpPtr );
-  cout << " Nq'=" << numVecsAboveThreshold << endl; cout.flush();
+  VERB_LOG(1, "Nq'=%d\n", numVecsAboveThreshold);
 
   // Nq contains number of inspected points in query file, 
   // numVecsAboveThreshold is number of points with power >= absolute_threshold
