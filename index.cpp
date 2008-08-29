@@ -91,12 +91,14 @@ void audioDB::index_initialize(double **snp, double **vsnp, double **spp, double
     error("INDEXed database must be power-enabled", dbName);
   }
 
-  double *snpp = *snp, *sppp = 0;
+  double *snpp = 0, *sppp = 0;
 
   *dvp = dbH->length / (dbH->dim * sizeof(double)); // number of database vectors
   *snp = new double[*dvp];  // songs norm pointer: L2 norm table for each vector
+  snpp = *snp;
   *spp = new double[*dvp]; // song powertable pointer
   sppp = *spp;
+
   memcpy(*snp, l2normTable, *dvp * sizeof(double));
   memcpy(*spp, powerTable, *dvp * sizeof(double));
   

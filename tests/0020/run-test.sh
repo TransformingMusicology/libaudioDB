@@ -24,11 +24,12 @@ intstring 2 > testquery
 floatstring 0 0.5 >> testquery
 
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-echo testfeature10 1 >> test-expected-output
+echo testfeature01 0 0 0 > test-expected-output
+echo testfeature10 2 0 0 >> test-expected-output
 cmp testoutput test-expected-output
+
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -r 1 -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
+echo testfeature01 0 0 0 > test-expected-output
 cmp testoutput test-expected-output
 
 check_server $!
@@ -43,9 +44,10 @@ floatstring 0.5 0 >> testquery
 # results...
 
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-echo testfeature10 1 >> test-expected-output
+echo testfeature01 0 0 0> test-expected-output
+echo testfeature10 2 0 0>> test-expected-output
 cmp testoutput test-expected-output
+
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -r 1 -R 5 > testoutput
 echo testfeature01 1 > test-expected-output
 cmp testoutput test-expected-output
