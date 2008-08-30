@@ -32,7 +32,7 @@ void audioDB::ws_status(const char*dbName, char* hostport){
 void audioDB::ws_query(const char*dbName, const char *featureFileName, const char* hostport){
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
-
+  VERB_LOG(1, "Calling fileName query on database %s with featureFile=%s\n", dbName, featureFileName);
   soap_init(&soap);  
   if(soap_call_adb__query(&soap,hostport,NULL,
 			  (char*)dbName,(char*)featureFileName,(char*)trackFileName,(char*)timesFileName,
@@ -68,7 +68,8 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
       asqp.usingQueryPoint = usingQueryPoint;
       asqp.lsh_exact = lsh_exact;
   */
-
+  VERB_LOG(1, "Calling %s query on database %s with %s=%s\n", strlen(trackKey)?"KEY":"FILENAME", dbName, strlen(trackKey)?"KEY":"FILENAME",
+	   strlen(trackKey)?trackKey:featureFileName);
   soap_init(&soap);  
   if(queryType==O2_SEQUENCE_QUERY || queryType==O2_N_SEQUENCE_QUERY){
     if(soap_call_adb__sequenceQueryByKey(&soap,hostport,NULL,
@@ -119,6 +120,9 @@ int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbS
 // Literal translation of command line to web service
 int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int trackNN, xsd__int seqLen, adb__queryResponse &adbQueryResponse){
   char queryType[256];
+
+  fprintf(stderr,"Calling fileName query on database %s with featureFile=%s\n", dbName, qKey);
+
   for(int k=0; k<256; k++)
     queryType[k]='\0';
   if(qType == O2_POINT_QUERY)
@@ -200,6 +204,9 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   char seqLenStr[256];
   char absolute_thresholdStr[256];
   char qtypeStr[256];
+
+  fprintf(stderr, "Calling %s query on database %s with %s=%s\n", strlen(trackKey)?"KEY":"FILENAME", dbName, strlen(trackKey)?"KEY":"FILENAME",
+	   strlen(trackKey)?trackKey:featureFileName);
 
   /* When the branch is merged, move this to a header and use it
      elsewhere */

@@ -81,10 +81,14 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
   }  
 
   // Test for index (again) here
-  if(radius && index_exists(dbName, radius, sequenceLength)) 
+  if(radius && index_exists(dbName, radius, sequenceLength)){ 
+    VERB_LOG(1, "Calling indexed query on database %s, radius=%f, sequenceLength=%d\n", dbName, radius, sequenceLength);
     index_query_loop(dbName, query_from_key_index);
-  else
+  }
+  else{
+    VERB_LOG(1, "Calling brute-force query on database %s\n", dbName);
     query_loop(dbName, query_from_key_index);
+  }
 
   reporter->report(fileTable, adbQueryResponse);
 }
