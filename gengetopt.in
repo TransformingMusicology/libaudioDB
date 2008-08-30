@@ -8,7 +8,7 @@ text ""
 section "Database Operations" sectiondesc="All database operations require a database argument."
 
 option "database" d "database file required by Database commands." string typestr="filename" optional
-option "adb_root" - "path prefix for database" string typestr="path" dependon="database" optional
+option "adb_root" - "path prefix for database" string typestr="path" optional
 
 section "Database Creation" sectiondesc="Creating a new database file."
 

@@ -51,7 +51,7 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
 }
 
 // WS_QUERY_BY_KEY (CLIENT SIDE)
-void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport){
+void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const char* featureFileName, const char* hostport){
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
   /*  JUST TRY TO USE A DATA STRUCTURE WITH PHP
@@ -72,18 +72,19 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
   soap_init(&soap);  
   if(queryType==O2_SEQUENCE_QUERY || queryType==O2_N_SEQUENCE_QUERY){
     if(soap_call_adb__sequenceQueryByKey(&soap,hostport,NULL,
-					   (char*)dbName,
-					   (char*)trackKey,
-					   queryType,
-					   (char*)trackFileName,
-					   (char*)timesFileName,
+					 (char*)dbName,
+					 (char*)trackKey,
+					 (char*)featureFileName,
+					 queryType,
+					 (char*)trackFileName, // this means keyFileName 
+					 (char*)timesFileName,
 					   queryPoint,
-					   pointNN,
-					   trackNN,
-					   sequenceLength,
-					   radius,
-					   absolute_threshold,
-					   usingQueryPoint,
+					 pointNN,
+					 trackNN,
+					 sequenceLength,
+					 radius,
+					 absolute_threshold,
+					 usingQueryPoint,
 					   lsh_exact,
 					 adbQueryResponse)==SOAP_OK){
       //std::std::cerr << "result list length:" << adbQueryResponse.result.__sizeRlist << std::std::endl;
@@ -179,8 +180,9 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
 
 int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
 			    xsd__string trackKey,
+			    xsd__string featureFileName,
 			    xsd__int queryType,
-			    xsd__string trackFileName,
+			    xsd__string keyFileName,
 			    xsd__string timesFileName,
 			    xsd__int queryPoint,
 			    xsd__int pointNN,
@@ -222,10 +224,10 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
     qtypeStr,
     COM_DATABASE,
     dbName, 
-    COM_QUERYKEY,
-    ENSURE_STRING(trackKey),
+    strlen(trackKey)?COM_QUERYKEY:COM_FEATURES,
+    strlen(trackKey)?ENSURE_STRING(trackKey):ENSURE_STRING(featureFileName),
     COM_KEYLIST,
-    ENSURE_STRING(trackFileName),
+    ENSURE_STRING(keyFileName),
     usingQueryPoint?COM_QPOINT:COM_EXHAUSTIVE,
     usingQueryPoint?qPosStr:"",
     COM_POINTNN,

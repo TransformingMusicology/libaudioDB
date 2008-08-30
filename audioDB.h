@@ -383,7 +383,7 @@ class audioDB{
   void startServer();
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
-  void ws_query_by_key(const char*dbName, const char *trackKey, const char* hostport);
+  void ws_query_by_key(const char*dbName, const char *trackKey, const char* featureFileName, const char* hostport);
   
 };
 

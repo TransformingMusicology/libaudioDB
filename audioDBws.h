@@ -46,4 +46,4 @@ int adb__status(xsd__string dbName, struct adb__statusResponse &adbStatusRespons
 // Query an existing adb database
 int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, struct adb__queryResponse &adbQueryResponse);
 
-int adb__sequenceQueryByKey(xsd__string dbName,xsd__string trackKey,xsd__int queryType,xsd__string trackFileName,xsd__string timesFileName,xsd__int queryPoint,xsd__int pointNN,xsd__int trackNN,xsd__int sequenceLength,xsd__double radius,xsd__double absolute_threshold,xsd__int usingQueryPoint,xsd__int lsh_exact,struct adb__queryResponse &adbQueryResponse);
+int adb__sequenceQueryByKey(xsd__string dbName,xsd__string trackKey, xsd__string featureFileName, xsd__int queryType,xsd__string trackFileName,xsd__string timesFileName,xsd__int queryPoint,xsd__int pointNN,xsd__int trackNN,xsd__int sequenceLength,xsd__double radius,xsd__double absolute_threshold,xsd__int usingQueryPoint,xsd__int lsh_exact,struct adb__queryResponse &adbQueryResponse);
