@@ -68,8 +68,7 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
       asqp.usingQueryPoint = usingQueryPoint;
       asqp.lsh_exact = lsh_exact;
   */
-  VERB_LOG(1, "Calling %s query on database %s with %s=%s\n", strlen(trackKey)?"KEY":"FILENAME", dbName, strlen(trackKey)?"KEY":"FILENAME",
-	   strlen(trackKey)?trackKey:featureFileName);
+  VERB_LOG(1, "Calling %s query on database %s with %s=%s\n", (trackKey&&strlen(trackKey))?"KEY":"FILENAME", dbName, (trackKey&&strlen(trackKey))?"KEY":"FILENAME",(trackKey&&strlen(trackKey))?trackKey:featureFileName);
   soap_init(&soap);  
   if(queryType==O2_SEQUENCE_QUERY || queryType==O2_N_SEQUENCE_QUERY){
     if(soap_call_adb__sequenceQueryByKey(&soap,hostport,NULL,
@@ -205,8 +204,7 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   char absolute_thresholdStr[256];
   char qtypeStr[256];
 
-  fprintf(stderr, "Calling %s query on database %s with %s=%s\n", strlen(trackKey)?"KEY":"FILENAME", dbName, strlen(trackKey)?"KEY":"FILENAME",
-	   strlen(trackKey)?trackKey:featureFileName);
+  fprintf(stderr, "Calling %s query on database %s with %s=%s\n", (trackKey&&strlen(trackKey))?"KEY":"FILENAME", dbName, (trackKey&&strlen(trackKey))?"KEY":"FILENAME",(trackKey&&strlen(trackKey))?trackKey:featureFileName);
 
   /* When the branch is merged, move this to a header and use it
      elsewhere */
