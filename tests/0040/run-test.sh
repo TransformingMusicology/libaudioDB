@@ -41,6 +41,7 @@ expect_clean_error_exit ${AUDIODB} -d testdb -X -l 1
 ${AUDIODB} -d testdb -X -l 1 -R 1
 
 # Query using the index
+
 ${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -w testpower -R 1 > testoutput
 echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
@@ -49,9 +50,16 @@ ${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -w testpower -p 0 -R 1 > test
 echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
-
 ${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -w testpower -p 1 -R 1 > testoutput
 echo testfeature 1 > test-expected-output
+cmp testoutput test-expected-output
+
+${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -w testpower -e -R 1 > testoutput
+echo testfeature 3 > test-expected-output
+cmp testoutput test-expected-output
+
+${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -w testpower -e -R 1 --lsh_exact > testoutput
+echo testfeature 3 > test-expected-output
 cmp testoutput test-expected-output
 
 # make index, sequenceLength=2

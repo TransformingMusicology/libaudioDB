@@ -58,11 +58,11 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
   else if(O2_ACTION(COM_QUERY))
     if(isClient){
       if(query_from_key){
-	VERB_LOG(1, "Calling web services query %s on database %s, query=%s\n", radius>0?"(Radius)":"(NN)", dbName, strlen(key)?key:inFile);
+	VERB_LOG(1, "Calling web services query %s on database %s, query=%s\n", radius>0?"(Radius)":"(NN)", dbName, (key&&strlen(key))?key:inFile);
 	ws_query_by_key(dbName, key, inFile, (char*)hostport);	
       }
       else{
-	VERB_LOG(1, "Calling web services query on database %s, query=%s\n", dbName, strlen(key)?key:inFile);
+	VERB_LOG(1, "Calling web services query on database %s, query=%s\n", dbName, (key&&strlen(key))?key:inFile);
 	ws_query(dbName, inFile, (char*)hostport);
       }
     }
