@@ -511,7 +511,7 @@ void trackSequenceQueryRadReporter::report(char *fileTable, void *adbQueryRespon
       ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
       ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = 0;
       ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = 0;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = 0;
+      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = r.count;
       if(fileTable)
 	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
       else

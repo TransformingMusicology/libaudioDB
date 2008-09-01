@@ -33,18 +33,33 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
   struct soap soap;
   adb__queryResponse adbQueryResponse;  
   VERB_LOG(1, "Calling fileName query on database %s with featureFile=%s\n", dbName, featureFileName);
-  soap_init(&soap);  
-  if(soap_call_adb__query(&soap,hostport,NULL,
-			  (char*)dbName,(char*)featureFileName,(char*)trackFileName,(char*)timesFileName,
-			  queryType, queryPoint, pointNN, trackNN, sequenceLength, adbQueryResponse)==SOAP_OK){
-    //std::std::cerr << "result list length:" << adbQueryResponse.result.__sizeRlist << std::std::endl;
-    for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++)
-      std::cout << adbQueryResponse.result.Rlist[i] << " " << adbQueryResponse.result.Dist[i] 
-		<< " " << adbQueryResponse.result.Qpos[i] << " " << adbQueryResponse.result.Spos[i] << std::endl;
-  }
-  else
+  soap_init(&soap);
+  if(soap_call_adb__query(&soap, hostport, NULL, (char *) dbName,
+			  (char *)featureFileName, (char *)trackFileName,
+			  (char *)timesFileName, (char *) powerFileName,
+			  queryType, queryPoint, 
+			  pointNN, trackNN, sequenceLength, 
+			  radius, absolute_threshold, relative_threshold,
+			  !usingQueryPoint, lsh_exact,
+			  adbQueryResponse) 
+     == SOAP_OK) {
+    if(radius == 0) {
+      for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++) {
+	std::cout << adbQueryResponse.result.Rlist[i] << " "
+		  << adbQueryResponse.result.Dist[i] << " "
+		  << adbQueryResponse.result.Qpos[i] << " " 
+		  << adbQueryResponse.result.Spos[i] << std::endl;
+      }
+    } else {
+      for(int i = 0; i < adbQueryResponse.result.__sizeRlist; i++) {
+	std::cout << adbQueryResponse.result.Rlist[i] << " " 
+		  << adbQueryResponse.result.Spos[i] << std::endl;
+      }
+    }
+  } else {
     soap_print_fault(&soap,stderr);
-  
+  }
+
   soap_destroy(&soap);
   soap_end(&soap);
   soap_done(&soap);
@@ -103,6 +118,14 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
 }
 
 
+/* handy macros */
+#define INTSTRINGIFY(val, str) \
+  char str[256]; \
+  snprintf(str, 256, "%d", val);
+#define DOUBLESTRINGIFY(val, str) \
+  char str[256]; \
+  snprintf(str, 256, "%f", val);
+
 /* Server definitions */
 int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbStatusResponse){
   char* const argv[]={"./audioDB",COM_STATUS,"-d",dbName};
@@ -117,7 +140,16 @@ int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbS
 }
  
 // Literal translation of command line to web service
-int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int trackNN, xsd__int seqLen, adb__queryResponse &adbQueryResponse){
+int adb__query(struct soap* soap, xsd__string dbName, 
+	       xsd__string qKey, xsd__string keyList, 
+	       xsd__string timesFileName, xsd__string powerFileName, 
+	       xsd__int qType, 
+	       xsd__int qPos, xsd__int pointNN, xsd__int trackNN, 
+	       xsd__int seqLen,
+	       xsd__double radius, 
+	       xsd__double absolute_threshold, xsd__double relative_threshold,
+	       xsd__int exhaustive, xsd__int lsh_exact,
+	       adb__queryResponse &adbQueryResponse){
   char queryType[256];
 
   fprintf(stderr,"Calling fileName query on database %s with featureFile=%s\n", dbName, qKey);
@@ -140,43 +172,92 @@ int adb__query(struct soap* soap, xsd__string dbName, xsd__string qKey, xsd__str
   if(seqLen==0)
     seqLen=16;
 
-  char qPosStr[256];
-  sprintf(qPosStr, "%d", qPos);
-  char pointNNStr[256];
-  sprintf(pointNNStr,"%d",pointNN);
-  char trackNNStr[256];
-  sprintf(trackNNStr,"%d",trackNN);
-  char seqLenStr[256];  
-  sprintf(seqLenStr,"%d",seqLen);
-  
-  const  char* argv[] ={
-    "./audioDB", 
-    COM_QUERY, 
-    queryType, // Need to pass a parameter
-    COM_DATABASE,
-    ENSURE_STRING(dbName),
-    COM_FEATURES,
-    ENSURE_STRING(qKey),
-    COM_KEYLIST,
-    ENSURE_STRING(keyList),
-    COM_TIMES,
-    ENSURE_STRING(timesFileName),
-    COM_QPOINT, 
-    qPosStr,
-    COM_POINTNN,
-    pointNNStr,
-    COM_TRACKNN,
-    trackNNStr, // Need to pass a parameter
-    COM_SEQLEN,
-    seqLenStr
-  };
+  INTSTRINGIFY(qPos, qPosStr);
+  INTSTRINGIFY(pointNN, pointNNStr);
+  INTSTRINGIFY(trackNN, trackNNStr);
+  INTSTRINGIFY(seqLen, seqLenStr);
 
-  const unsigned argc = 19;
+  /* We don't necessarily use these, but because of scope we do this
+     anyway.  We waste 756 bytes of stack this way. */
+  DOUBLESTRINGIFY(radius, radiusStr);
+  DOUBLESTRINGIFY(absolute_threshold, absolute_thresholdStr);
+  DOUBLESTRINGIFY(relative_threshold, relative_thresholdStr);
+
+  unsigned int argc = 19;
+  if (powerFileName) {
+    argc += 2;
+  }
+  if (radius != 0) {
+    argc += 2;
+  }
+  /* we can't use use_absolute_threshold and friends because we're not
+     in the audioDB class here. */
+  if (absolute_threshold != 0) {
+    argc += 2;
+  }
+  if (relative_threshold != 0) {
+    argc += 2;
+  }
+  if (exhaustive) {
+    argc++;
+  }
+  if (lsh_exact) {
+    argc++;
+  }
+
+  char **argv = new char*[argc+1];
+  argv[0] = "./audioDB";
+  argv[1] = COM_QUERY;
+  argv[2] = queryType;
+  argv[3] = COM_DATABASE;
+  argv[4] = (char *) (ENSURE_STRING(dbName));
+  argv[5] = COM_FEATURES;
+  argv[6] = (char *) (ENSURE_STRING(qKey));
+  argv[7] = COM_KEYLIST;
+  argv[8] = (char *) (ENSURE_STRING(keyList));
+  argv[9] = COM_TIMES;
+  argv[10] = (char *) (ENSURE_STRING(timesFileName));
+  argv[11] = COM_QPOINT;
+  argv[12] = qPosStr;
+  argv[13] = COM_POINTNN;
+  argv[14] = pointNNStr;
+  argv[15] = COM_TRACKNN;
+  argv[16] = trackNNStr;
+  argv[17] = COM_SEQLEN;
+  argv[18] = seqLenStr;
+  int argv_counter = 19;
+  if (powerFileName) {
+    argv[argv_counter++] = COM_QUERYPOWER;
+    argv[argv_counter++] = powerFileName;
+  }
+  if (radius != 0) {
+    argv[argv_counter++] = COM_RADIUS;
+    argv[argv_counter++] = radiusStr;
+  }
+  if (absolute_threshold != 0) {
+    argv[argv_counter++] = COM_ABSOLUTE_THRESH;
+    argv[argv_counter++] = absolute_thresholdStr;
+  }
+  if (relative_threshold != 0) {
+    argv[argv_counter++] = COM_RELATIVE_THRESH;
+    argv[argv_counter++] = relative_thresholdStr;
+  }
+  if (exhaustive) {
+    argv[argv_counter++] = COM_EXHAUSTIVE;
+  }
+  if (lsh_exact) {
+    argv[argv_counter++] = COM_LSH_EXACT;
+  }
+  argv[argv_counter] = NULL;
+
+
   try {
     audioDB(argc, (char* const*)argv, &adbQueryResponse);
+    delete [] argv;
     return SOAP_OK;
   } catch (char *err) {
     soap_receiver_fault(soap, err, "");
+    delete [] argv;
     return SOAP_FAULT;
   }
 }
@@ -196,22 +277,9 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
 			    xsd__int usingQueryPoint,
 			    xsd__int lsh_exact,
 			    struct adb__queryResponse& adbQueryResponse){
-  char radiusStr[256];
-  char qPosStr[256];
-  char pointNNStr[256];
-  char trackNNStr[256];
-  char seqLenStr[256];
-  char absolute_thresholdStr[256];
   char qtypeStr[256];
 
   fprintf(stderr, "Calling %s query on database %s with %s=%s\n", (trackKey&&strlen(trackKey))?"KEY":"FILENAME", dbName, (trackKey&&strlen(trackKey))?"KEY":"FILENAME",(trackKey&&strlen(trackKey))?trackKey:featureFileName);
-
-  /* When the branch is merged, move this to a header and use it
-     elsewhere */
-#define INTSTRINGIFY(val, str) \
-  snprintf(str, 256, "%d", val);
-#define DOUBLESTRINGIFY(val, str) \
-  snprintf(str, 256, "%f", val);
 
   INTSTRINGIFY(queryPoint, qPosStr);
   INTSTRINGIFY(pointNN, pointNNStr);

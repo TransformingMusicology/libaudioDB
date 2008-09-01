@@ -46,23 +46,23 @@ start_server ${AUDIODB} ${WSPORT}
 # WS Query using the index
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -R 1 > testoutput
-echo testfeature 1 0 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -p 0 -R 1 > testoutput
-echo testfeature 1 0 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -p 1 -R 1 > testoutput
-echo testfeature 1 1 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -e -R 1 > testoutput
-echo testfeature 1 0 0 > test-expected-output
+echo testfeature 3 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -e -R 1 --lsh_exact > testoutput
-echo testfeature 1 0 0 > test-expected-output
+echo testfeature 3 > test-expected-output
 cmp testoutput test-expected-output
 
 # make index, sequenceLength=2
@@ -70,15 +70,15 @@ ${AUDIODB} -d testdb -X -l 2 -R 1
 
 # query, sequenceLength=2
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 2 -f testquery -w testpower -p 0 -R 1 > testoutput
-echo testfeature 1.33333 0 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 2 -f testquery -w testpower -p 1 -R 1 > testoutput
-echo testfeature 1 1 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 2 -f testquery -w testpower -p 0 -R 1 --lsh_exact > testoutput
-echo testfeature 1.33333 0 0 > test-expected-output
+echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
 stop_server $!
