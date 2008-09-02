@@ -41,6 +41,7 @@
 #define COM_SERVER "--SERVER"
 #define COM_INDEX "--INDEX"
 #define COM_SAMPLE "--SAMPLE"
+#define COM_LISZT "--LISZT"
 
 // parameters
 #define COM_CLIENT "--client"
@@ -277,14 +278,18 @@ class audioDB{
   double absolute_threshold;
   bool use_relative_threshold;
   double relative_threshold;
-
+  
   ReporterBase* reporter;  // track/point reporter
   priority_queue<PointPair, std::vector<PointPair>, std::less<PointPair> >* exact_evaluation_queue;
 
   // Timers
   struct timeval tv1;
   struct timeval tv2;
-    
+
+  // LISZT parameters
+  unsigned lisztOffset;
+  unsigned lisztLength;
+
   // private methods
   void error(const char* a, const char* b = "", const char *sysFunc = 0);
   void sequence_sum(double *buffer, int length, int seqlen);
@@ -316,6 +321,8 @@ class audioDB{
   audioDB(const unsigned argc, char* const argv[]);
   audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse);
   audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse);
+  audioDB(const unsigned argc, char* const argv[], adb__lisztResponse *adbLisztResponse);
+
   void cleanup();
   ~audioDB();
   int processArgs(const unsigned argc, char* const argv[]);
@@ -336,6 +343,7 @@ class audioDB{
   void power_flag(const char *dbName);
   bool powers_acceptable(double p1, double p2);
   void dump(const char* dbName);
+  void liszt(const char* dbName, unsigned offset, unsigned numLines, adb__lisztResponse* adbLisztResponse=0);
 
   // LSH indexing parameters and data structures
   LSH* lsh;
@@ -384,7 +392,8 @@ class audioDB{
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
   void ws_query_by_key(const char*dbName, const char *trackKey, const char* featureFileName, const char* hostport);
-  
+  void ws_liszt(const char* dbName, char* hostport);
+
 };
 
 #define O2_AUDIODB_INITIALIZERS			\
@@ -456,6 +465,8 @@ class audioDB{
     relative_threshold(0.0),			\
     reporter(0),                                \
     exact_evaluation_queue(0),                  \
+    lisztOffset(0),                             \
+    lisztLength(0),                             \
     lsh(0),					\
     lsh_in_core(false),				\
     lsh_use_u_functions(false),                 \

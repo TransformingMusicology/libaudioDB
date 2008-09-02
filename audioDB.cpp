@@ -87,6 +87,12 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
   else if(O2_ACTION(COM_DUMP))
     dump(dbName);
 
+  else if(O2_ACTION(COM_LISZT))
+    if(isClient)
+      ws_liszt(dbName, (char*) hostport);
+    else
+      liszt(dbName, lisztOffset, lisztLength);
+
   else if(O2_ACTION(COM_INDEX))
     index_index_db(dbName);
   
@@ -124,6 +130,22 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
       prefix_name((char** const)&inFile, adb_feature_root);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
+  } catch(char *err) {
+    cleanup();
+    throw(err);
+  }
+}
+
+audioDB::audioDB(const unsigned argc, char* const argv[], adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
+{
+  try {
+    isServer = 1; // FIXME: Hack
+    processArgs(argc, argv);
+    // Perform database prefix substitution
+    if(dbName && adb_root)
+      prefix_name((char** const)&dbName, adb_root);
+    assert(O2_ACTION(COM_LISZT));
+    liszt(dbName, lisztOffset, lisztLength, adbLisztResponse);
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -546,6 +568,21 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     }
     return 0;
   }
+  
+  if(args_info.LISZT_given){
+    command = COM_LISZT;
+    dbName=args_info.database_arg;
+    lisztOffset = args_info.lisztOffset_arg;
+    lisztLength = args_info.lisztLength_arg;
+    if(args_info.lisztOffset_arg<0) // check upper bound later when database is opened
+      error("lisztOffset cannot be negative");
+    if(args_info.lisztLength_arg<0)
+      error("lisztLength cannot be negative");
+    if(lisztLength >1000000)
+      error("lisztLength too large (>1000000)");
+    return 0;
+  }
+  
   return -1; // no command found
 }
 

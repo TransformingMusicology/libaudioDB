@@ -24,6 +24,9 @@ option "DUMP"   D "output all entries: index key size." dependon="database" opti
 option "output" - "output directory" string dependon="DUMP" default="audioDB.dump" optional
 option "L2NORM" L "unit norm vectors and norm all future inserts." dependon="database" optional
 option "POWER"  P "turn on power flag for database." dependon="database" optional
+option "LISZT"  Z "LIst keyS and siZes of Tracks" dependon="database" optional
+option "lisztOffset" - "LISZT track offset (0-based index)" int typestr="number" default="0" dependon="LISZT" optional
+option "lisztLength" - "number of LISZT items to return" int typestr="number" default="32" dependon="LISZT" optional
 
 section "Database Information" sectiondesc="Information about databases."
 

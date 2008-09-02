@@ -40,8 +40,22 @@ struct adb__queryResponse {
   struct adb__queryResult result;
 };
 
+struct adb__lisztResult {
+  int __sizeRkey;
+  char **Rkey;
+  int __sizeRlen;
+  unsigned int *Rlen;
+};
+
+struct adb__lisztResponse {
+  struct adb__lisztResult result;
+};
+
 // Print the status of an existing adb database
 int adb__status(xsd__string dbName, struct adb__statusResponse &adbStatusResponse);
+
+// Print the status of an existing adb database
+int adb__liszt(xsd__string dbName, xsd__int lisztOffset, xsd__int lisztLength, struct adb__lisztResponse &adbLisztResponse);
 
 // Query an existing adb database
 int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__string powerFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, struct adb__queryResponse &adbQueryResponse);

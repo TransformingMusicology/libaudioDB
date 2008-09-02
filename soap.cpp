@@ -28,6 +28,21 @@ void audioDB::ws_status(const char*dbName, char* hostport){
   soap_done(&soap);
 }
 
+void audioDB::ws_liszt(const char* dbName, char* Hostport){
+  struct soap soap;
+  adb__lisztResponse adbLisztResponse;
+
+  soap_init(&soap);
+  if(soap_call_adb__liszt(&soap, hostport, NULL, (char*)dbName, lisztOffset, lisztLength, adbLisztResponse)==SOAP_OK){
+    for(int i = 0; i < adbLisztResponse.result.__sizeRkey; i++) {
+      std::cout << "[" << i+lisztOffset << "] " << adbLisztResponse.result.Rkey[i] << " (" 
+		<< adbLisztResponse.result.Rlen[i] << ")" << std::endl;
+    }
+  } else {
+    soap_print_fault(&soap, stderr);
+  }
+}
+
 // WS_QUERY (CLIENT SIDE)
 void audioDB::ws_query(const char*dbName, const char *featureFileName, const char* hostport){
   struct soap soap;
@@ -138,7 +153,24 @@ int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbS
     return SOAP_FAULT;
   }
 }
- 
+
+int adb__liszt(struct soap* soap, xsd__string dbName, xsd__int lisztOffset, xsd__int lisztLength, 
+	       adb__lisztResponse& adbLisztResponse){
+
+  INTSTRINGIFY(lisztOffset, lisztOffsetStr);
+  INTSTRINGIFY(lisztLength, lisztLengthStr);
+
+  char* const argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
+  const unsigned argc = 8;
+  try{
+    audioDB(argc, argv, &adbLisztResponse);
+    return SOAP_OK;
+  } catch(char *err) {
+    soap_receiver_fault(soap, err, "");
+    return SOAP_FAULT;
+  }
+} 
+
 // Literal translation of command line to web service
 int adb__query(struct soap* soap, xsd__string dbName, 
 	       xsd__string qKey, xsd__string keyList, 
