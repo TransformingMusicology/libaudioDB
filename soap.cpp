@@ -398,7 +398,8 @@ void audioDB::startServer(){
 	SERVER_ADB_ROOT = (char*)adb_root; // Server-side database root
       if(adb_feature_root)
 	SERVER_ADB_FEATURE_ROOT = (char*)adb_feature_root; // Server-side features root
-
+      
+      isServer = 1;  // From this point, errors are reported via SOAP to the client
       for (int i = 1; ; i++)
 	{
 	  s = soap_accept(&soap);

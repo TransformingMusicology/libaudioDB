@@ -103,7 +103,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
-    isServer = 1; // FIXME: Hack
+    isServer = 1; // Set to make errors report over SOAP
     processArgs(argc, argv);
     // Perform database prefix substitution
     if(dbName && adb_root)
@@ -121,7 +121,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
-    isServer = 1; // FIXME: Hack
+    isServer = 1; // Set to make errors report over SOAP
     processArgs(argc, argv);
     // Perform database prefix substitution
     if(dbName && adb_root)
@@ -139,8 +139,8 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
 audioDB::audioDB(const unsigned argc, char* const argv[], adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
-    isServer = 1; // FIXME: Hack
-    processArgs(argc, argv);
+    isServer = 1; // Set to make errors report over SOAP
+    processArgs(argc, argv); 
     // Perform database prefix substitution
     if(dbName && adb_root)
       prefix_name((char** const)&dbName, adb_root);
@@ -307,7 +307,6 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     port=args_info.SERVER_arg;
     if(port<100 || port > 100000)
       error("port out of range");
-    isServer = 1;
 #if defined(O2_DEBUG)
     struct sigaction sa;
     sa.sa_sigaction = sigterm_action;
