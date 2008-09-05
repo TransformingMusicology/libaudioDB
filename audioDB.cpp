@@ -40,9 +40,6 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
   if(dbName && adb_root)
     prefix_name((char** const)&dbName, adb_root);
 
-  if(inFile && adb_feature_root)
-    prefix_name((char** const)&inFile, adb_feature_root);
-
   if(O2_ACTION(COM_SERVER))
     startServer();
 
@@ -108,8 +105,6 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
     // Perform database prefix substitution
     if(dbName && adb_root)
       prefix_name((char** const)&dbName, adb_root);
-    if(inFile && adb_feature_root)
-      prefix_name((char** const)&inFile, adb_feature_root);
     assert(O2_ACTION(COM_QUERY));
     query(dbName, inFile, adbQueryResponse);
   } catch(char *err) {
@@ -126,8 +121,6 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
     // Perform database prefix substitution
     if(dbName && adb_root)
       prefix_name((char** const)&dbName, adb_root);
-    if(inFile && adb_feature_root)
-      prefix_name((char** const)&inFile, adb_feature_root);
     assert(O2_ACTION(COM_STATUS));
     status(dbName, adbStatusResponse);
   } catch(char *err) {
@@ -301,7 +294,7 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     adb_root = SERVER_ADB_ROOT;
   if(SERVER_ADB_FEATURE_ROOT && !adb_feature_root)
     adb_feature_root = SERVER_ADB_FEATURE_ROOT;
-  
+
   if(args_info.SERVER_given){
     command=COM_SERVER;
     port=args_info.SERVER_arg;
