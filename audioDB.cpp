@@ -458,6 +458,8 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     if(!(sequenceLength>0 && sequenceLength <= O2_MAXSEQLEN))
       error("INDEXing requires 1 <= sequenceLength <= 1000");
     command=COM_INDEX;
+    if(!args_info.database_given)
+      error("INDEXing requires a database");
     dbName=args_info.database_arg;
 
     // Whether to store LSH hash tables for query in core (FORMAT2)

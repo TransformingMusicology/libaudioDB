@@ -66,7 +66,7 @@ option "relative-threshold" - "relative power threshold between query and target
 
 section "Locality-sensitive hashing (LSH) parameters" sectiondesc="These parameters control LSH indexing and retrieval\n"
 
-option "INDEX"  X "build an index for -d database at -R radius and -l sequenceLength" dependon="database" dependon="radius" optional
+option "INDEX"  X "build an index for -d database at -R radius and -l sequenceLength" dependon="radius" optional
 option "lsh_w" - "width of LSH hash-function bins. " double default="4.0" dependon="INDEX" optional hidden
 option "lsh_k" - "even number of independent hash functions to employ with LSH" int typestr="size" default="8" dependon="INDEX" optional
 option "lsh_m" - "number of hash tables is m(m-1)/2" int typestr="size" default="5" dependon="INDEX" optional
