@@ -436,10 +436,13 @@ G::G(char* filename, bool lshInCoreFlag):
 
   // Format2 always needs unserializing
   if(lshHeader->flags&O2_SERIAL_FILEFORMAT2 && lshInCoreFlag){
-    unserialize_lsh_hashtables_format2(dbfid);
+    FILE* dbFile = fdopen(dbfid, "rb");
+    if(!dbFile)
+      error("Cannot open LSH file for reading", filename);
+    unserialize_lsh_hashtables_format2(dbFile);
   }
-
-  close(dbfid);}
+  serial_close(dbfid);
+}
 
 G::~G(){
   delete lshHeader;
@@ -658,10 +661,15 @@ void G::serialize(char* filename, Uns32T serialFormat){
   // Write the hashtables in the requested format
   if(serialFormat == O2_SERIAL_FILEFORMAT1)
     serialize_lsh_hashtables_format1(dbfid, !dbIsNew);
-  else
-    serialize_lsh_hashtables_format2(dbfid, !dbIsNew);
+  else{
+    FILE* dbFile = fdopen(dbfid, "r+b");
+    if(!dbFile)
+      error("Cannot open LSH file for writing",filename);
+    serialize_lsh_hashtables_format2(dbFile, !dbIsNew);
+    fflush(dbFile);
+  }
 
-  if(!dbIsNew){
+  if(!dbIsNew) { 
     db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);// get database pointer
     //serial_get_header(db);           // read header
     cout << "maxp = " << H::maxp << endl;
@@ -671,9 +679,8 @@ void G::serialize(char* filename, Uns32T serialFormat){
       lshHeader->flags|=O2_SERIAL_FILEFORMAT1;
     memcpy((char*)db, (char*)lshHeader, sizeof(SerialHeaderT));
     serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
-  }
-
-  serial_close(dbfid);
+  }  
+    serial_close(dbfid);
 }
 
 // Test to see if core structure and requested format is
@@ -874,7 +881,7 @@ void G::serial_write_element_format1(SerialElementT*& pe, sbucket* sb, Uns32T t2
   return;
 }
 
-int G::serialize_lsh_hashtables_format2(int fid, int merge){
+int G::serialize_lsh_hashtables_format2(FILE* dbFile, int merge){
   Uns32T x,y;
 
   if( merge && !serial_can_merge(O2_SERIAL_FILEFORMAT2) )
@@ -882,10 +889,13 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
 
   // We must pereform FORMAT2 merges in core
   if(merge)
-    unserialize_lsh_hashtables_format2(fid);
+    unserialize_lsh_hashtables_format2(dbFile);
 
   Uns32T colCount, meanColCount, colCountN, maxColCount, minColCount, t1;
-  lseek(fid, get_serial_hashtable_offset(), SEEK_SET);
+  if(fseek(dbFile, get_serial_hashtable_offset(), SEEK_SET)){
+    fclose(dbFile);
+    error("fSeek error in serialize_lsh_hashtables_format2");
+  }
 
   // Write the hash tables
   for( x = 0 ; x < H::L ; x++ ){
@@ -901,29 +911,29 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
 	// Check for empty row (even though row was allocated)
 #ifdef LSH_BLOCK_FULL_ROWS
 	if(bPtr->next->t2==IFLAG){
-	  close(fid);
+	  fclose(dbFile);
 	  error("b->next->t2==IFLAG","serialize_lsh_hashtables_format2()");
 	}
 #else
 	if(bPtr->t2==IFLAG){
-	  close(fid);
+	  fclose(dbFile);
 	  error("b->t2==IFLAG","serialize_lsh_hashtables_format2()");
 	}
 #endif
 	t1 = O2_SERIAL_TOKEN_T1;
-	if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
-	  close(fid);
+	if( fwrite(&t1, sizeof(Uns32T), 1, dbFile) != 1 ){
+	  fclose(dbFile);
 	  error("write error in serial_write_hashtable_format2() [T1]");
 	}
 	t1 = y;
-	if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
-	  close(fid);
+	if( fwrite(&t1, sizeof(Uns32T), 1, dbFile) != 1 ){
+	  fclose(dbFile);
 	  error("write error in serial_write_hashtable_format2() [t1]");
 	}
 #ifdef LSH_BLOCK_FULL_ROWS
-	serial_write_hashtable_row_format2(fid, bPtr->next, colCount); // skip collision counter bucket
+	serial_write_hashtable_row_format2(dbFile, bPtr->next, colCount); // skip collision counter bucket
 #else
-      serial_write_hashtable_row_format2(fid, bPtr, colCount);
+      serial_write_hashtable_row_format2(dbFile, bPtr, colCount);
 #endif
       }
       if(colCount){
@@ -937,8 +947,8 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
     }
     // Write END of table marker
     t1 = O2_SERIAL_TOKEN_ENDTABLE;
-    if( write(fid, &t1, sizeof(Uns32T)) != sizeof(Uns32T) ){
-      close(fid);
+    if( fwrite(&t1, sizeof(Uns32T), 1, dbFile ) != 1 ){
+      fclose(dbFile);
       error("write error in serial_write_hashtable_format2() [end]");
     }
 
@@ -952,31 +962,31 @@ int G::serialize_lsh_hashtables_format2(int fid, int merge){
   return 1;
 }
 
-void G::serial_write_hashtable_row_format2(int fid, bucket* b, Uns32T& colCount){
+void G::serial_write_hashtable_row_format2(FILE* dbFile, bucket* b, Uns32T& colCount){
   while(b && b->t2!=IFLAG){
     if(!b->snext){
-      close(fid);
+      fclose(dbFile);
       error("Empty collision chain in serial_write_hashtable_row_format2()");
     }
     t2 = O2_SERIAL_TOKEN_T2;
-    if( write(fid, &t2, sizeof(Uns32T)) != sizeof(Uns32T) ){
-      close(fid);
+    if( fwrite(&t2, sizeof(Uns32T), 1, dbFile) != 1 ){
+      fclose(dbFile);
       error("write error in serial_write_hashtable_row_format2()");
     }
     t2 = b->t2;
-    if( write(fid, &t2, sizeof(Uns32T)) != sizeof(Uns32T) ){
-      close(fid);
+    if( fwrite(&t2, sizeof(Uns32T), 1, dbFile) != 1 ){
+      fclose(dbFile);
       error("write error in serial_write_hashtable_row_format2()");
     }
-    serial_write_element_format2(fid, b->snext, colCount);
+    serial_write_element_format2(dbFile, b->snext, colCount);
     b=b->next;
   }
 }
 
-void G::serial_write_element_format2(int fid, sbucket* sb, Uns32T& colCount){
+void G::serial_write_element_format2(FILE* dbFile, sbucket* sb, Uns32T& colCount){
   while(sb){
-    if(write(fid, &sb->pointID, sizeof(Uns32T))!=sizeof(Uns32T)){
-      close(fid);
+    if(fwrite(&sb->pointID, sizeof(Uns32T), 1, dbFile) != 1){
+      fclose(dbFile);
       error("Write error in serial_write_element_format2()");
     }
     colCount++;
@@ -1197,19 +1207,19 @@ void G::unserialize_hashtable_row_format1(SerialElementT* pe, bucket** b){
   }
 }
  
-void G::unserialize_lsh_hashtables_format2(int fid){
+void G::unserialize_lsh_hashtables_format2(FILE* dbFile){
   Uns32T x=0,y=0;
 
   // Seek to hashtable base offset
-  if(lseek(fid, get_serial_hashtable_offset(), SEEK_SET)!=get_serial_hashtable_offset()){
-    close(fid);
-    error("Seek error in unserialize_lsh_hashtables_format2");
+  if(fseek(dbFile, get_serial_hashtable_offset(), SEEK_SET)){
+    fclose(dbFile);
+    error("fSeek error in unserialize_lsh_hashtables_format2");
   }
 
   // Read the hash tables into core (structure is given in header) 
   while( x < H::L){
-    if(read(fid, &(H::t1), sizeof(Uns32T))!=sizeof(Uns32T)){
-      close(fid);
+    if(fread(&(H::t1), sizeof(Uns32T), 1, dbFile) != 1){
+      fclose(dbFile);
       error("Read error","unserialize_lsh_hashtables_format2()");
     }
     if(H::t1==O2_SERIAL_TOKEN_ENDTABLE)
@@ -1218,19 +1228,19 @@ void G::unserialize_lsh_hashtables_format2(int fid){
       while(y < H::N){
 	// Read a row and move file pointer to beginning of next row or _bittable
 	if(!(H::t1==O2_SERIAL_TOKEN_T1)){
-	  close(fid);
+	  fclose(dbFile);
 	  error("State matchine error T1","unserialize_lsh_hashtables_format2()");
 	}
-	if(read(fid, &(H::t1), sizeof(Uns32T))!=sizeof(Uns32T)){
-	  close(fid);
+	if(fread(&(H::t1), sizeof(Uns32T), 1, dbFile) != 1){
+	  fclose(dbFile);
 	  error("Read error: t1","unserialize_lsh_hashtables_format2()");
 	}
 	y = H::t1;
 	if(y>=H::N){
-	  close(fid);
+	  fclose(dbFile);
 	  error("Unserialized hashtable row pointer out of range","unserialize_lsh_hashtables_format2()");
 	}
-	Uns32T token = unserialize_hashtable_row_format2(fid, h[x]+y);
+	Uns32T token = unserialize_hashtable_row_format2(dbFile, h[x]+y);
 	
 #ifdef __LSH_DUMP_CORE_TABLES__
 	printf("C[%d,%d]", x, y);
@@ -1238,7 +1248,7 @@ void G::unserialize_lsh_hashtables_format2(int fid){
 #endif
 	// Check that token is valid
 	if( !(token==O2_SERIAL_TOKEN_T1 || token==O2_SERIAL_TOKEN_ENDTABLE) ){
-	  close(fid);
+	  fclose(dbFile);
 	  error("State machine error end of row/table", "unserialize_lsh_hashtables_format2()");
 	}
 	// Check for end of table flag
@@ -1253,37 +1263,37 @@ void G::unserialize_lsh_hashtables_format2(int fid){
   }
 }
  
-Uns32T G::unserialize_hashtable_row_format2(int fid, bucket** b){
+Uns32T G::unserialize_hashtable_row_format2(FILE* dbFile, bucket** b){
   bool pointFound = false;
-  if(read(fid, &(H::t2), sizeof(Uns32T)) != sizeof(Uns32T)){
-    close(fid);
+  if(fread(&(H::t2), sizeof(Uns32T), 1, dbFile) != 1){
+    fclose(dbFile);
     error("Read error T2 token","unserialize_hashtable_row_format2");
   }
   if( !(H::t2==O2_SERIAL_TOKEN_ENDTABLE || H::t2==O2_SERIAL_TOKEN_T2)){
-    close(fid);
+    fclose(dbFile);
     error("State machine error: expected E or T2");
   }
   while(!(H::t2==O2_SERIAL_TOKEN_ENDTABLE || H::t2==O2_SERIAL_TOKEN_T1)){
     pointFound=false;
     // Check for T2 token
     if(H::t2!=O2_SERIAL_TOKEN_T2){
-      close(fid);
+      fclose(dbFile);
       error("State machine error T2 token", "unserialize_hashtable_row_format2()");
     }
     // Read t2 value
-    if(read(fid, &(H::t2), sizeof(Uns32T)) != sizeof(Uns32T)){
-      close(fid);
+    if(fread(&(H::t2), sizeof(Uns32T), 1, dbFile) != 1){
+      fclose(dbFile);
       error("Read error t2","unserialize_hashtable_row_format2");
     }
-    if(read(fid, &(H::p), sizeof(Uns32T)) != sizeof(Uns32T)){
-      close(fid);
+    if(fread(&(H::p), sizeof(Uns32T), 1, dbFile) != 1){
+      fclose(dbFile);
       error("Read error H::p","unserialize_hashtable_row_format2");
     }
     while(!(H::p==O2_SERIAL_TOKEN_ENDTABLE || H::p==O2_SERIAL_TOKEN_T1 || H::p==O2_SERIAL_TOKEN_T2 )){
       pointFound=true;
       bucket_insert_point(b);
-      if(read(fid, &(H::p), sizeof(Uns32T)) != sizeof(Uns32T)){
-	close(fid);
+      if(fread(&(H::p), sizeof(Uns32T), 1, dbFile) != 1){
+	fclose(dbFile);
 	error("Read error H::p","unserialize_hashtable_row_format2");
       }
     }
@@ -1325,7 +1335,7 @@ void G::serial_retrieve_point_set(char* filename, vector<vector<float> >& vv, Re
   serial_munmap(dbheader, O2_SERIAL_HEADER_SIZE); // drop header mmap
 
   if((lshHeader->flags & O2_SERIAL_FILEFORMAT2)){
-    close(dbfid);
+    serial_close(dbfid);
     error("serial_retrieve_point_set is for SERIAL_FILEFORMAT1 only");
   }
 
@@ -1362,7 +1372,7 @@ void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, Rep
   serial_munmap(dbheader, O2_SERIAL_HEADER_SIZE); // drop header mmap
 
   if((lshHeader->flags & O2_SERIAL_FILEFORMAT2)){
-    close(dbfid);
+    serial_close(dbfid);
     error("serial_retrieve_point is for SERIAL_FILEFORMAT1 only");
   }
 

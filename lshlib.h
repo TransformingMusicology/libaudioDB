@@ -287,9 +287,9 @@ class G: public H{
   int serial_can_merge(Uns32T requestedFormat); // Test to see whether core and on-disk structures are compatible
 
   // Functions to write hashtables to disk in format2 (optimized for in-core retrieval)
-  int serialize_lsh_hashtables_format2(int fid, int merge);
-  void serial_write_hashtable_row_format2(int fid, bucket* h, Uns32T& colCount);
-  void serial_write_element_format2(int fid, sbucket* sb, Uns32T& colCount);
+  int serialize_lsh_hashtables_format2(FILE* dbFile, int merge);
+  void serial_write_hashtable_row_format2(FILE* dbFile, bucket* h, Uns32T& colCount);
+  void serial_write_element_format2(FILE* dbFile, sbucket* sb, Uns32T& colCount);
 
   // Functions to read serial header and hash functions (format1 and format2)
   int unserialize_lsh_header(char* filename);            // read lsh header from disk into core
@@ -300,8 +300,8 @@ class G: public H{
   void unserialize_hashtable_row_format1(SerialElementT* pe, bucket** b); // read lsh hash table row into core
 
   // Functions to read hashtables in format2
-  void unserialize_lsh_hashtables_format2(int fid);       // read FORMAT2 hash tables into core (core format)
-  Uns32T unserialize_hashtable_row_format2(int fid, bucket** b); // read lsh hash table row into core
+  void unserialize_lsh_hashtables_format2(FILE* dbFile);       // read FORMAT2 hash tables into core (core format)
+  Uns32T unserialize_hashtable_row_format2(FILE* dbFile, bucket** b); // read lsh hash table row into core
 
   // Helper functions
   void serial_print_header(Uns32T requestedFormat);
