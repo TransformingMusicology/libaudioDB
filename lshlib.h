@@ -90,6 +90,9 @@ unsigned align_up(unsigned x, unsigned w);
 
 #define O2_SERIAL_MAGIC ('o'|'2'<<8|'l'<<16|'s'<<24)
 
+#define WRITE_UNS32(VAL, TOKENSTR) if( fwrite(VAL, sizeof(Uns32T), 1, dbFile) != 1 ){\
+  fclose(dbFile);error("write error in serial_write_format2",TOKENSTR);}	
+
 using namespace std;
 
 Uns32T get_page_logn();
@@ -226,6 +229,7 @@ class H{
   void initialize_partial_functions();
   void __bucket_insert_point(bucket*);
   void __sbucket_insert_point(sbucket*);
+  bucket** get_pointer_to_bucket_linked_list(bucket* rowPtr);
   Uns32T computeProductModDefaultPrime(Uns32T*,Uns32T*,IntT);
   Uns32T randr();
   float randn();
@@ -290,6 +294,8 @@ class G: public H{
   int serialize_lsh_hashtables_format2(FILE* dbFile, int merge);
   void serial_write_hashtable_row_format2(FILE* dbFile, bucket* h, Uns32T& colCount);
   void serial_write_element_format2(FILE* dbFile, sbucket* sb, Uns32T& colCount);
+  Uns32T count_buckets_and_points_hashtable_row(bucket* bPtr);
+  Uns32T count_points_hashtable_row(bucket* bPtr);
 
   // Functions to read serial header and hash functions (format1 and format2)
   int unserialize_lsh_header(char* filename);            // read lsh header from disk into core
@@ -300,8 +306,9 @@ class G: public H{
   void unserialize_hashtable_row_format1(SerialElementT* pe, bucket** b); // read lsh hash table row into core
 
   // Functions to read hashtables in format2
-  void unserialize_lsh_hashtables_format2(FILE* dbFile);       // read FORMAT2 hash tables into core (core format)
-  Uns32T unserialize_hashtable_row_format2(FILE* dbFile, bucket** b); // read lsh hash table row into core
+  void unserialize_lsh_hashtables_format2(FILE* dbFile, bool forMerge = 0);
+  Uns32T unserialize_hashtable_row_format2(FILE* dbFile, bucket** b, Uns32T token=0); // to dynamic linked list
+  Uns32T unserialize_hashtable_row_to_array(FILE* dbFile, bucket** b, Uns32T numElements); // to core array
 
   // Helper functions
   void serial_print_header(Uns32T requestedFormat);
@@ -319,6 +326,10 @@ class G: public H{
   // Serial (Format 1) Retrieval/Inspection Functions
   void serial_bucket_chain_point(SerialElementT* pe, Uns32T qpos);
   void serial_bucket_dump(SerialElementT* pe);
+
+  // Core ARRAY Retrieval Functions
+  void retrieve_from_core_hashtable_array(Uns32T* p, Uns32T qpos);
+
 
   // Callback Function for point reporting
   void* calling_instance; // store calling object instance for member-function callback

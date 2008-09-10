@@ -190,14 +190,19 @@ void audioDB::index_index_db(const char* dbName){
   if((lshfid = open(newIndexName,O_RDONLY))>0){
     printf("INDEX: merging with existing LSH index\n");
     fflush(stdout);
+    char* mergeIndexName = newIndexName;
 
     // Get the lsh header info and find how many tracks are inserted already
-    lsh = new LSH(newIndexName, false); // lshInCore=false to avoid loading hashTables here
+    lsh = new LSH(mergeIndexName, false); // lshInCore=false to avoid loading hashTables here
     assert(lsh);
     Uns32T maxs = index_to_trackID(lsh->get_maxp(), lsh_n_point_bits)+1;
     delete lsh;
     lsh = 0;
 
+    // Insert up to lsh_param_b tracks
+    if(  !sNorm && !(dbH->flags & O2_FLAG_LARGE_ADB) ){
+      index_initialize(&sNorm, &snPtr, &sPower, &spPtr, &dbVectors);  
+    }
     // This allows for updating index after more tracks are inserted into audioDB
     for(Uns32T startTrack = maxs; startTrack < dbH->numFiles; startTrack+=lsh_param_b){
 
@@ -206,17 +211,17 @@ void audioDB::index_index_db(const char* dbName){
 	endTrack = dbH->numFiles;
       printf("Indexing track range: %d - %d\n", startTrack, endTrack);
       fflush(stdout);
-      lsh = new LSH(newIndexName, lsh_in_core); // Initialize core memory for LSH tables
+      lsh = new LSH(mergeIndexName, false); // Initialize empty LSH tables
       assert(lsh);
       
       // Insert up to lsh_param_b database tracks
       index_insert_tracks(startTrack, endTrack, &fvp, &sNorm, &snPtr, &sPower, &spPtr);
 
-      // Serialize to file
-      lsh->serialize(newIndexName, lsh_in_core?O2_SERIAL_FILEFORMAT2:O2_SERIAL_FILEFORMAT1); // Serialize core LSH heap to disk
+      // Serialize to file (merging is performed here)
+      lsh->serialize(mergeIndexName, lsh_in_core?O2_SERIAL_FILEFORMAT2:O2_SERIAL_FILEFORMAT1); // Serialize core LSH heap to disk
       delete lsh;
       lsh = 0;
-    }    
+    }
     
     close(lshfid);    
     printf("INDEX: done constructing LSH index.\n");  

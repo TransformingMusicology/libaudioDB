@@ -7,6 +7,7 @@ GSL_INCLUDE=
 GSOAP_INCLUDE=
 
 override CFLAGS+=-O3 -g
+#override CFLAGS+=-ggdb -gstabs+ -g3
 
 ifeq ($(shell uname),Linux)
 override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
