@@ -309,7 +309,7 @@ void audioDB::set_up_query(double **qp, double **vqp, double **qnp, double **vqn
 
   if(usingQueryPoint) {
     if( !(queryPoint < *nvp && queryPoint < *nvp - sequenceLength + 1) ) {
-      error("queryPoint > numVectors-sequenceLength+1 in query");
+      error("queryPoint >= numVectors-sequenceLength+1 in query");
     } else {
       VERB_LOG(1, "query point: %u\n", queryPoint);
       *vqp = *qp + queryPoint * dbH->dim;
@@ -416,7 +416,7 @@ void audioDB::set_up_query_from_key(double **qp, double **vqp, double **qnp, dou
 
   if(usingQueryPoint) {
     if( !(queryPoint < *nvp && queryPoint < *nvp - sequenceLength + 1) ) {
-      error("queryPoint > numVectors-sequenceLength+1 in query");
+      error("queryPoint >= numVectors-sequenceLength+1 in query");
     } else {
       VERB_LOG(1, "query point: %u\n", queryPoint);
       *vqp = *qp + queryPoint * dbH->dim;
