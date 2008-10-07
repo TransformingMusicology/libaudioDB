@@ -175,15 +175,18 @@ class bucket {
   friend class H;
   friend class G;
   bucket* next;
-  sbucket* snext;
+  union {
+    sbucket* ptr;
+    Uns32T numBuckets;
+  } snext;
  public:
   unsigned int t2;  
   bucket(){
     next=0;
-    snext=0;
+    snext.ptr=0;
     t2=IFLAG;
   }
-  ~bucket(){delete next;delete snext;}
+  ~bucket(){delete next;delete snext.ptr;}
   bucket* get_next(){return next;}
 };
 

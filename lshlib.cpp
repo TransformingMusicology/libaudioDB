@@ -240,12 +240,12 @@ H::~H(){
 	    if(H::h[ j ][ i ]->t2 & LSH_CORE_ARRAY_BIT){	      
 	      pp = get_pointer_to_bucket_linked_list(H::h[ j ][ i ]);
 	      if(*pp){
-		(*pp)->snext=0; // Head of list uses snext as a non-pointer value
+		(*pp)->snext.ptr=0; // Head of list uses snext as a non-pointer value
 		delete *pp;   // Now the destructor can do its work properly
 	      }
 	      free(H::h[ j ][ i ]->next);
 	      H::h[ j ][ i ]->next = 0; // Zero next pointer
-	      H::h[ j ][ i ]->snext = 0; // Zero head-of-list pointer as above
+	      H::h[ j ][ i ]->snext.ptr = 0; // Zero head-of-list pointer as above
 	    }
 #endif
 	delete H::h[ j ][ i ];
@@ -393,13 +393,13 @@ void H::__bucket_insert_point(bucket* p){
   if(p->t2 == IFLAG){ // initialization flag, is it in the domain of t2?
     p->t2 = H::t2;
     bucketCount++; // Record start of new point-locale collision chain
-    p->snext = new sbucket();
-    __sbucket_insert_point(p->snext);
+    p->snext.ptr = new sbucket();
+    __sbucket_insert_point(p->snext.ptr);
     return;
   }
 
   if(p->t2 == H::t2){
-    __sbucket_insert_point(p->snext);
+    __sbucket_insert_point(p->snext.ptr);
     return;
   }
 
@@ -444,7 +444,7 @@ inline bucket** H::get_bucket(int j){
 
 // Find the linked-list pointer at the end of the CORE_ARRAY
 bucket** H::get_pointer_to_bucket_linked_list(bucket* rowPtr){
-  Uns32T numBuckets = reinterpret_cast<Uns32T> (rowPtr->snext); // Cast pointer to unsigned int
+  Uns32T numBuckets = rowPtr->snext.numBuckets; // Cast pointer to unsigned int
   Uns32T numPoints = rowPtr->t2 & 0x7FFFFFFF; // Value is stored in low 31 bits of t2 field
   bucket** listPtr = reinterpret_cast<bucket**> (reinterpret_cast<unsigned int*>(rowPtr->next)+numPoints+numBuckets+1);
   return listPtr;
@@ -880,7 +880,7 @@ int G::serialize_lsh_hashtables_format1(int fid, int merge){
 void G::serial_merge_hashtable_row_format1(SerialElementT* pr, bucket* b, Uns32T& colCount){
   while(b && b->t2!=IFLAG){
     SerialElementT*pe=pr; // reset disk pointer to beginning of row
-    serial_merge_element_format1(pe, b->snext, b->t2, colCount);  
+    serial_merge_element_format1(pe, b->snext.ptr, b->t2, colCount);  
     b=b->next;
   }
 }
@@ -912,7 +912,7 @@ void G::serial_merge_element_format1(SerialElementT* pe, sbucket* sb, Uns32T t2,
 void G::serial_write_hashtable_row_format1(SerialElementT*& pe, bucket* b, Uns32T& colCount){
   pe->hashValue=IFLAG;
   while(b && b->t2!=IFLAG){
-    serial_write_element_format1(pe, b->snext, b->t2, colCount);
+    serial_write_element_format1(pe, b->snext.ptr, b->t2, colCount);
     b=b->next;
   }
 }
@@ -1033,7 +1033,7 @@ Uns32T G::count_points_hashtable_row(bucket* bPtr){
   bucket* p = bPtr;
   sbucket* s = 0;
   while(p){
-    s = p->snext;
+    s = p->snext.ptr;
     while(s){
       point_count++;
       s=s->snext;
@@ -1045,7 +1045,7 @@ Uns32T G::count_points_hashtable_row(bucket* bPtr){
 
 void G::serial_write_hashtable_row_format2(FILE* dbFile, bucket* b, Uns32T& colCount){
   while(b && b->t2!=IFLAG){
-    if(!b->snext){
+    if(!b->snext.ptr){
       fclose(dbFile);
       error("Empty collision chain in serial_write_hashtable_row_format2()");
     }
@@ -1059,7 +1059,7 @@ void G::serial_write_hashtable_row_format2(FILE* dbFile, bucket* b, Uns32T& colC
       fclose(dbFile);
       error("write error in serial_write_hashtable_row_format2()");
     }
-    serial_write_element_format2(dbFile, b->snext, colCount);
+    serial_write_element_format2(dbFile, b->snext.ptr, colCount);
     b=b->next;
   }
 }
@@ -1510,7 +1510,7 @@ Uns32T G::unserialize_hashtable_row_to_array(FILE* dbFile, bucket** rowPP, Uns32
   // Reallocate the row to its actual size
   CR_ASSERT(rowPtr->next = (bucket*) realloc(rowPtr->next, (numBuckets+numPoints+1)*sizeof(Uns32T)+sizeof(bucket**)));
   // Record the sizes at the head of the row
-  rowPtr->snext = (sbucket*) numBuckets;
+  rowPtr->snext.numBuckets = numBuckets;
   rowPtr->t2 = numPoints;
   // Place end of row marker
   *ap++ = LSH_CORE_ARRAY_END_ROW_TOKEN;
@@ -1562,7 +1562,7 @@ void G::retrieve_from_core_hashtable_array(Uns32T* p, Uns32T qpos){
  
 void G::dump_hashtable_row(bucket* p){
   while(p && p->t2!=IFLAG){
-    sbucket* sbp = p->snext;
+    sbucket* sbp = p->snext.ptr;
     while(sbp){
       printf("(%0X,%u)", p->t2, sbp->pointID);
       fflush(stdout);
@@ -1709,7 +1709,7 @@ void G::bucket_chain_point(bucket* p, Uns32T qpos){
   if(!p || p->t2==IFLAG)
     return;
   if(p->t2==t2){ // match
-    sbucket_chain_point(p->snext, qpos); // add to reporter
+    sbucket_chain_point(p->snext.ptr, qpos); // add to reporter
   }  
   if(p->next){
     bucket_chain_point(p->next, qpos); // recurse
