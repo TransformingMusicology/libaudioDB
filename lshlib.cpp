@@ -444,10 +444,10 @@ inline bucket** H::get_bucket(int j){
 
 // Find the linked-list pointer at the end of the CORE_ARRAY
 bucket** H::get_pointer_to_bucket_linked_list(bucket* rowPtr){
-   Uns32T numBuckets = (Uns32T) rowPtr->snext; // Cast pointer to unsigned int
-   Uns32T numPoints = rowPtr->t2 & 0x7FFFFFFF; // Value is stored in low 31 bits of t2 field
-   bucket** listPtr = reinterpret_cast<bucket**> (reinterpret_cast<unsigned int*>(rowPtr->next)+numPoints+numBuckets+1);
-   return listPtr;
+  Uns32T numBuckets = reinterpret_cast<Uns32T> (rowPtr->snext); // Cast pointer to unsigned int
+  Uns32T numPoints = rowPtr->t2 & 0x7FFFFFFF; // Value is stored in low 31 bits of t2 field
+  bucket** listPtr = reinterpret_cast<bucket**> (reinterpret_cast<unsigned int*>(rowPtr->next)+numPoints+numBuckets+1);
+  return listPtr;
 }
 
 // Interface to Locality Sensitive Hashing G
