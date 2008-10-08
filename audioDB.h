@@ -318,14 +318,14 @@ class audioDB{
   void prefix_name(char** const name, const char* prefix);
 
  public:
-  audioDB(const unsigned argc, char* const argv[]);
-  audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse);
-  audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse);
-  audioDB(const unsigned argc, char* const argv[], adb__lisztResponse *adbLisztResponse);
+  audioDB(const unsigned argc, const char *const argv[]);
+  audioDB(const unsigned argc, const char *const argv[], adb__queryResponse *adbQueryResponse);
+  audioDB(const unsigned argc, const char *const argv[], adb__statusResponse *adbStatusResponse);
+  audioDB(const unsigned argc, const char *const argv[], adb__lisztResponse *adbLisztResponse);
 
   void cleanup();
   ~audioDB();
-  int processArgs(const unsigned argc, char* const argv[]);
+  int processArgs(const unsigned argc, const char* const argv[]);
   void get_lock(int fd, bool exclusive);
   void release_lock(int fd);
   void create(const char* dbName);

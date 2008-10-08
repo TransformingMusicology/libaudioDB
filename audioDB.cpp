@@ -22,7 +22,7 @@ bool operator==(const PointPair& a, const PointPair& b){
   return ( (a.trackID==b.trackID) && (a.qpos==b.qpos) && (a.spos==b.spos) );
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char *const argv[]): O2_AUDIODB_INITIALIZERS
 {
   if(processArgs(argc, argv)<0){
     printf("No command found.\n");
@@ -97,7 +97,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[]): O2_AUDIODB_INITIALIZE
     error("Unrecognized command",command);
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char *const argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     isServer = 1; // Set to make errors report over SOAP
@@ -113,7 +113,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__queryResponse *ad
   }
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char* const argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     isServer = 1; // Set to make errors report over SOAP
@@ -129,7 +129,7 @@ audioDB::audioDB(const unsigned argc, char* const argv[], adb__statusResponse *a
   }
 }
 
-audioDB::audioDB(const unsigned argc, char* const argv[], adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char *const argv[], adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     isServer = 1; // Set to make errors report over SOAP
@@ -193,7 +193,7 @@ audioDB::~audioDB(){
   cleanup();
 }
 
-int audioDB::processArgs(const unsigned argc, char* const argv[]){
+int audioDB::processArgs(const unsigned argc, const char *const argv[]){
 
   if(argc<2){
     cmdline_parser_print_version ();
@@ -206,7 +206,10 @@ int audioDB::processArgs(const unsigned argc, char* const argv[]){
     exit(0);
   }
 
-  if (cmdline_parser (argc, argv, &args_info) != 0)
+  /* KLUDGE: gengetopt generates a function which is not completely
+     const-clean in its declaration.  We cast argv here to keep the
+     compiler happy.  -- CSR, 2008-10-08 */
+  if (cmdline_parser (argc, (char *const *) argv, &args_info) != 0)
     error("Error parsing command line");
 
   if(args_info.help_given){

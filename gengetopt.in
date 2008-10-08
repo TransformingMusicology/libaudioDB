@@ -1,7 +1,7 @@
 package "audioDB"
 version "version 0.8.preview"
 purpose "A feature vector database management system for content-based retrieval."
-option "help" H "print help on audioDB usage and exit." optional
+
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional
 text "\nDatabase commands are UPPER CASE. Command options are lower case.\n" 
 text ""
@@ -53,11 +53,11 @@ section "Database Search" sectiondesc="These commands control the retrieval beha
 
 option "QUERY" Q "content-based search on --database using --features as a query. Optionally restrict the search to those tracks identified in a --keyList." values="point","track","sequence","nsequence","onetoonensequence" typestr="searchtype" dependon="database" optional
 option "qpoint" p "ordinal position of query start point in --features file." int typestr="position" default="0" optional
-option "exhaustive" e "exhaustive search: iterate through all query vectors in search. Overrides --qpoint." flag off optional hidden
+option "exhaustive" e "exhaustive search: iterate through all query vectors in search. Overrides --qpoint." flag off hidden
 option "pointnn" n "number of point nearest neighbours to use in retrieval." int typestr="numpoints" default="10" optional
 option "radius"  R "radius search, returns all points/tracks/sequences inside given radius. (Overrides --pointnn)." double default="1.0" optional 
 option "expandfactor" x "time compress/expand factor of result length to query length [1.0 .. 100.0]." double default="1.1" optional hidden
-option "rotate"       o "rotate query vectors for rotationally invariant search." flag off optional hidden
+option "rotate"       o "rotate query vectors for rotationally invariant search." flag off hidden
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional
 option "sequencelength" l "length of sequences for sequence search." int typestr="length" default="16" optional
 option "sequencehop"  h "hop size of sequence window for sequence search." int typestr="hop" default="1" optional
@@ -73,18 +73,18 @@ option "lsh_m" - "number of hash tables is m(m-1)/2" int typestr="size" default=
 option "lsh_N" - "number of rows per hash tables" int typestr="size" default="100000" dependon="INDEX" optional
 option "lsh_b" - "number of tracks per indexing iteration" int typestr="size" default="500" dependon="INDEX" optional
 option "lsh_ncols" - "number of columns (collisions) to allocate for FORMAT1 LSH serialization" int typestr="size" default="250" dependon="INDEX" optional hidden
-option "lsh_exact" - "use exact evaluation of points retrieved by LSH." flag off dependon="QUERY" optional
-option "lsh_on_disk" - "Construct LSH hash tables for on-disk query (INDEX/QUERY)" flag off optional
-option "lsh_use_u_functions" - "use m independent hash functions combinatorically to approximate L independent hash functions." flag off optional
+option "lsh_exact" - "use exact evaluation of points retrieved by LSH." flag off dependon="QUERY"
+option "lsh_on_disk" - "Construct LSH hash tables for on-disk query (INDEX/QUERY)" flag off
+option "lsh_use_u_functions" - "use m independent hash functions combinatorically to approximate L independent hash functions." flag off
 
 section "Normalization control parameters" sectiondesc="These parameters control the normalization of feaures at query time\n"
 
-option "no_unit_norming" - "do not unit norm features when querying an L2Norm databases." flag off optional
+option "no_unit_norming" - "do not unit norm features when querying an L2Norm databases." flag off
 
 section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
 
 option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
-option "load_index" - "make web service with memory-resident hashtables" flag off dependon="radius" optional
+option "load_index" - "make web service with memory-resident hashtables" flag off dependon="radius"
 option "client" c "run as a client using named host service." string typestr="hostname:port" optional
 
 

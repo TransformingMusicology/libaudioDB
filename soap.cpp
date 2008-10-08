@@ -143,7 +143,7 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
 
 /* Server definitions */
 int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbStatusResponse){
-  char* const argv[]={"./audioDB",COM_STATUS,"-d",dbName};
+  const char *const argv[]={"./audioDB",COM_STATUS,"-d",dbName};
   const unsigned argc = 4;
   try {
     audioDB(argc, argv, &adbStatusResponse);
@@ -160,7 +160,7 @@ int adb__liszt(struct soap* soap, xsd__string dbName, xsd__int lisztOffset, xsd_
   INTSTRINGIFY(lisztOffset, lisztOffsetStr);
   INTSTRINGIFY(lisztLength, lisztLengthStr);
 
-  char* const argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
+  const char* const argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
   const unsigned argc = 8;
   try{
     audioDB(argc, argv, &adbLisztResponse);
@@ -237,7 +237,7 @@ int adb__query(struct soap* soap, xsd__string dbName,
     argc++;
   }
 
-  char **argv = new char*[argc+1];
+  const char **argv = new const char*[argc+1];
   argv[0] = "./audioDB";
   argv[1] = COM_QUERY;
   argv[2] = queryType;
