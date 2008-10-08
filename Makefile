@@ -41,7 +41,7 @@ soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} ${GSL_INCLUDE} -Wall  $<
 
 cmdline.o: cmdline.c cmdline.h
-	gcc -c $<
+	gcc -c ${CFLAGS} $<
 
 OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o index.o lshlib.o
 
