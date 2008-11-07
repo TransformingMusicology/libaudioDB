@@ -282,7 +282,6 @@ int adb__query(struct soap* soap, xsd__string dbName,
   }
   argv[argv_counter] = NULL;
 
-
   try {
     audioDB(argc, (char* const*)argv, &adbQueryResponse);
     delete [] argv;
@@ -359,7 +358,75 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
     return SOAP_FAULT;
   }
 }
-
+
+// Query an audioDB database by vector (serialized)
+int adb__shingleQuery(struct soap* soap, xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, struct adb__queryResponse &adbQueryResponse){
+
+  // open a tmp file on the server, write shingle, query as a file with query point 0
+  // and shingle length l/dim
+  char tmpFileName[] = "/tmp/adb_XXXXXX";
+  int tmpFid = mkstemp(tmpFileName);
+  if(tmpFid==-1){
+    cerr << "Cannot make tmpfile <" << tmpFileName << "> on server" << endl;
+    return SOAP_FAULT;
+  }
+
+ FILE* tmpFile = fdopen(tmpFid, "r+b");
+  if(!tmpFile){
+    cerr << "error opening <" << tmpFileName << "> for write" << endl;
+    return SOAP_FAULT;
+  }
+
+  if(fwrite(&qVector.dim, sizeof(int), 1, tmpFile)!=1){
+    cerr << "error writing tmp file dim <"<< tmpFileName << ">" << endl;
+    return SOAP_FAULT;
+  }
+
+  if(fwrite(qVector.v, sizeof(double), qVector.__sizev, tmpFile)!=(size_t)qVector.__sizev){
+    cerr << "error writing tmp file doubles <" << tmpFileName << ">" << endl;
+    return SOAP_FAULT;
+  }
+
+  // Close the file so that a new FD can be opened
+  fclose(tmpFile);
+
+  char tmpFileName2[] = "/tmp/adbP_XXXXXX";
+  int tmpFid2 = 0;
+  FILE* tmpFile2 = NULL;
+
+  // Check if powers have been passed and write accordingly
+  if(qVector.__sizep){
+    tmpFid2 = mkstemp(tmpFileName2);
+    tmpFile2 = fdopen(tmpFid2, "r+b");
+    if(!tmpFile2){
+      cerr << "error opening power file <" << tmpFileName2 << "> for write" << endl;
+      return SOAP_FAULT;
+    }
+    int pSize=1;
+    if(fwrite(&pSize, sizeof(int), 1, tmpFile2)!=1){
+      cerr << "error writing tmp power file dim <"<< tmpFileName2 << ">" << endl;
+      return SOAP_FAULT;
+    }
+    
+    if(fwrite(qVector.p, sizeof(double), qVector.__sizep, tmpFile2)!=(size_t)qVector.__sizep){
+      cerr << "error writing tmp power file doubles <" << tmpFileName2 << ">" << endl;
+      return SOAP_FAULT;
+    }
+    fclose(tmpFile2);
+  }
+
+  // fix up sequenceLength if it isn't provided, we know what the caller wants by the size of the shingle
+  // and the feature dimensionality
+  if(!sequenceLength)
+    sequenceLength = qVector.__sizev/qVector.dim;
+
+  int retVal = adb__query(soap, dbName, tmpFileName, keyList, timesFileName, qVector.__sizep?tmpFileName2:0,
+			  queryType, queryPos, pointNN, trackNN, sequenceLength, radius, 
+			  absolute_threshold, relative_threshold, exhaustive, lsh_exact, adbQueryResponse);
+
+  return retVal;
+}
+
 /* Server loop */
 void audioDB::startServer(){
   struct soap soap;
