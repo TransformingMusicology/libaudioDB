@@ -603,11 +603,13 @@ int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
   }
   else if(numVecsAboveThreshold)
     for( Uns32T pointID = 0 ; pointID < Nq; pointID++ )
-      if(!use_absolute_threshold || (use_absolute_threshold && (*qpp++ >= absolute_threshold)))
-	if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core)
+      if(!use_absolute_threshold || (use_absolute_threshold && (*qpp++ >= absolute_threshold))) {
+	if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core) {
 	  lsh->retrieve_point((*vv)[pointID], pointID, add_point_func, (void*)this);
-	else
+        } else {
 	  lsh->serial_retrieve_point(database, (*vv)[pointID], pointID, add_point_func, (void*)this);   
+        }
+      }
 
   if(lsh_exact)
     // Perform exact distance computation on point pairs in exact_evaluation_queue

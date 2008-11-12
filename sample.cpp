@@ -109,11 +109,15 @@ void audioDB::sample(const char *dbName) {
 
     /* FIXME: this seeking, reading and distance calculation should
        share more code with the query loop */
-    lseek(dbfid, dbH->dataOffset + trackOffsetTable[track1] * sizeof(double) + i1 * dbH->dim * sizeof(double), SEEK_SET);
-    read(dbfid, v1, dbH->dim * sequenceLength * sizeof(double));
+    if(lseek(dbfid, dbH->dataOffset + trackOffsetTable[track1] * sizeof(double) + i1 * dbH->dim * sizeof(double), SEEK_SET) == (off_t) -1) {
+      error("seek failure", "", "lseek");
+    }
+    CHECKED_READ(dbfid, v1, dbH->dim * sequenceLength * sizeof(double));
 
-    lseek(dbfid, dbH->dataOffset + trackOffsetTable[track2] * sizeof(double) + i2 * dbH->dim * sizeof(double), SEEK_SET);
-    read(dbfid, v2, dbH->dim * sequenceLength * sizeof(double));
+    if(lseek(dbfid, dbH->dataOffset + trackOffsetTable[track2] * sizeof(double) + i2 * dbH->dim * sizeof(double), SEEK_SET) == (off_t) -1) {
+      error("seek failure", "", "lseek");
+    }
+    CHECKED_READ(dbfid, v2, dbH->dim * sequenceLength * sizeof(double));
 
     v1norm = 0;
     v2norm = 0;

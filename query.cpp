@@ -239,7 +239,7 @@ void audioDB::read_data(int trkfid, int track, double **data_buffer_p, size_t *d
     }
   }
 
-  read(trkfid, *data_buffer_p, trackTable[track] * sizeof(double) * dbH->dim);
+  CHECKED_READ(trkfid, *data_buffer_p, trackTable[track] * sizeof(double) * dbH->dim);
 }
 
 // These names deserve some unpicking.  The names starting with a "q"

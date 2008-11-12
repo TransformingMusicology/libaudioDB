@@ -53,15 +53,15 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
  
 
     if(isServer) {
-    /* FIXME: I think this is leaky -- we never delete err.  actually
-       deleting it is tricky, though; it gets placed into some
-       soap-internal struct with uncertain extent... -- CSR,
-       2007-10-01 */
-    char *err = new char[256]; /* FIXME: overflows */
-    snprintf(err, 255, "%s: %s\n%s", a, b, sysFunc ? strerror(errno) : "");
-    /* FIXME: actually we could usefully do with a properly structured
-       type, so that we can throw separate faultstring and details.
-       -- CSR, 2007-10-01 */
+        /* FIXME: I think this is leaky -- we never delete err.
+           actually deleting it is tricky, though; it gets placed into
+           some soap-internal struct with uncertain extent... -- CSR,
+           2007-10-01 */
+        char *err = new char[256]; /* FIXME: overflows */
+        snprintf(err, 255, "%s: %s\n%s", a, b, sysFunc ? strerror(errno) : "");
+        /* FIXME: actually we could usefully do with a properly
+           structured type, so that we can throw separate faultstring
+           and details.  -- CSR, 2007-10-01 */
         throw(err);
     } else if (UseApiError){
         apierrortemp=-1;

@@ -112,6 +112,6 @@ int audiodb_status(adb_ptr mydb, adb_status_ptr status);
 
 /* varoius dump formats */
 int audiodb_dump(adb_ptr mydb);
-int audiodb_dump_withdir(adb_ptr mydb, char * outputdir);
+int audiodb_dump_withdir(adb_ptr mydb, const char *outputdir);
 
 

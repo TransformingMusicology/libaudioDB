@@ -78,7 +78,7 @@ void audioDB::create(const char* dbName){
     dbH->dbSize = dbH->l2normTableOffset;
   } 
 
-  write(dbfid, dbH, O2_HEADERSIZE);
+  CHECKED_WRITE(dbfid, dbH, O2_HEADERSIZE);
 
   // go to the location corresponding to the last byte
   if (lseek (dbfid, dbH->dbSize - 1, SEEK_SET) == -1)

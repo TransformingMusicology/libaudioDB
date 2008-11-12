@@ -50,13 +50,13 @@ cmdline.o: cmdline.c cmdline.h
 	gcc -c $(CFLAGS) $<
 
 
-$(EXECUTABLE): cmdline.c $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
+$(EXECUTABLE): cmdline.o $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) -Wall audioDB.cpp -DBINARY
 	g++ -o $(EXECUTABLE) $(CFLAGS) audioDB.o $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 
-$(LIBRARY): cmdline.c $(LIBOBJS)
-	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) -Wall audioDB.cpp
+$(LIBRARY): cmdline.o $(LIBOBJS)
+	g++ -c $(CFLAGS) -Wall audioDB.cpp
 	g++ -shared -o $(LIBRARY) $(CFLAGS) $(LIBGSL) audioDB.o $^ 
 
 tags:

@@ -15,8 +15,10 @@ bool audioDB::enough_data_space_free(off_t size) {
 }
 
 void audioDB::insert_data_vectors(off_t offset, void *buffer, size_t size) {
-  lseek(dbfid, dbH->dataOffset + offset, SEEK_SET);
-  write(dbfid, buffer, size);
+  if(lseek(dbfid, dbH->dataOffset + offset, SEEK_SET) == (off_t) -1) {
+    error("error seeking to offset", "", "lseek");
+  }
+  CHECKED_WRITE(dbfid, buffer, size);
 }
 
 void audioDB::insert(const char* dbName, const char* inFile) {

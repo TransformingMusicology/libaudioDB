@@ -133,10 +133,10 @@
 // Macros
 #define O2_ACTION(a) (strcmp(command,a)==0)
 
-#define ALIGN_UP(x,w) ((x) + ((1<<w)-1) & ~((1<<w)-1))
+#define ALIGN_UP(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
 #define ALIGN_DOWN(x,w) ((x) & ~((1<<w)-1))
 
-#define ALIGN_PAGE_UP(x) ((x) + (getpagesize()-1) & ~(getpagesize()-1))
+#define ALIGN_PAGE_UP(x) (((x) + (getpagesize()-1)) & ~(getpagesize()-1))
 #define ALIGN_PAGE_DOWN(x) ((x) & ~(getpagesize()-1))
 
 #define ENSURE_STRING(x) ((x) ? (x) : "")
@@ -147,6 +147,26 @@
       error("mmap error for db table", #var, "mmap"); \
     } \
     var = (type) tmp; \
+  }
+
+#define CHECKED_READ(fd, buf, count) \
+  { size_t tmpcount = count; \
+    ssize_t tmp = read(fd, buf, tmpcount); \
+    if(tmp == -1) { \
+      error("read error", "", "read"); \
+    } else if((size_t) tmp != tmpcount) {	\
+      error("short read", ""); \
+    } \
+  }
+
+#define CHECKED_WRITE(fd, buf, count) \
+  { size_t tmpcount = count; \
+    ssize_t tmp = write(fd, buf, tmpcount); \
+    if(tmp == -1) { \
+      error("write error", "", "write"); \
+    } else if((size_t) tmp != tmpcount) {	\
+      error("short write", ""); \
+    } \
   }
 
 #define VERB_LOG(vv, ...) \
@@ -302,6 +322,7 @@ class audioDB{
   unsigned lisztLength;
 
   //for lib / API
+  int apierrortemp;
   unsigned UseApiError;
 
   // private methods
@@ -333,18 +354,18 @@ class audioDB{
   void prefix_name(char** const name, const char* prefix);
 
  public:
-  audioDB(const unsigned argc, const char *const argv[]);
-  audioDB(const unsigned argc, const char *const argv[], adb__queryResponse *adbQueryResponse);
-  audioDB(const unsigned argc, const char *const argv[], adb__statusResponse *adbStatusResponse);
-  audioDB(const unsigned argc, const char *const argv[], adb__lisztResponse *adbLisztResponse);
-  audioDB(const unsigned argc, char* const argv[], int * apierror);
-  audioDB(const unsigned argc, char* const argv[], cppstatusptr stat, int * apierror);
-  audioDB(const unsigned argc, char* const argv[],adb__queryResponse *adbQueryResponse, int * apierror);
+  audioDB(const unsigned argc, const char *argv[]);
+  audioDB(const unsigned argc, const char *argv[], adb__queryResponse *adbQueryResponse);
+  audioDB(const unsigned argc, const char *argv[], adb__statusResponse *adbStatusResponse);
+  audioDB(const unsigned argc, const char *argv[], adb__lisztResponse *adbLisztResponse);
+  audioDB(const unsigned argc, const char *argv[], int * apierror);
+  audioDB(const unsigned argc, const char *argv[], cppstatusptr stat, int * apierror);
+  audioDB(const unsigned argc, const char *argv[],adb__queryResponse *adbQueryResponse, int * apierror);
 
 
   void cleanup();
   ~audioDB();
-  int processArgs(const unsigned argc, const char* const argv[]);
+  int processArgs(const unsigned argc, const char* argv[]);
   void get_lock(int fd, bool exclusive);
   void release_lock(int fd);
   void create(const char* dbName);
@@ -410,8 +431,6 @@ class audioDB{
   
   // Web Services
   void startServer();
-
-  int apierrortemp;
 
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
@@ -491,6 +510,8 @@ class audioDB{
     exact_evaluation_queue(0),                  \
     lisztOffset(0),                             \
     lisztLength(0),                             \
+    apierrortemp(0),                            \
+    UseApiError(0),                             \
     lsh(0),					\
     lsh_in_core(false),				\
     lsh_use_u_functions(false),                 \
@@ -502,6 +523,5 @@ class audioDB{
     lsh_param_b(0),				\
     lsh_param_ncols(0),                         \
     lsh_n_point_bits(0),                        \
-    vv(0),          \
-    apierrortemp(0)
+    vv(0)
 #endif

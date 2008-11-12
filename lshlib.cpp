@@ -22,7 +22,7 @@ Uns32T get_page_logn(){
   return (Uns32T)log2((double)pagesz);  
 }
 
-unsigned align_up(unsigned x, unsigned w){ return ((x) + ((1<<w)-1) & ~((1<<w)-1)); }
+unsigned align_up(unsigned x, unsigned w) { return (((x) + ((1<<w)-1)) & ~((1<<w)-1)); }
 
 void H::error(const char* a, const char* b, const char *sysFunc) {
   cerr << a << ": " << b << endl;
@@ -527,15 +527,17 @@ void G::retrieve_point(vector<float>& v, Uns32T qpos, ReporterCallbackPtr add_po
   H::compute_hash_functions( v );
   for(Uns32T j = 0 ; j < H::L ; j++ ){
     H::generate_hash_keys( *( H::g + j ), *( H::r1 + j ), *( H::r2 + j ) ); 
-    if( bucket* bPtr = *(get_bucket(j) + get_t1()) )
+    if( bucket* bPtr = *(get_bucket(j) + get_t1()) ) {
 #ifdef LSH_LIST_HEAD_COUNTERS
-      if(bPtr->t2&LSH_CORE_ARRAY_BIT)
+      if(bPtr->t2&LSH_CORE_ARRAY_BIT) {
 	retrieve_from_core_hashtable_array((Uns32T*)(bPtr->next), qpos);
-      else
+      } else {
 	bucket_chain_point( bPtr->next, qpos);
+      }
 #else
-    bucket_chain_point( bPtr , qpos);
+      bucket_chain_point( bPtr , qpos);
 #endif
+    }
   }
 }
 
@@ -684,18 +686,19 @@ void G::serialize(char* filename, Uns32T serialFormat){
     error("Unrecognized serial file format request: ", "serialize()");
  
   // Test to see if file exists
-  if((dbfid = open (filename, O_RDONLY)) < 0)
+  if((dbfid = open (filename, O_RDONLY)) < 0) {
     // If it doesn't, then create the file (CREATE)
-    if(errno == ENOENT){
+    if(errno == ENOENT) {
       // Create the file
       std::cout << "Creating new serialized LSH database:" << filename << "...";
       std::cout.flush();
       serial_create(filename, serialFormat);
       dbIsNew=1;
-    }
-    else
+    } else {
       // The file can't be opened
       error("Can't open the file", filename, "open");
+    }
+  }
 
   // Load the on-disk header into core
   dbfid = serial_open(filename, 1); // open for write
@@ -846,17 +849,19 @@ int G::serialize_lsh_hashtables_format1(int fid, int merge){
       pe=pt+y*lshHeader->numCols;
       
       colCount=0;
-      if(bucket* bPtr = h[x][y])
-	if(merge)
+      if(bucket* bPtr = h[x][y]) {
+	if(merge) {
 #ifdef LSH_LIST_HEAD_COUNTERS
 	  serial_merge_hashtable_row_format1(pe, bPtr->next, colCount); // skip collision counter bucket
-	else
+	} else {
 	  serial_write_hashtable_row_format1(pe, bPtr->next, colCount); // skip collision counter bucket
 #else
-      serial_merge_hashtable_row_format1(pe, bPtr, colCount);
-      else
-	serial_write_hashtable_row_format1(pe, bPtr, colCount);
+          serial_merge_hashtable_row_format1(pe, bPtr, colCount);
+        } else {
+	  serial_write_hashtable_row_format1(pe, bPtr, colCount);
 #endif
+	}
+      }
       if(colCount){
 	if(colCount<minColCount)
 	  minColCount=colCount;

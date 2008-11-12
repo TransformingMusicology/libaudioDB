@@ -143,7 +143,7 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
 
 /* Server definitions */
 int adb__status(struct soap* soap, xsd__string dbName, adb__statusResponse &adbStatusResponse){
-  const char *const argv[]={"./audioDB",COM_STATUS,"-d",dbName};
+  const char *argv[]={"./audioDB",COM_STATUS,"-d",dbName};
   const unsigned argc = 4;
   try {
     audioDB(argc, argv, &adbStatusResponse);
@@ -160,7 +160,7 @@ int adb__liszt(struct soap* soap, xsd__string dbName, xsd__int lisztOffset, xsd_
   INTSTRINGIFY(lisztOffset, lisztOffsetStr);
   INTSTRINGIFY(lisztLength, lisztLengthStr);
 
-  const char* const argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
+  const char *argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
   const unsigned argc = 8;
   try{
     audioDB(argc, argv, &adbLisztResponse);
@@ -283,7 +283,7 @@ int adb__query(struct soap* soap, xsd__string dbName,
   argv[argv_counter] = NULL;
 
   try {
-    audioDB(argc, (char* const*)argv, &adbQueryResponse);
+    audioDB(argc, argv, &adbQueryResponse);
     delete [] argv;
     return SOAP_OK;
   } catch (char *err) {
@@ -351,7 +351,7 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   
  
   try {
-    audioDB(argc, (char* const*)argv, &adbQueryResponse);
+    audioDB(argc, argv, &adbQueryResponse);
     return SOAP_OK;
   } catch (char *err) {
     soap_receiver_fault(soap, err, "");
