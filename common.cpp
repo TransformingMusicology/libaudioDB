@@ -50,7 +50,9 @@ void audioDB::release_lock(int fd) {
 }
 
 void audioDB::error(const char* a, const char* b, const char *sysFunc) {
-  if(isServer) {
+ 
+
+    if(isServer) {
     /* FIXME: I think this is leaky -- we never delete err.  actually
        deleting it is tricky, though; it gets placed into some
        soap-internal struct with uncertain extent... -- CSR,
@@ -60,14 +62,18 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
     /* FIXME: actually we could usefully do with a properly structured
        type, so that we can throw separate faultstring and details.
        -- CSR, 2007-10-01 */
-    throw(err);
-  } else {
-    std::cerr << a << ": " << b << std::endl;
-    if (sysFunc) {
-      perror(sysFunc);
+        throw(err);
+    } else if (UseApiError){
+        apierrortemp=-1;
+        throw(apierrortemp);
+    } else {
+        std::cerr << a << ": " << b << std::endl;
+        if (sysFunc) {
+            perror(sysFunc);
+        }
+        exit(1);
     }
-    exit(1);
-  }
+
 }
 
 void audioDB::initRNG() {

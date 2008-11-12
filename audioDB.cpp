@@ -41,7 +41,11 @@ audioDB::audioDB(const unsigned argc, const char *const argv[]): O2_AUDIODB_INIT
     prefix_name((char** const)&dbName, adb_root);
 
   if(O2_ACTION(COM_SERVER))
+    #ifdef BINARY
     startServer();
+    #else
+    ;
+    #endif
 
   else  if(O2_ACTION(COM_CREATE))
     create(dbName);
@@ -54,6 +58,7 @@ audioDB::audioDB(const unsigned argc, const char *const argv[]): O2_AUDIODB_INIT
 
   else if(O2_ACTION(COM_QUERY))
     if(isClient){
+    #ifdef BINARY
       if(query_from_key){
 	VERB_LOG(1, "Calling web services query %s on database %s, query=%s\n", radius>0?"(Radius)":"(NN)", dbName, (key&&strlen(key))?key:inFile);
 	ws_query_by_key(dbName, key, inFile, (char*)hostport);	
@@ -62,13 +67,20 @@ audioDB::audioDB(const unsigned argc, const char *const argv[]): O2_AUDIODB_INIT
 	VERB_LOG(1, "Calling web services query on database %s, query=%s\n", dbName, (key&&strlen(key))?key:inFile);
 	ws_query(dbName, inFile, (char*)hostport);
       }
+    #else
+    ;
+    #endif
     }
     else
       query(dbName, inFile);
 
   else if(O2_ACTION(COM_STATUS))
     if(isClient)
+    #ifdef BINARY
       ws_status(dbName,(char*)hostport);
+    #else
+    ;
+    #endif
     else
       status(dbName);
 
@@ -86,7 +98,11 @@ audioDB::audioDB(const unsigned argc, const char *const argv[]): O2_AUDIODB_INIT
 
   else if(O2_ACTION(COM_LISZT))
     if(isClient)
+    #ifdef BINARY
       ws_liszt(dbName, (char*) hostport);
+    #else
+    ;
+    #endif
     else
       liszt(dbName, lisztOffset, lisztLength);
 
@@ -145,6 +161,141 @@ audioDB::audioDB(const unsigned argc, const char *const argv[], adb__lisztRespon
   }
 }
 
+
+//for the lib / API
+audioDB::audioDB(const unsigned argc, char* const argv[], int * apierror): O2_AUDIODB_INITIALIZERS
+{
+
+    try {
+        UseApiError=1;
+
+        if(processArgs(argc, argv)<0){
+            printf("No command found.\n");
+            cmdline_parser_print_version ();
+            if (strlen(gengetopt_args_info_purpose) > 0)
+                printf("%s\n", gengetopt_args_info_purpose);
+            printf("%s\n", gengetopt_args_info_usage);
+            printf("%s\n", gengetopt_args_info_help[1]);
+            printf("%s\n", gengetopt_args_info_help[2]);
+            printf("%s\n", gengetopt_args_info_help[0]);
+            error("No command found");
+        }
+
+        adb__queryResponse adbq;
+
+        if(O2_ACTION(COM_CREATE))
+            create(dbName);
+
+        else if(O2_ACTION(COM_INSERT))
+            insert(dbName, inFile);
+
+        else if(O2_ACTION(COM_BATCHINSERT))
+            batchinsert(dbName, inFile);
+
+        else if(O2_ACTION(COM_QUERY))
+            if(isClient)
+                ;//ws_query(dbName, inFile, (char*)hostport);
+            else
+                query(dbName, inFile, &adbq);
+        //query(dbName, inFile);
+
+        else if(O2_ACTION(COM_STATUS))
+            if(isClient)
+                ;//ws_status(dbName,(char*)hostport);
+            else
+                status(dbName);
+
+        else if(O2_ACTION(COM_L2NORM))
+            l2norm(dbName);
+
+        else if(O2_ACTION(COM_POWER))
+            power_flag(dbName);
+
+        else if(O2_ACTION(COM_DUMP))
+            dump(dbName);
+
+        else
+            error("Unrecognized command",command);
+
+    } catch(int a) {
+        *apierror=a;
+        return;
+
+    }
+    *apierror=apierrortemp;
+    return;
+
+}
+
+//for API status
+audioDB::audioDB(const unsigned argc, char* const argv[], cppstatusptr stat, int * apierror): O2_AUDIODB_INITIALIZERS
+{
+
+    try {
+        UseApiError=1;
+
+
+        if(processArgs(argc, argv)<0){
+            printf("No command found.\n");
+            cmdline_parser_print_version ();
+            if (strlen(gengetopt_args_info_purpose) > 0)
+                printf("%s\n", gengetopt_args_info_purpose);
+            printf("%s\n", gengetopt_args_info_usage);
+            printf("%s\n", gengetopt_args_info_help[1]);
+            printf("%s\n", gengetopt_args_info_help[2]);
+            printf("%s\n", gengetopt_args_info_help[0]);
+            error("No command found");
+        }
+
+        status(dbName, stat);
+
+
+    } catch(int a) {
+        *apierror=a;
+        return;
+
+    }
+    *apierror=apierrortemp;
+    return;
+
+}
+
+
+//for API query
+audioDB::audioDB(const unsigned argc, char* const argv[],adb__queryResponse *adbQueryResponse, int * apierror): O2_AUDIODB_INITIALIZERS
+{
+
+    try {
+        UseApiError=1;
+
+        if(processArgs(argc, argv)<0){
+            printf("No command found.\n");
+            cmdline_parser_print_version ();
+            if (strlen(gengetopt_args_info_purpose) > 0)
+                printf("%s\n", gengetopt_args_info_purpose);
+            printf("%s\n", gengetopt_args_info_usage);
+            printf("%s\n", gengetopt_args_info_help[1]);
+            printf("%s\n", gengetopt_args_info_help[2]);
+            printf("%s\n", gengetopt_args_info_help[0]);
+            error("No command found");
+        }
+
+        query(dbName, inFile, adbQueryResponse);
+
+    } catch(int a) {
+        *apierror=a;
+        return;
+
+    }
+    *apierror=apierrortemp;
+    return;
+
+}
+
+
+
+
+
 void audioDB::cleanup() {
   cmdline_parser_free(&args_info);
   if(indata)
@@ -170,7 +321,7 @@ void audioDB::cleanup() {
   if(powerFileNameTable)
     munmap(powerFileNameTable, fileTableLength);
   if(trackOffsetTable)
-    delete trackOffsetTable;
+    delete [] trackOffsetTable;
   if(reporter)
     delete reporter;
   if(exact_evaluation_queue)
@@ -632,6 +783,35 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
   }
 }
 
+///used by lib/API
+void audioDB::status(const char* dbName, cppstatusptr status){
+    if(!dbH) {
+        initTables(dbName, 0);
+    }
+
+  unsigned dudCount=0;
+  unsigned nullCount=0;
+  for(unsigned k=0; k<dbH->numFiles; k++){
+    if(trackTable[k]<sequenceLength){
+      dudCount++;
+      if(!trackTable[k])
+        nullCount++;
+    }
+  }
+  
+  status->numFiles = dbH->numFiles;
+  status->dim = dbH->dim;
+  status->length = dbH->length;
+  status->dudCount = dudCount;
+  status->nullCount = nullCount;
+  status->flags = dbH->flags;
+  
+  return;
+}
+
+
+
+
 void audioDB::l2norm(const char* dbName) {
   forWrite = true;
   initTables(dbName, 0);
@@ -713,3 +893,468 @@ int main(const unsigned argc, char* const argv[]){
   SERVER_ADB_FEATURE_ROOT = 0;    // Server-side features root prefix
   audioDB(argc, argv);
 }
+
+
+extern "C" {
+
+/* for API questions contact 
+ * Christophe Rhodes c.rhodes@gold.ac.uk
+ * Ian Knopke mas01ik@gold.ac.uk, ian.knopke@gmail.com */
+
+#include "audioDB_API.h"
+
+
+    //adb_ptr audiodb_create(char * path,long ntracks, long datadim) {
+    adb_ptr audiodb_create(char * path,long datasize,long ntracks, long datadim) {
+        char *argv[12];
+        int argvctr=0;
+        char tempstr1[200];
+        char tempstr2[200];
+        char tempstr3[200];
+        int apierror=0;
+
+
+        argv[argvctr++] = "audioDB";
+        argv[argvctr++] = "--NEW";
+        argv[argvctr++] = "-d";
+        argv[argvctr++] = path;
+
+        if (datasize >0){
+            argv[argvctr++]="--datasize";
+            snprintf(tempstr1,sizeof(tempstr1),"%ld",datasize);
+            argv[argvctr++]=tempstr1;
+        }
+
+        if (ntracks >0){
+            argv[argvctr++]="--ntracks";
+            snprintf(tempstr2,sizeof(tempstr2),"%ld",ntracks);
+            argv[argvctr++]=tempstr2;
+        }
+
+        if (datadim > 0){
+            argv[argvctr++]="--datadim";
+            snprintf(tempstr3,sizeof(tempstr3),"%ld",datadim);
+            argv[argvctr++]=tempstr3;
+        }
+
+        argv[argvctr+1]='\0';
+
+        audioDB::audioDB(argvctr, argv, &apierror);
+
+        if (!apierror){ 
+            return audiodb_open(path);
+        }
+
+        /* database exists, so fail and pass NULL */
+        return NULL;
+    }
+
+
+
+  int audiodb_insert(adb_ptr mydb, adb_insert_ptr ins) {
+    char *argv[15];
+    int argvctr=0;
+    int apierror=0;
+
+    argv[argvctr++]="audioDB";
+    argv[argvctr++]="-I";
+    argv[argvctr++]="-d";
+    argv[argvctr++]=mydb->dbname;
+    argv[argvctr++]="-f";
+    argv[argvctr++]=ins->features;
+
+    if (ins->times){
+        argv[argvctr++]="--times";
+        argv[argvctr++]=ins->times;
+    }
+
+    if (ins->power){
+        argv[argvctr++]="-w";
+        argv[argvctr++]=ins->power;
+    }
+
+    if (ins->key){
+        argv[argvctr++]="--key";
+        argv[argvctr++]=ins->key;
+    }
+    argv[argvctr+1]='\0';
+
+    audioDB::audioDB(argvctr,argv,&apierror);
+    return apierror;
+  }
+
+
+  int audiodb_batchinsert(adb_ptr mydb, adb_insert_ptr ins, unsigned int size) {
+
+    char *argv[22];
+    int argvctr=0;
+    unsigned int i=0;
+    int retval=0;
+    char tempfeaturename[]="tempfeatureXXXXXX";
+    char temppowername[]="temppowerXXXXXX";
+    char tempkeyname[]="tempkeyXXXXXX";
+    char temptimesname[]="temptimesXXXXXX";
+    int tempfeaturefd=0;
+    int temppowerfd=0;
+    int tempkeyfd=0;
+    int temptimesfd=0;
+
+    int flags[4]={0};
+    int apierror=0;
+
+    /*  So the final API should take an array of structs. However, the current 
+    *   version requires four separate text files. So temporarily, we need to
+    *   unpack the struct array, make four separate text files, and then reinsert
+    *   them into the command-line call. This should change as soon as possible */
+
+
+    argv[argvctr++]="audioDB";
+    argv[argvctr++]="-B";
+    argv[argvctr++]="-d";
+    argv[argvctr++]=mydb->dbname;
+
+
+    /* assume struct is well formed for all entries */
+    if (ins[0].features){ flags[0]++;} else {
+        /* short circuit the case where there are no features in the structs */
+        return -1;
+    } ;
+    if (ins[0].power){ flags[1]++;};
+    if (ins[0].key){ flags[2]++;};
+    if (ins[0].times){ flags[3]++;};
+
+
+    /* make four temp files */
+    tempfeaturefd=mkstemp(tempfeaturename);
+    if (tempfeaturefd !=-1){ 
+
+        temppowerfd=mkstemp(temppowername);
+        if (temppowerfd !=-1){ 
+
+            tempkeyfd=mkstemp(tempkeyname);
+            if (tempkeyfd !=-1){ 
+
+                temptimesfd=mkstemp(temptimesname);
+                if (temptimesfd !=-1){ 
+
+                } else {
+                    retval=-1; 
+                    close(tempkeyfd);
+                    remove(tempkeyname);
+                    close(temppowerfd);
+                    remove(temppowername);
+                    close(tempfeaturefd);
+                    remove(tempfeaturename);
+                }
+
+            } else {
+                retval=-1; 
+                close(temppowerfd);
+                remove(temppowername);
+                close(tempfeaturefd);
+                remove(tempfeaturename);
+            }
+
+        } else {
+            retval=-1; 
+            close(tempfeaturefd);
+            remove(tempfeaturename);
+        } 
+
+    } else { 
+        retval=-1; 
+    }
+
+
+
+
+
+    if (retval == -1){
+        return -1;
+    }
+        
+    /* Ok, so we should have a working set of files to write to */ 
+    /* I'm going to assume that the same format is kept for all structs in the array */
+    /* That is, each struct should be correctly formed, and contain at least a features file, because I'm just going to pass the terms along to the text files */
+    for (i=0; i<size; i++){
+
+         write(tempfeaturefd,ins[i].features,strlen(ins[i].features)); 
+         write(tempfeaturefd,"\n",1); 
+
+         if (flags[1]){
+             write(temppowerfd,ins[i].power,strlen(ins[i].power)); 
+             write(temppowerfd,"\n",1); 
+         }
+
+         if (flags[2]){
+             write(tempkeyfd,ins[i].key,strlen(ins[i].key)); 
+             write(tempkeyfd,"\n",1); 
+         }
+
+         if (flags[3]){
+             write(temptimesfd,ins[i].times,strlen(ins[i].times)); 
+             write(temptimesfd,"\n",1); 
+         }
+    } 
+
+    argv[argvctr++]="-F";
+    argv[argvctr++]=tempfeaturename;
+    close(tempfeaturefd);
+    close(temppowerfd);
+    close(tempkeyfd);
+    close(temptimesfd);
+
+    if (flags[1]){
+        argv[argvctr++]="--powerList";
+        argv[argvctr++]=temppowername;
+    }
+
+    if (flags[2]){
+        argv[argvctr++]="--keyList";
+        argv[argvctr++]=tempkeyname;
+    }
+
+    if (flags[3]){
+        argv[argvctr++]="--timesList";
+        argv[argvctr++]=temptimesname;
+    }
+
+    argv[argvctr+1]='\0';
+
+    audioDB::audioDB(argvctr,argv,&apierror);
+
+    remove(tempfeaturename);
+    remove(temppowername);
+    remove(tempkeyname);
+    remove(temptimesname);
+
+
+    return apierror;
+  }
+
+
+  int audiodb_query(adb_ptr mydb, adb_query_ptr adbq, adb_queryresult_ptr adbqr){
+
+    char *argv[32];
+    int argvctr=0;
+    char tempstr1[200];
+    char tempstr2[200];
+    char tempstr3[200];
+    int apierror=0;
+
+    adb__queryResponse adbQueryResponse; 
+
+    /* TODO: may need error checking here */
+    /* currently counting on audioDB binary to fail for me */
+    argv[argvctr++]="audioDB";
+    
+    if(adbq->querytype){
+        argv[argvctr++]="-Q";
+        argv[argvctr++]=adbq->querytype;
+    }
+
+    if(mydb->dbname){
+        argv[argvctr++]="-d";
+        argv[argvctr++]=mydb->dbname;
+    }
+
+    if (adbq->feature){
+        argv[argvctr++]="-f";
+        argv[argvctr++]=adbq->feature;
+    }
+
+    if (adbq->power){
+        argv[argvctr++]="-w";
+        argv[argvctr++]=adbq->power;
+    }
+
+    if (adbq->qpoint){
+        argv[argvctr++]="-p";
+        argv[argvctr++]=adbq->qpoint;
+    }
+    if (adbq->numpoints){
+        argv[argvctr++]="-n";
+        argv[argvctr++]=adbq->numpoints;
+    }
+    if (adbq->radius){
+        argv[argvctr++]="-R";
+        argv[argvctr++]=adbq->radius;
+    }
+    if(adbq->resultlength){
+        argv[argvctr++]="-r";
+        argv[argvctr++]=adbq->resultlength;
+    }
+    if(adbq->sequencelength){
+        argv[argvctr++]="-l";
+        argv[argvctr++]=adbq->sequencelength;
+    }
+    if(adbq->sequencehop){
+        argv[argvctr++]="-h";
+        argv[argvctr++]=adbq->sequencehop;
+    }
+
+    if (adbq->absolute_threshold){
+        argv[argvctr++]="--absolute-threshold";
+        snprintf(tempstr1,sizeof(tempstr1),"%f",adbq->absolute_threshold);
+        argv[argvctr++]=tempstr1;
+    }
+
+    if (adbq->relative_threshold){
+        argv[argvctr++]="--relative-threshold";
+        snprintf(tempstr2,sizeof(tempstr2),"%f",adbq->relative_threshold);
+        argv[argvctr++]=tempstr2;
+    }
+
+    if (adbq->exhaustive){
+        argv[argvctr++]="--exhaustive";
+    }
+
+    if (adbq->expandfactor){
+        argv[argvctr++]="--expandfactor";
+        snprintf(tempstr3,sizeof(tempstr3),"%f",adbq->expandfactor);
+        argv[argvctr++]=tempstr3;
+    }
+
+    if (adbq->rotate){
+        argv[argvctr++]="--rotate";
+    }
+
+    if (adbq->keylist){
+        argv[argvctr++]="-K";
+        argv[argvctr++]=adbq->keylist;
+    }
+    argv[argvctr+1]='\0';
+
+    /* debugging */
+
+    audioDB::audioDB(argvctr,argv, &adbQueryResponse, &apierror);
+
+    //copy data over here from adbQueryResponse to adbqr
+    adbqr->sizeRlist=adbQueryResponse.result.__sizeRlist;
+    adbqr->sizeDist=adbQueryResponse.result.__sizeDist;
+    adbqr->sizeQpos=adbQueryResponse.result.__sizeQpos;
+    adbqr->sizeSpos=adbQueryResponse.result.__sizeSpos;
+    adbqr->Rlist=adbQueryResponse.result.Rlist;
+    adbqr->Dist=adbQueryResponse.result.Dist;
+    adbqr->Qpos=adbQueryResponse.result.Qpos;
+    adbqr->Spos=adbQueryResponse.result.Spos;
+
+    return apierror;
+  }
+
+  ///* status command */
+  int audiodb_status(adb_ptr mydb, adb_status_ptr status){
+
+      cppstatus sss;
+      int apierror=0;
+
+      char * argv[5];
+
+      apierror=0;
+      argv[0]="audioDB";
+      argv[1]="--STATUS";
+      argv[2]="-d";
+      argv[3]=mydb->dbname;
+      argv[4]='\0';
+
+      audioDB::audioDB(4,argv,&sss ,&apierror);
+      
+      status->numFiles=sss.numFiles;
+      status->dim=sss.dim;
+      status->length=sss.length;
+      status->dudCount=sss.dudCount;
+      status->nullCount=sss.nullCount;
+      status->flags=sss.flags;
+
+      return apierror;
+  }
+
+  int audiodb_dump(adb_ptr mydb){
+      return audiodb_dump_withdir(mydb,"audioDB.dump");
+  }
+
+  int audiodb_dump_withdir(adb_ptr mydb, char * outputdir){
+
+      char * argv[7];
+      int argvctr=0;
+      int apierror=0;
+
+      argv[argvctr++]="audioDB";
+      argv[argvctr++]="--DUMP";
+      argv[argvctr++]="-d";
+      argv[argvctr++]=mydb->dbname;
+      argv[argvctr++]="--output";
+      argv[argvctr++]=(char *)outputdir;
+      argv[argvctr+1]='\0';
+
+      audioDB::audioDB(6,argv,&apierror);
+
+      return apierror;
+  }
+
+  int audiodb_l2norm(adb_ptr mydb){
+
+      char * argv[5];
+      int apierror=0;
+
+      argv[0]="audioDB";
+      argv[1]="--L2NORM";
+      argv[2]="-d";
+      argv[3]=mydb->dbname;
+      argv[4]='\0';
+
+      audioDB::audioDB(4,argv,&apierror);
+      return apierror;
+  }
+
+  int audiodb_power(adb_ptr mydb){
+
+      char * argv[5];
+      int apierror=0;
+
+      argv[0]="audioDB";
+      argv[1]="--POWER";
+      argv[2]="-d";
+      argv[3]=mydb->dbname;
+      argv[4]='\0';
+
+      audioDB::audioDB(4,argv,&apierror);
+      return apierror;
+  }
+
+  adb_ptr audiodb_open(char * path){
+
+        adb_ptr mydbp;
+        adbstatus mystatus;
+
+        /* if db exists */
+
+        if (open(path, O_EXCL) != -1){
+
+            mydbp=(adb_ptr)malloc(sizeof(adb));
+            mydbp->dbname=(char *)malloc(sizeof(path));
+
+            strcpy(mydbp->dbname,path); 
+
+            audiodb_status(mydbp, &mystatus);
+            mydbp->ntracks=mystatus.numFiles;
+            mydbp->datadim=mystatus.dim;
+
+            return mydbp;
+        }
+
+        return NULL;
+  };
+
+
+
+  void audiodb_close(adb_ptr db){
+
+      free(db->dbname);
+      free(db);
+
+  }
+
+
+}
+

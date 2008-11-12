@@ -184,6 +184,17 @@ typedef struct dbTableHeader {
   off_t dbSize;
 } dbTableHeaderT, *dbTableHeaderPtr;
 
+typedef struct {
+
+    unsigned numFiles;
+    unsigned dim;
+    unsigned length;
+    unsigned dudCount;
+    unsigned nullCount;
+    unsigned flags;
+
+
+} cppstatus, *cppstatusptr;
 
 class PointPair{
  public:
@@ -290,11 +301,15 @@ class audioDB{
   unsigned lisztOffset;
   unsigned lisztLength;
 
+  //for lib / API
+  unsigned UseApiError;
+
   // private methods
   void error(const char* a, const char* b = "", const char *sysFunc = 0);
   void sequence_sum(double *buffer, int length, int seqlen);
   void sequence_sqrt(double *buffer, int length, int seqlen);
   void sequence_average(double *buffer, int length, int seqlen);
+
 
   void initialize_arrays(int track, unsigned int numVectors, double *query, double *data_buffer, double **D, double **DD);
   void delete_arrays(int track, unsigned int numVectors, double **D, double **DD);
@@ -322,6 +337,10 @@ class audioDB{
   audioDB(const unsigned argc, const char *const argv[], adb__queryResponse *adbQueryResponse);
   audioDB(const unsigned argc, const char *const argv[], adb__statusResponse *adbStatusResponse);
   audioDB(const unsigned argc, const char *const argv[], adb__lisztResponse *adbLisztResponse);
+  audioDB(const unsigned argc, char* const argv[], int * apierror);
+  audioDB(const unsigned argc, char* const argv[], cppstatusptr stat, int * apierror);
+  audioDB(const unsigned argc, char* const argv[],adb__queryResponse *adbQueryResponse, int * apierror);
+
 
   void cleanup();
   ~audioDB();
@@ -337,6 +356,8 @@ class audioDB{
   void batchinsert_large_adb(const char* dbName, const char* inFile);
   void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
+  void status(const char* dbName, cppstatusptr status);
+
   unsigned random_track(unsigned *propTable, unsigned total);
   void sample(const char *dbName);
   void l2norm(const char* dbName);
@@ -389,6 +410,9 @@ class audioDB{
   
   // Web Services
   void startServer();
+
+  int apierrortemp;
+
   void ws_status(const char*dbName, char* hostport);
   void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
   void ws_query_by_key(const char*dbName, const char *trackKey, const char* featureFileName, const char* hostport);
@@ -478,5 +502,6 @@ class audioDB{
     lsh_param_b(0),				\
     lsh_param_ncols(0),                         \
     lsh_n_point_bits(0),                        \
-    vv(0)
+    vv(0),          \
+    apierrortemp(0)
 #endif

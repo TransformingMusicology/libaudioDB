@@ -6,7 +6,7 @@ LIBGSL=-lgsl -lgslcblas
 GSL_INCLUDE=
 GSOAP_INCLUDE=
 
-override CFLAGS+=-O3 -g
+override CFLAGS+=-O3 -g -fPIC
 #override CFLAGS+=-ggdb -gstabs+ -g3
 
 ifeq ($(shell uname),Linux)
@@ -19,46 +19,85 @@ override CFLAGS+=-arch x86_64
 endif
 endif
 
+LIBOBJS=insert.o create.o common.o dump.o query.o sample.o index.o lshlib.o
+OBJS=$(LIBOBJS) soap.o
+
+
 EXECUTABLE=audioDB
+LIBRARY=libaudioDB_API.so
+
 
 .PHONY: all clean test
 
-all: ${EXECUTABLE}
+all: $(OBJS) $(LIBRARY) $(EXECUTABLE) tags 
 
-${EXECUTABLE}.1: ${EXECUTABLE}
-	${HELP2MAN} ./${EXECUTABLE} > ${EXECUTABLE}.1
+$(EXECUTABLE).1: $(EXECUTABLE)
+	$(HELP2MAN) ./$(EXECUTABLE) > $(EXECUTABLE).1
 
-HELP.txt: ${EXECUTABLE}
-	./${EXECUTABLE} --help > HELP.txt
+HELP.txt: $(EXECUTABLE)
+	./$(EXECUTABLE) --help > HELP.txt
 
 cmdline.c cmdline.h: gengetopt.in
-	${GENGETOPT} -e <gengetopt.in
+	$(GENGETOPT) -e <gengetopt.in
 
 soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
-	${SOAPCPP2} audioDBws.h
+	$(SOAPCPP2) audioDBws.h
 
 %.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
-	g++ -c ${CFLAGS} ${GSOAP_INCLUDE} ${GSL_INCLUDE} -Wall  $<
+	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) $(GSL_INCLUDE) -Wall  $<
 
 cmdline.o: cmdline.c cmdline.h
-	gcc -c ${CFLAGS} $<
+	gcc -c $(CFLAGS) $<
 
-OBJS=insert.o create.o common.o dump.o query.o soap.o sample.o audioDB.o index.o lshlib.o
 
-${EXECUTABLE}: ${OBJS} soapServer.cpp soapClient.cpp soapC.cpp cmdline.o
-	g++ -o ${EXECUTABLE} ${CFLAGS} ${GSL_INCLUDE} ${LIBGSL} ${GSOAP_INCLUDE} $^ ${GSOAP_CPP}
+$(EXECUTABLE): cmdline.c $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
+	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) -Wall audioDB.cpp -DBINARY
+	g++ -o $(EXECUTABLE) $(CFLAGS) audioDB.o $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
+
+
+$(LIBRARY): cmdline.c $(LIBOBJS)
+	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) -Wall audioDB.cpp
+	g++ -shared -o $(LIBRARY) $(CFLAGS) $(LIBGSL) audioDB.o $^ 
+
+tags:
+	ctags *.cpp *.h
+
 
 clean:
 	-rm cmdline.c cmdline.h
 	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
-	-rm adb.nsmap adb.xsd adb.wsdl adb.*.req.xml adb.*.res.xml
+	-rm adb.*
 	-rm HELP.txt
-	-rm ${EXECUTABLE} ${EXECUTABLE}.1 ${OBJS}
+	-rm $(EXECUTABLE) $(EXECUTABLE).1 $(OBJS)
 	-rm xthresh
 	-sh -c "cd tests && sh ./clean.sh"
+	-sh -c "cd libtests && sh ./clean.sh"
+	-rm $(LIBRARY)
+	-rm tags
 
-test: ${EXECUTABLE}
+dist_clean:
+	-rm cmdline.c cmdline.h
+	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
+	-rm adb.*
+	-rm HELP.txt
+	-rm $(EXECUTABLE) $(EXECUTABLE).1 $(OBJS)
+	-rm xthresh
+	-sh -c "cd tests && sh ./clean.sh"
+	-sh -c "cd libtests && sh ./clean.sh"
+	-rm $(LIBRARY)
+	-rm *.o
+	-rm tags
+	-rm -rf audioDB.dump
+
+
+test: $(EXECUTABLE)
 	-sh -c "cd tests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
-	gcc -o $@ ${CFLAGS} ${GSL_INCLUDE} ${LIBGSL} $<
+	gcc -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
+
+install:
+	cp $(LIBRARY) /usr/local/lib/
+	ldconfig
+	cp audioDB_API.h /usr/local/include/
+
