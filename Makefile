@@ -23,8 +23,10 @@ OBJS=$(LIBOBJS) soap.o audioDB.o
 
 
 EXECUTABLE=audioDB
-LIBRARY=libaudioDB_API.so
 
+SOVERSION=0
+MINORVERSION=0
+LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
 
 .PHONY: all clean test
 
@@ -56,7 +58,7 @@ $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 
 
 $(LIBRARY): $(LIBOBJS) audioDB_library.o
-	g++ -shared -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
+	g++ -shared -Wl,-soname,lib$(EXECUTABLE).so.$(SOVERSION) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
 
 tags:
 	ctags *.cpp *.h
@@ -87,6 +89,8 @@ xthresh: xthresh.c
 
 install:
 	cp $(LIBRARY) /usr/local/lib/
+	ln -sf /usr/local/lib/$(LIBRARY) /usr/local/lib/lib$(EXECUTABLE).so.$(SOVERSION)
+	ln -sf /usr/local/lib/lib$(EXECUTABLE).so.$(SOVERSION) /usr/local/lib/lib$(EXECUTABLE).so
 	ldconfig
 	cp audioDB_API.h /usr/local/include/
 

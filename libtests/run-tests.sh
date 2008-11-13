@@ -3,9 +3,6 @@
 AUDIODB=../../${EXECUTABLE:-audioDB}
 export AUDIODB
 
-LD_LIBRARY_PATH=../
-export LD_LIBRARY_PATH
-
 if [ -x ${AUDIODB#../} ]; then 
   :
 else 
@@ -21,13 +18,13 @@ fi
 
 for file in ${pattern}; do
   if [ -d ${file} ]; then
-    if [ -f ${file}/run-test.sh ]; then
+    if [ /bin/true ]; then
       echo -n Running test ${file}
       if [ -f ${file}/short-description ]; then
         awk '{ printf(" (%s)",$0) }' < ${file}/short-description
       fi
       echo -n :
-      (cd ${file} && /bin/bash ./run-test.sh > test.out 2> test.err)
+      (cd ${file} && make -f ../libtest.mk >/dev/null 2>&1 && ./test1 > test.out 2> test.err && exit 104)
       EXIT_STATUS=$?
       if [ ${EXIT_STATUS} -eq 14 ]; then
         echo " n/a."
