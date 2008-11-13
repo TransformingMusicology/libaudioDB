@@ -7,7 +7,6 @@ GSL_INCLUDE=
 GSOAP_INCLUDE=
 
 override CFLAGS+=-O3 -g -fPIC
-#override CFLAGS+=-ggdb -gstabs+ -g3
 
 ifeq ($(shell uname),Linux)
 override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
@@ -75,18 +74,8 @@ clean:
 	-rm $(LIBRARY) audioDB_library.o
 	-rm tags
 
-dist_clean:
-	-rm cmdline.c cmdline.h
-	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
-	-rm adb.*
-	-rm HELP.txt
-	-rm $(EXECUTABLE) $(EXECUTABLE).1 $(OBJS)
-	-rm xthresh
-	-sh -c "cd tests && sh ./clean.sh"
-	-sh -c "cd libtests && sh ./clean.sh"
-	-rm $(LIBRARY)
+distclean: clean
 	-rm *.o
-	-rm tags
 	-rm -rf audioDB.dump
 
 
