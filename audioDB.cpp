@@ -41,11 +41,11 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
     prefix_name((char** const)&dbName, adb_root);
 
   if(O2_ACTION(COM_SERVER))
-    #ifdef BINARY
-    startServer();
-    #else
+#ifdef LIBRARY
     ;
-    #endif
+#else
+    startServer();
+#endif
 
   else  if(O2_ACTION(COM_CREATE))
     create(dbName);
@@ -58,7 +58,9 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
 
   else if(O2_ACTION(COM_QUERY))
     if(isClient){
-    #ifdef BINARY
+#ifdef LIBRARY
+      ;
+#else
       if(query_from_key){
 	VERB_LOG(1, "Calling web services query %s on database %s, query=%s\n", radius>0?"(Radius)":"(NN)", dbName, (key&&strlen(key))?key:inFile);
 	ws_query_by_key(dbName, key, inFile, (char*)hostport);	
@@ -67,20 +69,18 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
 	VERB_LOG(1, "Calling web services query on database %s, query=%s\n", dbName, (key&&strlen(key))?key:inFile);
 	ws_query(dbName, inFile, (char*)hostport);
       }
-    #else
-    ;
-    #endif
+#endif
     }
     else
       query(dbName, inFile);
 
   else if(O2_ACTION(COM_STATUS))
     if(isClient)
-    #ifdef BINARY
+#ifdef LIBRARY
+      ;
+#else
       ws_status(dbName,(char*)hostport);
-    #else
-    ;
-    #endif
+#endif
     else
       status(dbName);
 
@@ -98,11 +98,11 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
 
   else if(O2_ACTION(COM_LISZT))
     if(isClient)
-    #ifdef BINARY
+#ifdef LIBRARY
+      ;
+#else 
       ws_liszt(dbName, (char*) hostport);
-    #else
-    ;
-    #endif
+#endif
     else
       liszt(dbName, lisztOffset, lisztLength);
 

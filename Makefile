@@ -19,8 +19,8 @@ override CFLAGS+=-arch x86_64
 endif
 endif
 
-LIBOBJS=insert.o create.o common.o dump.o query.o sample.o index.o lshlib.o
-OBJS=$(LIBOBJS) soap.o
+LIBOBJS=insert.o create.o common.o dump.o query.o sample.o index.o lshlib.o cmdline.o
+OBJS=$(LIBOBJS) soap.o audioDB.o
 
 
 EXECUTABLE=audioDB
@@ -29,7 +29,7 @@ LIBRARY=libaudioDB_API.so
 
 .PHONY: all clean test
 
-all: $(OBJS) $(LIBRARY) $(EXECUTABLE) tags 
+all: $(LIBRARY) $(EXECUTABLE)
 
 $(EXECUTABLE).1: $(EXECUTABLE)
 	$(HELP2MAN) ./$(EXECUTABLE) > $(EXECUTABLE).1
@@ -49,15 +49,15 @@ soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 cmdline.o: cmdline.c cmdline.h
 	gcc -c $(CFLAGS) $<
 
+audioDB_library.o: audioDB.cpp
+	g++ -c -o $@ $(CFLAGS) $(GSOAP_INCLUDE) -Wall -DLIBRARY $< 
 
-$(EXECUTABLE): cmdline.o $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
-	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) -Wall audioDB.cpp -DBINARY
-	g++ -o $(EXECUTABLE) $(CFLAGS) audioDB.o $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
+$(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
+	g++ -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 
-$(LIBRARY): cmdline.o $(LIBOBJS)
-	g++ -c $(CFLAGS) -Wall audioDB.cpp
-	g++ -shared -o $(LIBRARY) $(CFLAGS) $(LIBGSL) audioDB.o $^ 
+$(LIBRARY): $(LIBOBJS) audioDB_library.o
+	g++ -shared -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
 
 tags:
 	ctags *.cpp *.h
@@ -72,7 +72,7 @@ clean:
 	-rm xthresh
 	-sh -c "cd tests && sh ./clean.sh"
 	-sh -c "cd libtests && sh ./clean.sh"
-	-rm $(LIBRARY)
+	-rm $(LIBRARY) audioDB_library.o
 	-rm tags
 
 dist_clean:
