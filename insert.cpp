@@ -327,9 +327,12 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 	memcpy (db, dbH, sizeof(dbTableHeaderT));  
       }
     }
+
     // CLEAN UP
     munmap(indata,statbuf.st_size);
+    indata = NULL;
     close(infid);
+    infid = 0;
   } while(!filesIn->eof());
 
   VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * dbH->dim * sizeof(double)));
