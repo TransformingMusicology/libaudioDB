@@ -1320,7 +1320,7 @@ extern "C" {
         if (open(path, O_EXCL) != -1){
 
             mydbp=(adb_ptr)malloc(sizeof(adb));
-            mydbp->dbname=(char *)malloc(sizeof(path));
+            mydbp->dbname=(char *)malloc(1+strlen(path));
 
             strcpy(mydbp->dbname,path); 
 
