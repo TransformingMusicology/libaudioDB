@@ -6,17 +6,9 @@ LIBGSL=-lgsl -lgslcblas
 GSL_INCLUDE=
 GSOAP_INCLUDE=
 
-override CFLAGS+=-O3 -g -fPIC
+SHARED_LIB_FLAGS=-shared -Wl,-soname,
 
-ifeq ($(shell uname),Linux)
-override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
-endif
 
-ifeq ($(shell uname),Darwin)
-ifeq ($(shell sysctl -n hw.optional.x86_64),1)
-override CFLAGS+=-arch x86_64
-endif
-endif
 
 LIBOBJS=insert.o create.o common.o dump.o query.o sample.o index.o lshlib.o cmdline.o
 OBJS=$(LIBOBJS) soap.o audioDB.o
@@ -27,6 +19,20 @@ EXECUTABLE=audioDB
 SOVERSION=0
 MINORVERSION=0
 LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
+
+override CFLAGS+=-O3 -g -fPIC
+
+ifeq ($(shell uname),Linux)
+override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+endif
+
+ifeq ($(shell uname),Darwin)
+ifeq ($(shell sysctl -n hw.optional.x86_64),1)
+override CFLAGS+=-arch x86_64
+endif
+override SHARED_LIB_FLAGS=-dynamiclib -current_version $(SOVERSION).$(MINORVERSION) -Wl -install_name 
+override LIBRARY=lib$(EXECUTABLE).$(SOVERSION).$(MINORVERSION).dylib
+endif
 
 .PHONY: all clean test
 
@@ -58,7 +64,7 @@ $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 
 
 $(LIBRARY): $(LIBOBJS) audioDB_library.o
-	g++ -shared -Wl,-soname,lib$(EXECUTABLE).so.$(SOVERSION) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
+	g++ $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
 
 tags:
 	ctags *.cpp *.h
