@@ -27,7 +27,7 @@ $(LIBRARY_VERS):
 $(LIBRARY): $(LIBRARY_VERS)
 	-ln -s $< $@
 
-test1: prog1.c
+test1: prog1.c ../test_utils_lib.h ../../audioDB_API.h
 	gcc -Wall $(ARCH_FLAGS) -laudioDB -L. -Wl,-rpath,. -o $@ $<
 
 clean:
