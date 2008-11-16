@@ -6,7 +6,7 @@ void dump_query(adb_query_ptr adbq, adb_queryresult_ptr myadbqueryresult);
 int testoneresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, double Dist,double Qpos,double Spos);
 double doubleabs(double foo);
 void maketestfile(char * filename, int * ivals, double * dvals, int dvalsize);
-int testoneradiusresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, double Dist);
+int testoneradiusresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, int count);
 void makekeylistfile(char * filename, char * item);
 
 
@@ -149,29 +149,21 @@ int testoneresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, dou
 }
 
 
-int testoneradiusresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, double Dist){
+int testoneradiusresult(adb_queryresult_ptr myadbqueryresult, int i, char * Rlist, int count){
 
     int ret=0;
-    double tolerance=.0001;
 
-
-    
     if (strcmp(Rlist,myadbqueryresult->Rlist[i])){
         ret=-1;
     } 
 
-
-    if (doubleabs((double)Dist - (double)myadbqueryresult->Dist[i]) > tolerance){
+    /* KLUDGE: at the moment, the structure returned from "sequence"
+       queries with a radius has two unused fields, Dist and Qpos, and
+       the Spos field is punned to indicate the count of hits from
+       that track.  This is really ugly and needs to die. */
+    if (count != myadbqueryresult->Spos[i]) {
         ret=-1;
     } 
-    
-    //if (doubleabs((double)Qpos - (double)myadbqueryresult->Qpos[i]) > tolerance){
-    //    ret=-1;
-    //} 
-
-    //if (doubleabs((double)Spos - (double)myadbqueryresult->Spos[i]) > tolerance){
-    //    ret=-1;
-    //} 
 
     return ret;
 }

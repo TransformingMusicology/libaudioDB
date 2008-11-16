@@ -148,7 +148,7 @@ int main(int argc, char **argv){
 //cmp testoutput test-expected-output
     myadbquery.querytype="sequence";
     myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
+    //myadbquery.power="testquerypower";
     myadbquery.sequencelength="2";
     myadbquery.qpoint="0";
     //myadbquery.absolute_threshold=0.0;
