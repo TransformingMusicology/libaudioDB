@@ -86,12 +86,11 @@ typedef struct adbqueryresult adb_queryresult_t, *adb_queryresult_ptr;
 
 /* open an existing database */
 /* returns a struct or NULL on failure */
-adb_ptr audiodb_open(char * path);
+adb_ptr audiodb_open(const char *path);
 
 /* create a new database */
 /* returns a struct or NULL on failure */
-//adb_ptr audiodb_create(char * path,long ntracks, long datadim);
-adb_ptr audiodb_create(char * path,long datasize, long ntracks, long datadim);
+adb_ptr audiodb_create(const char *path, unsigned datasize, unsigned ntracks, unsigned datadim);
 
 /* close a database */
 void audiodb_close(adb_ptr db);

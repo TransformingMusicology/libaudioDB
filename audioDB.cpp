@@ -907,9 +907,7 @@ extern "C" {
 
 #include "audioDB_API.h"
 
-
-    //adb_ptr audiodb_create(char * path,long ntracks, long datadim) {
-    adb_ptr audiodb_create(char * path,long datasize,long ntracks, long datadim) {
+    adb_ptr audiodb_create(const char *path, unsigned datasize, unsigned ntracks, unsigned datadim) {
         const char *argv[12];
         int argvctr=0;
         char tempstr1[200];
@@ -925,19 +923,19 @@ extern "C" {
 
         if (datasize >0){
             argv[argvctr++]="--datasize";
-            snprintf(tempstr1,sizeof(tempstr1),"%ld",datasize);
+            snprintf(tempstr1,sizeof(tempstr1),"%u",datasize);
             argv[argvctr++]=tempstr1;
         }
 
         if (ntracks >0){
             argv[argvctr++]="--ntracks";
-            snprintf(tempstr2,sizeof(tempstr2),"%ld",ntracks);
+            snprintf(tempstr2,sizeof(tempstr2),"%u",ntracks);
             argv[argvctr++]=tempstr2;
         }
 
         if (datadim > 0){
             argv[argvctr++]="--datadim";
-            snprintf(tempstr3,sizeof(tempstr3),"%ld",datadim);
+            snprintf(tempstr3,sizeof(tempstr3),"%u",datadim);
             argv[argvctr++]=tempstr3;
         }
 
@@ -1310,7 +1308,7 @@ extern "C" {
       return apierror;
   }
 
-  adb_ptr audiodb_open(char * path){
+  adb_ptr audiodb_open(const char *path){
 
         adb_ptr mydbp;
         adbstatus mystatus;
