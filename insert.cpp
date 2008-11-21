@@ -388,6 +388,12 @@ void audioDB::batchinsert_large_adb(const char* dbName, const char* inFile) {
   if(!usingPower && (dbH->flags & O2_FLAG_POWER))
     error("Must use power with power-enabled database", dbName);
 
+  char *cwd = new char[PATH_MAX];
+
+  if ((getcwd(cwd, PATH_MAX)) == 0) {
+    error("error getting working directory", "", "getcwd");
+  }
+
   unsigned totalVectors=0;
   char *thisFile = new char[MAXSTR];
   char *thisKey = 0;
@@ -468,18 +474,38 @@ void audioDB::batchinsert_large_adb(const char* dbName, const char* inFile) {
 	
 	// Primary Keys
 	INSERT_FILETABLE_STRING(fileTable, thisKey);
-	
+
+	if(*thisFile != '/') {
+	  /* FIXME: MAXSTR and O2_FILETABLE_ENTRY_SIZE should probably
+	     be the same thing.  Also, both are related to PATH_MAX,
+	     which admittedly is not always defined or a
+	     constant... */
+	  char tmp[MAXSTR];
+	  strncpy(tmp, thisFile, MAXSTR);
+	  snprintf(thisFile, MAXSTR, "%s/%s", cwd, tmp);
+	}
 	// Feature Vector fileNames
 	INSERT_FILETABLE_STRING(featureFileNameTable, thisFile);
 	
 	// Time Stamp fileNames
-	if(usingTimes)
+	if(usingTimes) {
+	  if(*thisTimesFileName != '/') {
+	    char tmp[MAXSTR];
+	    strncpy(tmp, thisTimesFileName, MAXSTR);
+	    snprintf(thisTimesFileName, MAXSTR, "%s/%s", cwd, tmp);
+	  }
 	  INSERT_FILETABLE_STRING(timesFileNameTable, thisTimesFileName);
-
+	}
 
 	// Power fileNames
-	if(usingPower)
+	if(usingPower) {
+	  if(*thisPowerFileName != '/') {
+	    char tmp[MAXSTR];
+	    strncpy(tmp, thisPowerFileName, MAXSTR);
+	    snprintf(thisPowerFileName, MAXSTR, "%s/%s", cwd, tmp);
+	  }
 	  INSERT_FILETABLE_STRING(powerFileNameTable, thisPowerFileName);
+	}
 
 	// Increment file count
 	dbH->numFiles++;  
