@@ -939,7 +939,7 @@ extern "C" {
             argv[argvctr++]=tempstr3;
         }
 
-        argv[argvctr+1]='\0';
+        argv[argvctr]='\0';
 
         audioDB::audioDB(argvctr, argv, &apierror);
 
@@ -979,7 +979,7 @@ extern "C" {
         argv[argvctr++]="--key";
         argv[argvctr++]=ins->key;
     }
-    argv[argvctr+1]='\0';
+    argv[argvctr]='\0';
 
     audioDB::audioDB(argvctr,argv,&apierror);
     return apierror;
@@ -1086,7 +1086,7 @@ extern "C" {
         argv[argvctr++]=temptimesname;
     }
 
-    argv[argvctr+1]='\0';
+    argv[argvctr]='\0';
 
     audioDB::audioDB(argvctr,argv,&apierror);
 
@@ -1209,7 +1209,7 @@ extern "C" {
         argv[argvctr++]="-K";
         argv[argvctr++]=adbq->keylist;
     }
-    argv[argvctr+1]='\0';
+    argv[argvctr]='\0';
 
     /* debugging */
 
