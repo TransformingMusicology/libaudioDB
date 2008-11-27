@@ -47,6 +47,7 @@ struct adbquery {
 
     char * querytype;
     char * feature; //usually a file of some kind
+    char * key;
     char * power; //also a file
     char * keylist; //also a file
     char * qpoint;  //position 

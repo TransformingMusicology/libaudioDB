@@ -1149,6 +1149,11 @@ extern "C" {
         argv[argvctr++]=adbq->feature;
     }
 
+    if (adbq->key){
+        argv[argvctr++]="-k";
+        argv[argvctr++]=adbq->key;
+    }
+
     if (adbq->power){
         argv[argvctr++]="-w";
         argv[argvctr++]=adbq->power;
