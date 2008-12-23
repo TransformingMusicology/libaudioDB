@@ -312,6 +312,7 @@ class audioDB{
   
   ReporterBase* reporter;  // track/point reporter
   priority_queue<PointPair, std::vector<PointPair>, std::less<PointPair> >* exact_evaluation_queue;
+  set<Uns32T> * allowed_keys;    // search restrict list by key
 
   // Timers
   struct timeval tv1;
@@ -419,8 +420,7 @@ class audioDB{
   int index_init_query(const char* dbName);
   int index_exists(const char* dbName, double radius, Uns32T sequenceLength);
   char* index_get_name(const char*dbName, double radius, Uns32T sequenceLength);
-  static void index_add_point_approximate(void* instance, Uns32T pointID, Uns32T qpos, float dist); // static point reporter callback method
-  static void index_add_point_exact(void* instance, Uns32T pointID, Uns32T qpos, float dist); // static point reporter callback method
+  static void index_add_point(void* instance, Uns32T pointID, Uns32T qpos, float dist); // static point reporter callback method
   static Uns32T index_to_trackID(Uns32T lshID, Uns32T nPntBits);  // Convert lsh point index to audioDB trackID
   static Uns32T index_to_trackPos(Uns32T lshID, Uns32T nPntBits); // Convert lsh point index to audioDB trackPos (spos)
   static Uns32T index_from_trackInfo(Uns32T trackID, Uns32T pntID, Uns32T nPntBits); // Convert audioDB trackID and trackPos to an lsh point index
@@ -428,6 +428,8 @@ class audioDB{
   void index_insert_exact_evaluation_queue(Uns32T trackID, Uns32T qpos, Uns32T spos);
   LSH* index_allocate(char* indexName, bool load_hashTables);
   void init_track_aux_data(Uns32T trackID, double* fvp, double** sNormpp,double** snPtrp, double** sPowerp, double** spPtrp);
+  void initialize_allowed_keys(std::ifstream*); // implementation of restrict lists using STL "set" class
+  int is_in_allowed_keys(Uns32T trackID); // test method for allowed_keys used during search
   
   // Web Services
   void startServer();
@@ -508,6 +510,7 @@ class audioDB{
     relative_threshold(0.0),			\
     reporter(0),                                \
     exact_evaluation_queue(0),                  \
+    allowed_keys(0),                            \
     lisztOffset(0),                             \
     lisztLength(0),                             \
     apierrortemp(0),                            \

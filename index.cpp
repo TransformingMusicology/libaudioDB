@@ -512,27 +512,30 @@ int audioDB::index_init_query(const char* dbName){
   return true;
 }
 
-// *Static* approximate NN point reporter callback method for lshlib
-void audioDB::index_add_point_approximate(void* instancePtr, Uns32T pointID, Uns32T qpos, float dist){
-  assert(instancePtr); // We need an instance for this callback
-  audioDB* myself = (audioDB*) instancePtr; // Use explicit cast to recover "this" instance
-  Uns32T trackID = index_to_trackID(pointID, myself->lsh_n_point_bits);
-  Uns32T spos = index_to_trackPos(pointID, myself->lsh_n_point_bits);
-  // Skip identity in query_from_key
-  if( !myself->query_from_key || (myself->query_from_key && ( trackID != myself->query_from_key_index )) )
-    myself->reporter->add_point(trackID, qpos, spos, dist);
-}
-
 // *Static* exact NN point reporter callback method for lshlib
-// Maintain a queue of points to pass to query_points() for exact evaluation
-void audioDB::index_add_point_exact(void* instancePtr, Uns32T pointID, Uns32T qpos, float dist){
+void audioDB::index_add_point(void* instancePtr, Uns32T pointID, Uns32T qpos, float dist){
   assert(instancePtr); // We need an instance for this callback
   audioDB* myself = (audioDB*) instancePtr; // Use explicit cast to recover "this" instance  
   Uns32T trackID = index_to_trackID(pointID, myself->lsh_n_point_bits);
   Uns32T spos = index_to_trackPos(pointID, myself->lsh_n_point_bits);
   // Skip identity in query_from_key
-  if( !myself->query_from_key || (myself->query_from_key && ( trackID != myself->query_from_key_index )) )
-    myself->index_insert_exact_evaluation_queue(trackID, qpos, spos);
+  if( (!myself->query_from_key || (myself->query_from_key && ( trackID != myself->query_from_key_index ))) 
+      && (!myself->trackFile || myself->is_in_allowed_keys(trackID)) )
+    if(myself->lsh_exact)
+      myself->index_insert_exact_evaluation_queue(trackID, qpos, spos);
+    else    
+      myself->reporter->add_point(trackID, qpos, spos, dist);
+}      
+
+int audioDB::is_in_allowed_keys(Uns32T trackID){
+  std::set<Uns32T>::iterator it;
+  if(!allowed_keys)
+    return 0;
+  it = allowed_keys->find(trackID);
+  if(it == allowed_keys->end())
+    return 0;
+  else
+    return 1;
 }
 
 void audioDB::initialize_exact_evalutation_queue(){
@@ -540,6 +543,21 @@ void audioDB::initialize_exact_evalutation_queue(){
     delete exact_evaluation_queue;
   exact_evaluation_queue = new priority_queue<PointPair, std::vector<PointPair>, std::less<PointPair> >;
 }
+
+void audioDB::initialize_allowed_keys(std::ifstream* trackFile){
+  Uns32T trackIndex;
+  char nextKey[MAXSTR];
+
+  allowed_keys = new std::set<Uns32T>;
+  // Read keys from file, look up the index for each and insert in allowed_keys set
+  do {
+    trackFile->getline(nextKey,MAXSTR);
+    if(!trackFile->eof()) {
+      trackIndex = getKeyPos(nextKey);
+      allowed_keys->insert(trackIndex);
+    }
+  } while(!trackFile->eof());
+} 
 
 void audioDB::index_insert_exact_evaluation_queue(Uns32T trackID, Uns32T qpos, Uns32T spos){
   PointPair p(trackID, qpos, spos);
@@ -555,14 +573,11 @@ int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
   double *qNorm = 0, *qnPtr = 0, *qPower = 0, *qpPtr = 0;
   double meanQdur = 0;
   void (*add_point_func)(void*,Uns32T,Uns32T,float);
-
+  
   // Set the point-reporter callback based on the value of lsh_exact
-  if(lsh_exact){
+  if(lsh_exact)
     initialize_exact_evalutation_queue();
-    add_point_func = &index_add_point_exact;
-  }
-  else
-    add_point_func = &index_add_point_approximate;  
+  add_point_func = &index_add_point;
 
   if(!index_init_query(dbName)) // sets-up LSH index structures for querying
     return 0;
@@ -584,6 +599,11 @@ int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
   Uns32T Nq = (numVectors>O2_MAXTRACKLEN?O2_MAXTRACKLEN:numVectors) - sequenceLength + 1;
   vv = index_initialize_shingles(Nq); // allocate memory to copy query vectors to shingles
   VERB_LOG(1, "Nq=%d", Nq);
+
+  // restrictList initialization
+  if(trackFile)
+    initialize_allowed_keys(trackFile); // trackFile is list of valid keys to admit in search
+
   // Construct shingles from query features  
   for( Uns32T pointID = 0 ; pointID < Nq ; pointID++ ) 
     index_make_shingle(vv, pointID, query, dbH->dim, sequenceLength);

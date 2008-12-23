@@ -326,6 +326,8 @@ void audioDB::cleanup() {
     delete reporter;
   if(exact_evaluation_queue)
     delete exact_evaluation_queue;
+  if(allowed_keys)
+    delete allowed_keys;
   if(rng)
     gsl_rng_free(rng);
   if(vv)
