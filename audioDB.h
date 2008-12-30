@@ -68,7 +68,7 @@
 // Because we work in Radius^2 units,
 // The sqrt of this number is the multiplier on the radius
 
-#define O2_LSH_EXACT_MULT 9
+#define O2_LSH_EXACT_MULT 1
 
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
@@ -100,7 +100,7 @@
 #define O2_TRACKTABLE_ENTRY_SIZE (sizeof(unsigned))
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
-#define O2_MAXDIM (2000U)
+#define O2_MAXDIM (20000U)
 #define O2_MAXNN (1000000U)
 #define O2_MAXSEQLEN (8000U)            // maximum feature vectors in a sequence
 #define O2_MAXTRACKS (1000000U)           // maximum number of tracks
