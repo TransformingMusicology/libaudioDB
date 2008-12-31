@@ -702,8 +702,8 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     if(!args_info.exhaustive_flag){
       queryPoint = args_info.qpoint_arg;
       usingQueryPoint=1;
-      if(queryPoint<0 || queryPoint >10000)
-        error("queryPoint out of range: 0 <= queryPoint <= 10000");
+      if(queryPoint<0 || queryPoint >O2_MAX_VECTORS)
+        error("queryPoint out of range: 0 <= queryPoint <= O2_MAX_VECTORS");
     }
 
     // Whether to pre-load LSH hash tables for query (default on, if flag set then off)
