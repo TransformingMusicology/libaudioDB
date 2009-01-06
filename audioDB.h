@@ -62,6 +62,7 @@
 #define COM_ABSOLUTE_THRESH "--absolute-threshold"
 #define COM_EXHAUSTIVE "--exhaustive"
 #define COM_LSH_EXACT "--lsh_exact"
+#define COM_NO_UNIT_NORMING "--no_unit_norming"
 
 // Because LSH returns NN with P(1)<1 we want to return exact
 // points above this boundary. 

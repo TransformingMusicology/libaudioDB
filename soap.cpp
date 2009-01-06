@@ -55,7 +55,7 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
 			  queryType, queryPoint, 
 			  pointNN, trackNN, sequenceLength, 
 			  radius, absolute_threshold, relative_threshold,
-			  !usingQueryPoint, lsh_exact,
+			  !usingQueryPoint, lsh_exact, no_unit_norming,
 			  adbQueryResponse) 
      == SOAP_OK) {
     if(radius == 0) {
@@ -115,7 +115,8 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
 					 radius,
 					 absolute_threshold,
 					 usingQueryPoint,
-					   lsh_exact,
+					 lsh_exact,
+					 no_unit_norming,
 					 adbQueryResponse)==SOAP_OK){
       //std::std::cerr << "result list length:" << adbQueryResponse.result.__sizeRlist << std::std::endl;
       for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++)
@@ -180,7 +181,7 @@ int adb__query(struct soap* soap, xsd__string dbName,
 	       xsd__int seqLen,
 	       xsd__double radius, 
 	       xsd__double absolute_threshold, xsd__double relative_threshold,
-	       xsd__int exhaustive, xsd__int lsh_exact,
+	       xsd__int exhaustive, xsd__int lsh_exact, xsd__int no_unit_norming,
 	       adb__queryResponse &adbQueryResponse){
   char queryType[256];
 
@@ -237,6 +238,10 @@ int adb__query(struct soap* soap, xsd__string dbName,
     argc++;
   }
 
+  if(no_unit_norming){
+    argc++;
+  }
+
   const char **argv = new const char*[argc+1];
   argv[0] = "./audioDB";
   argv[1] = COM_QUERY;
@@ -280,6 +285,11 @@ int adb__query(struct soap* soap, xsd__string dbName,
   if (lsh_exact) {
     argv[argv_counter++] = COM_LSH_EXACT;
   }
+
+  if (no_unit_norming) {
+    argv[argv_counter++] = COM_NO_UNIT_NORMING;
+  }
+
   argv[argv_counter] = NULL;
 
   try {
@@ -306,11 +316,11 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
 			    xsd__double radius,
 			    xsd__double absolute_threshold,
 			    xsd__int usingQueryPoint,
-			    xsd__int lsh_exact,
+			    xsd__int lsh_exact, xsd__int no_unit_norming,
 			    struct adb__queryResponse& adbQueryResponse){
   char qtypeStr[256];
 
-  fprintf(stderr, "Calling %s query on database %s with %s=%s\n", (trackKey&&strlen(trackKey))?"KEY":"FILENAME", dbName, (trackKey&&strlen(trackKey))?"KEY":"FILENAME",(trackKey&&strlen(trackKey))?trackKey:featureFileName);
+  fprintf(stderr, "Calling %s query on database %s with %s=%s, distFun:%s\n", (trackKey&&strlen(trackKey))?"KEY":"FILENAME", dbName, (trackKey&&strlen(trackKey))?"KEY":"FILENAME",(trackKey&&strlen(trackKey))?trackKey:featureFileName, no_unit_norming?"Euclidean":"Normed Euclidean");
 
   INTSTRINGIFY(queryPoint, qPosStr);
   INTSTRINGIFY(pointNN, pointNNStr);
@@ -319,8 +329,6 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   DOUBLESTRINGIFY(absolute_threshold, absolute_thresholdStr);
   DOUBLESTRINGIFY(radius, radiusStr);
 
-  // WS queries only support 1-nearest neighbour point reporting
-  // at the moment, until we figure out how to better serve results
   snprintf(qtypeStr, 256, "nsequence");
   const char *argv[]={
     "./audioDB",
@@ -344,10 +352,11 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
     seqLenStr,
     COM_ABSOLUTE_THRESH,
     absolute_thresholdStr,
-    lsh_exact?COM_LSH_EXACT:""
+    lsh_exact?COM_LSH_EXACT:"",
+    no_unit_norming?COM_NO_UNIT_NORMING:"",
   };
 
-  const unsigned argc = 22;
+  const unsigned argc = 23;
   
  
   try {
@@ -360,7 +369,7 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
 }
 
 // Query an audioDB database by vector (serialized)
-int adb__shingleQuery(struct soap* soap, xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, struct adb__queryResponse &adbQueryResponse){
+int adb__shingleQuery(struct soap* soap, xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, xsd__int no_unit_norming, struct adb__queryResponse &adbQueryResponse){
 
   // open a tmp file on the server, write shingle, query as a file with query point 0
   // and shingle length l/dim
@@ -422,7 +431,7 @@ int adb__shingleQuery(struct soap* soap, xsd__string dbName, struct adb__queryVe
 
   int retVal = adb__query(soap, dbName, tmpFileName, keyList, timesFileName, qVector.__sizep?tmpFileName2:0,
 			  queryType, queryPos, pointNN, trackNN, sequenceLength, radius, 
-			  absolute_threshold, relative_threshold, exhaustive, lsh_exact, adbQueryResponse);
+			  absolute_threshold, relative_threshold, exhaustive, lsh_exact, no_unit_norming, adbQueryResponse);
 
   return retVal;
 }

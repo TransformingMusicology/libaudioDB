@@ -66,10 +66,10 @@ int adb__status(xsd__string dbName, struct adb__statusResponse &adbStatusRespons
 int adb__liszt(xsd__string dbName, xsd__int lisztOffset, xsd__int lisztLength, struct adb__lisztResponse &adbLisztResponse);
 
 // Query an existing adb database
-int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__string powerFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, struct adb__queryResponse &adbQueryResponse);
+int adb__query(xsd__string dbName, xsd__string qKey, xsd__string keyList, xsd__string timesFileName, xsd__string powerFileName, xsd__int qType, xsd__int qPos, xsd__int pointNN, xsd__int segNN, xsd__int segLen, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, xsd__int no_unit_norming, struct adb__queryResponse &adbQueryResponse);
 
-int adb__sequenceQueryByKey(xsd__string dbName,xsd__string trackKey, xsd__string featureFileName, xsd__int queryType,xsd__string trackFileName,xsd__string timesFileName,xsd__int queryPoint,xsd__int pointNN,xsd__int trackNN,xsd__int sequenceLength,xsd__double radius,xsd__double absolute_threshold,xsd__int usingQueryPoint,xsd__int lsh_exact,struct adb__queryResponse &adbQueryResponse);
+int adb__sequenceQueryByKey(xsd__string dbName,xsd__string trackKey, xsd__string featureFileName, xsd__int queryType,xsd__string trackFileName,xsd__string timesFileName,xsd__int queryPoint,xsd__int pointNN,xsd__int trackNN,xsd__int sequenceLength,xsd__double radius,xsd__double absolute_threshold,xsd__int usingQueryPoint,xsd__int lsh_exact, xsd__int no_unit_norming, struct adb__queryResponse &adbQueryResponse);
 
 // Query an audioDB database by vector (serialized), queryKey/featureFileName is here replaced with qVector
-int adb__shingleQuery(xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, struct adb__queryResponse &adbQueryResponse);
+int adb__shingleQuery(xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, xsd__int no_unit_norming, struct adb__queryResponse &adbQueryResponse);
 

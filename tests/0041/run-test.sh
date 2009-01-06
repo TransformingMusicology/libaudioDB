@@ -81,6 +81,16 @@ ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 2 -f testquery -w tes
 echo testfeature 1 > test-expected-output
 cmp testoutput test-expected-output
 
+# make index, no_unit_norming
+# Index with default LSH params
+${AUDIODB} -d testdb -X -l 1 -R 0.9 --lsh_k 1 --no_unit_norming
+
+${AUDIODB} -c localhost:${WSPORT} -d testdb -Q nsequence -l 1 -f testquery -w testpower -p 0 -R 0.9 -n 2 --no_unit_norming --lsh_exact > testoutput
+echo testfeature 3 > test-expected-output
+echo testfeature 0 >> test-expected-output
+cmp testoutput test-expected-output
+
+
 stop_server $!
 
 exit 104
