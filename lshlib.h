@@ -244,7 +244,7 @@ class H{
 
   H();
   H(Uns32T k, Uns32T m, Uns32T d, Uns32T N, Uns32T C, float w, float r);
-  ~H();
+  virtual ~H();
 
   float get_w(){return w;}
   float get_radius(){return radius;}  
@@ -341,7 +341,7 @@ class G: public H{
  public:
   G(char* lshFile, bool lshInCore = false); // unserialize constructor
   G(float w, Uns32T k,Uns32T m, Uns32T d, Uns32T N, Uns32T C, float r); // core constructor
-  ~G();
+  virtual ~G();
 
   Uns32T insert_point(vector<float>&, Uns32T pointID);
   void insert_point_set(vector<vector<float> >& vv, Uns32T basePointID);

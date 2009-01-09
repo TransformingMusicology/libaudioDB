@@ -15,7 +15,7 @@ dbName = 'tutorial.adb'
 # From: http://www.informit.com/articles/article.aspx?p=686162&seqNum=2
 #serverHost = 'research-hm3.corp.sk1.yahoo.com'
 serverHost = 'localhost'
-serverPort = 14475
+serverPort = 14476
 
 # Start the server on serverHost with
 #	./audioDB -s 14475
@@ -117,6 +117,39 @@ SHINGLE_QUERY_TEMPLATE = """
 </SOAP-ENV:Envelope>
 """
 
+
+
+FEATURE_QUERY_TEMPLATE = """
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope
+ xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+ xmlns:adb="http://tempuri.org/adb.xsd">
+ <SOAP-ENV:Body>
+  <adb:query>
+   <dbName>%s</dbName>
+   <qKey>%s</qKey>
+   <keyList>%s</keyList>
+   <timesFileName>%s</timesFileName>
+   <powerFileName>%s</powerFileName>
+   <qType>%s</qType>
+   <qPos>%s</qPos>
+   <pointNN>%s</pointNN>
+   <segNN>%s</segNN>
+   <segLen>%s</segLen>
+   <radius>%s</radius>
+   <absolute-threshold>%s</absolute-threshold>
+   <relative-threshold>%s</relative-threshold>
+   <exhaustive>%s</exhaustive>
+   <lsh-exact>%s</lsh-exact>
+   <no-unit-norming>%s</no-unit-norming>
+  </adb:query>
+ </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+"""
+
 ###############  List Query - Show the files in the database ###########
 # Return a list of (key identifier, frame length) pairs.
 def RunListQuery():
@@ -210,7 +243,7 @@ def RunSequenceQuery(argv):
 		pointNN = '10'
 		trackNN = '5'
 		seqLen = argv[4]
-		queryRadius = '0.5'
+		queryRadius = '2'
 	else:
 		dbKey = 'tmp/3.chr'
 		qType = '32'			# nSequence
@@ -223,6 +256,51 @@ def RunSequenceQuery(argv):
 	message = SEQUENCE_TEMPLATE
 	message = SEQUENCE_TEMPLATE%(dbName, dbKey, qType, qPos, pointNN, trackNN, seqLen, queryRadius)
 	# print message
+	response = SendXMLCommand(message)
+	ParseShingleXML(response)
+
+###############  Sequence Query - Show the data closest to one query ###########
+def RunQuery(argv):
+#   <dbName>%s</dbName>
+#   <qKey>%s</qKey>
+#   <keyList>%s</keyList>
+#   <timesFileName>%s</timesFileName>
+#   <powerFileName>%s</powerFileName>
+#   <qType>%s</qType>
+#   <qPos>%s</qPos>
+#   <pointNN>%s</pointNN>
+#   <segNN>%s</segNN>
+#   <segLen>%s</segLen>
+#   <radius>%s</radius>
+#   <absolute-threshold>%s</absolute-threshold>
+#   <relative-threshold>%s</relative-threshold>
+#   <exhaustive>%s</exhaustive>
+#   <lsh-exact>%s</lsh-exact>
+#   <no-unit-norming>%s</no-unit-norming>
+	global debug, dbName
+	if len(argv) > 2:
+		featureFile = argv[2]
+		powerFile = argv[3]
+		qType = '32'			# nSequence
+		qPos = argv[4]
+		pointNN = '20'
+		trackNN = '5'
+		seqLen = argv[5]
+		queryRadius = '0.2'
+	else:
+		featureFile = 'foo.chr12'
+		powerFile = 'foo.power'
+		qType = '32'			# nSequence
+		qPos = '0'
+		pointNN = '3'
+		trackNN = '5'
+		seqLen = '10'
+		queryRadius = '0.2'
+
+	message = FEATURE_QUERY_TEMPLATE
+	message = FEATURE_QUERY_TEMPLATE%(dbName, featureFile, "", "", powerFile, qType, qPos, pointNN, trackNN, seqLen, queryRadius, '0.0', '0.0', '0', '1','0')
+
+	print message
 	response = SendXMLCommand(message)
 	ParseShingleXML(response)
 
@@ -301,7 +379,7 @@ import sys
 if __name__=="__main__":
 	cmdname = sys.argv[0]
 	if len(sys.argv) == 1:
-		print "Syntax: " + sys.argv[0] + " -q feature_file pos len"
+		print "Syntax: " + sys.argv[0] + " -{s,q,f,l} feature_file [power_file] pos len"
 		sys.exit(1)
 
 	queryType = sys.argv[1]
@@ -311,6 +389,8 @@ if __name__=="__main__":
 			print k, v
 	elif queryType == '-q' or queryType == 'query':
 		RunSequenceQuery(sys.argv)
+	elif queryType == '-f' or queryType == 'feature':
+		RunQuery(sys.argv)
 	elif queryType == '-l' or queryType == 'list':
 		response = RunListQuery()
 		# print response

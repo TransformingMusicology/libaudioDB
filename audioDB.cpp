@@ -40,13 +40,15 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
   if(dbName && adb_root)
     prefix_name((char** const)&dbName, adb_root);
 
-  if(O2_ACTION(COM_SERVER))
+  if(O2_ACTION(COM_SERVER)){
 #ifdef LIBRARY
     ;
 #else
     startServer();
+    if(SERVER_LSH_INDEX_SINGLETON)
+      delete lsh;
 #endif
-
+  }
   else  if(O2_ACTION(COM_CREATE))
     create(dbName);
 

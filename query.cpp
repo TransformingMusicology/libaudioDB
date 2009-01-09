@@ -589,12 +589,15 @@ void audioDB::query_loop_points(double* query, double* qnPtr, double* qpPtr, dou
 	  dist = qn*qn + sn*sn - 2*dist;
       // else
       // dist = dist;      
-      if((!radius) || dist <= (O2_LSH_EXACT_MULT*radius+O2_DISTANCE_TOLERANCE)) 
+      if((!radius) || dist <= (radius+O2_DISTANCE_TOLERANCE)) 
 	reporter->add_point(pp.trackID, pp.qpos, pp.spos, dist);    
     }
     exact_evaluation_queue->pop();
   }
+
+  
   // Cleanup
+  free(data_buffer);
   SAFE_DELETE_ARRAY(sNorm);
   SAFE_DELETE_ARRAY(sPower);
   SAFE_DELETE_ARRAY(meanDBdur);

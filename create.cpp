@@ -55,9 +55,9 @@ void audioDB::create(const char* dbName){
   // For backward-compatibility, Record the point-encoding parameter for LSH indexing in the adb header
   // If this value is 0 then it will be set to 14
 
-#if O2_LSH_N_POINT_BITS > 15
-#error "AudioDB Compile ERROR: consistency check of O2_LSH_POINT_BITS failed (>15)"
-#endif
+  //#if O2_LSH_N_POINT_BITS > 28
+  //#error "AudioDB Compile ERROR: consistency check of O2_LSH_POINT_BITS failed (>15)"
+  //#endif
   
   dbH->flags |= LSH_N_POINT_BITS << 28;
 

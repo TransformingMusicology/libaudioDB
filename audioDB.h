@@ -69,8 +69,6 @@
 // Because we work in Radius^2 units,
 // The sqrt of this number is the multiplier on the radius
 
-#define O2_LSH_EXACT_MULT 1
-
 #define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
 #define O2_FORMAT_VERSION (4U)

@@ -252,9 +252,9 @@ H::~H(){
       }
       delete[] H::h[ j ];
   }
-  delete[] H::r1;
-  delete[] H::r2;
-  delete[] H::h;
+    delete[] H::r1;
+    delete[] H::r2;
+    delete[] H::h;
 }
 
 
@@ -472,6 +472,7 @@ G::G(char* filename, bool lshInCoreFlag):
   calling_instance(0),
   add_point_callback(0)
 {
+  FILE* dbFile = 0;
   int dbfid = unserialize_lsh_header(filename);
   indexName = new char[O2_INDEX_MAXSTR];
   strncpy(indexName, filename, O2_INDEX_MAXSTR); // COPY THE CONTENTS TO THE NEW POINTER
@@ -485,16 +486,21 @@ G::G(char* filename, bool lshInCoreFlag):
 
   // Format2 always needs unserializing
   if(lshHeader->flags&O2_SERIAL_FILEFORMAT2 && lshInCoreFlag){
-    FILE* dbFile = fdopen(dbfid, "rb");
+    dbFile = fdopen(dbfid, "rb");
     if(!dbFile)
       error("Cannot open LSH file for reading", filename);
     unserialize_lsh_hashtables_format2(dbFile);
   }
   serial_close(dbfid);
+  if(dbFile){
+    fclose(dbFile);
+    dbFile = 0;
+  }
 }
 
 G::~G(){
   delete lshHeader;
+  delete[] indexName;
 }
 
 // single point insertion; inserted values are hash value and pointID
@@ -680,7 +686,7 @@ void G::serialize(char* filename, Uns32T serialFormat){
   int dbfid;
   char* db;
   int dbIsNew=0;
-
+  FILE* dbFile = 0;
   // Check requested serialFormat
   if(!(serialFormat==O2_SERIAL_FILEFORMAT1 || serialFormat==O2_SERIAL_FILEFORMAT2))
     error("Unrecognized serial file format request: ", "serialize()");
@@ -717,7 +723,7 @@ void G::serialize(char* filename, Uns32T serialFormat){
   if(serialFormat == O2_SERIAL_FILEFORMAT1)
     serialize_lsh_hashtables_format1(dbfid, !dbIsNew);
   else{
-    FILE* dbFile = fdopen(dbfid, "r+b");
+    dbFile = fdopen(dbfid, "r+b");
     if(!dbFile)
       error("Cannot open LSH file for writing",filename);
     serialize_lsh_hashtables_format2(dbFile, !dbIsNew);
@@ -736,6 +742,10 @@ void G::serialize(char* filename, Uns32T serialFormat){
     serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
   }  
     serial_close(dbfid);
+    if(dbFile){
+      fclose(dbFile);
+      dbFile = 0;
+    }
 }
 
 // Test to see if core structure and requested format is
