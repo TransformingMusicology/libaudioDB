@@ -55,11 +55,11 @@ void audioDB::create(const char* dbName){
   // For backward-compatibility, Record the point-encoding parameter for LSH indexing in the adb header
   // If this value is 0 then it will be set to 14
 
-  //#if O2_LSH_N_POINT_BITS > 28
-  //#error "AudioDB Compile ERROR: consistency check of O2_LSH_POINT_BITS failed (>15)"
-  //#endif
+  #if LSH_N_POINT_BITS > 31
+  #error "AudioDB Compile ERROR: consistency check of O2_LSH_POINT_BITS failed (>31)"
+  #endif
   
-  dbH->flags |= LSH_N_POINT_BITS << 28;
+  dbH->flags |= LSH_N_POINT_BITS << 27;
 
   // If database will fit in a single file the vectors are copied into the AudioDB instance
   // Else all the vectors are left on the FileSystem and we use the dataOffset as storage

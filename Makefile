@@ -71,7 +71,7 @@ tags:
 
 
 clean:
-	-rm cmdline.c cmdline.h
+	-rm cmdline.c cmdline.h cmdline.o
 	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
 	-rm adb.*
 	-rm HELP.txt

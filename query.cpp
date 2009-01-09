@@ -70,10 +70,20 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
     }
     break;
   case O2_ONE_TO_ONE_N_SEQUENCE_QUERY :
+    if(no_unit_norming)
+      normalizedDistance = false;
     if(radius == 0) {
       error("query-type not yet supported");
-    } else {
-      reporter = new trackSequenceQueryRadNNReporterOneToOne(pointNN,trackNN, dbH->numFiles);
+    }
+    else {
+      if(index_exists(dbName, radius, sequenceLength)){
+	char* indexName = index_get_name(dbName, radius, sequenceLength);
+	lsh = index_allocate(indexName, false);
+	reporter = new trackSequenceQueryRadNNReporterOneToOne(pointNN,trackNN, index_to_trackID(lsh->get_maxp(), lsh_n_point_bits)+1);
+	delete[] indexName;
+      } 
+      else
+	reporter = new trackSequenceQueryRadNNReporterOneToOne(pointNN,trackNN, dbH->numFiles);
     }
     break;
   default:

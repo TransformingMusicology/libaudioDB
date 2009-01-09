@@ -589,6 +589,7 @@ int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
   else
     set_up_query(&query_data, &query, &qNorm, &qnPtr, &qPower, &qpPtr, &meanQdur, &numVectors); // get query vectors
 
+  close(infid); // Free up this file handle
   VERB_LOG(1, "retrieving tracks...");
   
   assert(pointNN>0 && pointNN<=O2_MAXNN);
