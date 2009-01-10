@@ -1,0 +1,93 @@
+Currently supported query types:
+
+O2_POINT_QUERY
+  * dot_product
+
+    Find and report, from the database, up to "pointNN"
+    near-neighbours of length-1 query sequences.
+
+O2_TRACK_QUERY
+  * dot_product
+
+    Find, in each track, up to "pointNN" near-neighbours of length-1
+    query sequences, reporting the top "trackNN" tracks, ordered by
+    the average distance of the pairwise matches.
+
+O2_SEQUENCE_QUERY
+  - radius, + radius
+  * euclidean_normed, euclidean
+
+O2_N_SEQUENCE_QUERY
+  - radius, + radius
+  * euclidean_normed, euclidean
+
+    Find, in each track, up to "pointNN" near-neighbours of query
+    sequences.  Report the results from the "trackNN" top tracks,
+    where the tracks are ordered by the average distance of the
+    retrieved pairwise matches.  The difference between SEQUENCE and
+    N_SEQUENCE is that the SEQUENCE case reports only the average,
+    while the N_SEQUENCE reports the individual points too.
+
+    (Ordering by average is arbitrary, and it's not hard to construct
+    cases where it is suboptimal.  The two cases where it is not
+    arbitrary are when pointNN is 1, and when trackNN is equal to the
+    number of files in the database.)
+
+O2_ONE_TO_ONE_N_SEQUENCE_QUERY
+  + radius
+  * euclidean_normed
+
+    For all applicable query sequences, find and report the closest
+    target instance point.  Each query sequence is responsible for
+    exactly one result.
+
+    (This feels like it should be more orthogonal than a separate
+    query type; the restriction on using a target instance point only
+    once in a match seems like it should compose with the sequencing
+    query above.)
+
+Plan:
+
+We have 
+
+  reporter->add_point(), 
+  reporter->report().  
+
+Insert into the whole shebang a new class Accumulator, with methods
+
+  void accumulator->add_point()
+  adb_query_results *accumulator->get_points()
+
+The accumulator has to be responsible for keeping track of how many
+points (total, or per track) there are so far; ->get_points() has to
+make the final decision about which points to preserve.  So sadly we
+can't be completely on the side of the angels and have only one single
+accumulator class, as POINT_QUERY is different from all the others.
+(Though maybe we can with a suitably careful use of the "if"
+construct).
+
+We don't have to alter the Reporter class at all.  The query loop goes
+roughly
+
+  choose point pair
+    if(everything OK with point pair)
+      accumulator->add_point()
+  loop
+
+  results = accumulator->get_points()
+
+  for matches in results
+    reporter->add_point(match)
+  loop
+
+  reporter->report()
+
+This separation is engineered (ha) such that everything after the last
+use of the accumulator doesn't need to be in libaudiodb; the return
+value from audiodb_query() can be "results" in the above, and then the
+command-line binary and SOAP server can do whatever weird mangling to
+the results they want to.
+
+We still need to be careful in the accumulator to defend against some
+of the weird things that our query implementation might choose to do:
+insert the same hit multiple times or some such.

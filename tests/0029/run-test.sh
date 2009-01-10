@@ -62,14 +62,16 @@ echo testfeature 1 1 0 > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-0.8 -p 0 > testoutput
-echo testfeature 1 0 0 > test-expected-output
-cmp testoutput test-expected-output
+echo testfeature 1 0 0 > test-expected-output1
+echo testfeature 1 0 2 > test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 ${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-0.8 -p 1 > testoutput
 cat /dev/null > test-expected-output
 cmp testoutput test-expected-output
 
 ${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --relative-threshold=0.1 -p 0 > testoutput
-echo testfeature 1 0 0 > test-expected-output
-cmp testoutput test-expected-output
+echo testfeature 1 0 0 > test-expected-output1
+echo testfeature 1 0 2 > test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 
 exit 104

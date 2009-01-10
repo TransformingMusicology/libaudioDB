@@ -12,75 +12,85 @@
 // 19th August 2008 - added O2_FLAG_LARGE_ADB support
 
 #include "audioDB.h"
-#include "ReporterBase.h"
+#include "audioDB-internals.h"
 
-
-/************************* LSH point index to audioDB conversion  *****************/
-Uns32T audioDB::index_to_trackID(Uns32T lshID, Uns32T nPntBits){
-  assert(nPntBits);
-  return lshID>>nPntBits;
-}
-
-Uns32T audioDB::index_to_trackPos(Uns32T lshID, Uns32T nPntBits){
-  assert(nPntBits);
-  return lshID&((1<<nPntBits)-1);
-}
-
-Uns32T audioDB::index_from_trackInfo(Uns32T trackID, Uns32T spos, Uns32T nPntBits){
-  assert(nPntBits);
-  return (trackID << nPntBits) | spos;
-}
+typedef struct adb_qcallback {
+  adb_t *adb;
+  adb_qstate_internal_t *qstate;
+} adb_qcallback_t;
 
 /************************* LSH indexing and query initialization  *****************/
 
-char* audioDB::index_get_name(const char*dbName, double radius, Uns32T sequenceLength){
-  char* indexName = new char[MAXSTR];  
-  // Attempt to make new file
-  if(strlen(dbName) > (MAXSTR - 32))
-    error("dbName is too long for LSH index filename appendages");
+/* FIXME: there are several things wrong with this: the memory
+ * discipline isn't ideal, the radius printing is a bit lame, the name
+ * getting will succeed or fail depending on whether the path was
+ * relative or absolute -- but most importantly encoding all that
+ * information in a filename is going to lose: it's impossible to
+ * maintain backwards-compatibility.  Instead we should probably store
+ * the index metadata inside the audiodb instance. */
+char *audiodb_index_get_name(const char *dbName, double radius, Uns32T sequenceLength) {
+  char *indexName;
+  if(strlen(dbName) > (MAXSTR - 32)) {
+    return NULL;
+  }
+  indexName = new char[MAXSTR];  
   strncpy(indexName, dbName, MAXSTR);
   sprintf(indexName+strlen(dbName), ".lsh.%019.9f.%d", radius, sequenceLength);
   return indexName;
 }
 
-// return true if index exists else return false
-int audioDB::index_exists(const char* dbName, double radius, Uns32T sequenceLength){
-  // Test to see if file exists
-  char* indexName = index_get_name(dbName, radius, sequenceLength);
-  lshfid = open (indexName, O_RDONLY);
-  delete[] indexName;
-  close(lshfid);
-  
-  if(lshfid<0)
-    return false;  
-  else
-    return true;
-}
-
-// If we are a server and have a memory-resident index, check the indexName against the resident index (using get_indexName())
-// If they match, i.e. path+dbName_resident == path+dbName_requested, use
-// the memory-resident index.
-// Else allocate a new LSH instance and load the index from disk
-LSH* audioDB::index_allocate(char* indexName, bool load_hashTables){
-  LSH* gIndx=SERVER_LSH_INDEX_SINGLETON;
-  if(isServer && gIndx && (strncmp(gIndx->get_indexName(), indexName, MAXSTR)==0) )
-    audioDB::lsh = gIndx; // Use the global SERVER resident index
-  else{
-    if(audioDB::lsh)
-      delete audioDB::lsh;
-    audioDB::lsh = new LSH(indexName, load_hashTables);
+bool audiodb_index_exists(const char *dbName, double radius, Uns32T sequenceLength) {
+  char *indexName = audiodb_index_get_name(dbName, radius, sequenceLength);
+  if(!indexName) {
+    return false;
   }
-  assert(audioDB::lsh);  
-  return audioDB::lsh;
+  struct stat st;
+  if(stat(indexName, &st)) {
+    delete [] indexName;
+    return false;
+  }
+  /* FIXME: other stat checks here? */
+  /* FIXME: is there any better way to check whether we can open a
+   * file for reading than by opening a file for reading? */
+  int fd = open(indexName, O_RDONLY);
+  delete [] indexName;
+  if(fd < 0) {
+    return false;
+  } else {
+    close(fd);
+    return true;
+  }
 }
 
-vector<vector<float> >* audioDB::index_initialize_shingles(Uns32T sz){
-  if(vv)
-    delete vv;
-  vv = new vector<vector<float> >(sz);
-  for(Uns32T i=0 ; i < sz ; i++)
-    (*vv)[i]=vector<float>(dbH->dim*sequenceLength);  // allocate shingle storage
+/* FIXME: the indexName arg should be "const char *", but the LSH
+ * library doesn't like that.
+ */
+LSH *audiodb_index_allocate(adb_t *adb, char *indexName, bool load_tables) {
+  LSH *lsh;
+  if(adb->cached_lsh) {
+    if(!strncmp(adb->cached_lsh->get_indexName(), indexName, MAXSTR)) {
+      return adb->cached_lsh;
+    } else {
+      delete adb->cached_lsh;
+    }
+  }
+  lsh = new LSH(indexName, load_tables);
+  if(load_tables) {
+    adb->cached_lsh = lsh;
+  } 
+  return lsh;
+}
+
+vector<vector<float> > *audiodb_index_initialize_shingles(Uns32T sz, Uns32T dim, Uns32T seqLen) {
+  std::vector<std::vector<float> > *vv = new vector<vector<float> >(sz);
+  for(Uns32T i=0 ; i < sz ; i++) {
+    (*vv)[i]=vector<float>(dim * seqLen);
+  }
   return vv;
+}
+
+void audiodb_index_delete_shingles(vector<vector<float> > *vv) {
+  delete vv;
 }
 
 /********************  LSH indexing audioDB database access forall s \in {S} ***********************/
@@ -105,11 +115,11 @@ void audioDB::index_initialize(double **snp, double **vsnp, double **spp, double
   
   for(Uns32T i = 0; i < dbH->numFiles; i++){
     if(trackTable[i] >= sequenceLength) {
-      sequence_sum(snpp, trackTable[i], sequenceLength);
-      sequence_sqrt(snpp, trackTable[i], sequenceLength);
+      audiodb_sequence_sum(snpp, trackTable[i], sequenceLength);
+      audiodb_sequence_sqrt(snpp, trackTable[i], sequenceLength);
       
-      sequence_sum(sppp, trackTable[i], sequenceLength);
-      sequence_average(sppp, trackTable[i], sequenceLength);
+      audiodb_sequence_sum(sppp, trackTable[i], sequenceLength);
+      audiodb_sequence_average(sppp, trackTable[i], sequenceLength);
     }
     snpp += trackTable[i];
     sppp += trackTable[i];
@@ -122,6 +132,80 @@ void audioDB::index_initialize(double **snp, double **vsnp, double **spp, double
   lseek(dbfid, dbH->dataOffset, SEEK_SET);
 }
 
+
+/********************* LSH shingle construction ***************************/
+
+// Construct shingles out of a feature matrix
+// inputs:
+// idx is vector index in feature matrix
+// fvp is base feature matrix pointer double* [numVecs x dbH->dim]
+//
+// pre-conditions: 
+// dbH->dim 
+// sequenceLength
+// idx < numVectors - sequenceLength + 1
+//
+// post-conditions:
+// (*vv)[idx] contains a shingle with dbH->dim*sequenceLength float values
+
+static void audiodb_index_make_shingle(vector<vector<float> >* vv, Uns32T idx, double* fvp, Uns32T dim, Uns32T seqLen){
+  assert(idx<(*vv).size());
+  vector<float>::iterator ve = (*vv)[idx].end();
+  vector<float>::iterator vi = (*vv)[idx].begin();
+  // First feature vector in shingle
+  if(idx == 0) {
+    while(vi!=ve) {
+      *vi++ = (float)(*fvp++);
+    }
+  } else {
+    // Not first feature vector in shingle
+    vector<float>::iterator ui=(*vv)[idx-1].begin() + dim;
+    // Previous seqLen-1 dim-vectors
+    while(vi!=ve-dim) {
+      *vi++ = *ui++;
+    }
+    // Move data pointer to next feature vector
+    fvp += ( seqLen + idx - 1 ) * dim ;
+    // New d-vector
+    while(vi!=ve) {
+      *vi++ = (float)(*fvp++);
+    }
+  }
+}
+
+// norm shingles
+// in-place norming, no deletions
+// If using power, return number of shingles above power threshold
+int audiodb_index_norm_shingles(vector<vector<float> >* vv, double* snp, double* spp, Uns32T dim, Uns32T seqLen, double radius, bool normed_vectors, bool use_pthreshold, float pthreshold) {
+  int z = 0; // number of above-threshold shingles
+  float l2norm;
+  double power;
+  float oneOverRadius = 1./(float)sqrt(radius); // Passed radius is really radius^2
+  float oneOverSqrtl2NormDivRad = oneOverRadius;
+  Uns32T shingleSize = seqLen * dim;
+
+  if(!spp) {
+    return -1;
+  }
+  for(Uns32T a=0; a<(*vv).size(); a++){
+    l2norm = (float)(*snp++);
+    if(normed_vectors)
+      oneOverSqrtl2NormDivRad = (1./l2norm)*oneOverRadius;
+    
+    for(Uns32T b=0; b < shingleSize ; b++)
+      (*vv)[a][b]*=oneOverSqrtl2NormDivRad;
+
+    power = *spp++;
+    if(use_pthreshold){
+      if (power >= pthreshold)
+	z++;
+    }
+    else
+      z++;	
+  }
+  return z;
+}
+  
 
 /************************ LSH indexing ***********************************/
 void audioDB::index_index_db(const char* dbName){
@@ -141,7 +225,10 @@ void audioDB::index_index_db(const char* dbName){
   if(dbH->flags & O2_FLAG_TIMES)
     usingTimes = true;
 
-  newIndexName = index_get_name(dbName, radius, sequenceLength);
+  newIndexName = audiodb_index_get_name(dbName, radius, sequenceLength);
+  if(!newIndexName) {
+    error("failed to get index name", dbName);
+  }
 
   // Set unit norming flag override
   audioDB::normalizedDistance = !audioDB::no_unit_norming;
@@ -183,6 +270,7 @@ void audioDB::index_index_db(const char* dbName){
     // Clean up
     delete lsh;
     lsh = 0;
+  } else {
     close(lshfid);
   }
   
@@ -195,7 +283,7 @@ void audioDB::index_index_db(const char* dbName){
     // Get the lsh header info and find how many tracks are inserted already
     lsh = new LSH(mergeIndexName, false); // lshInCore=false to avoid loading hashTables here
     assert(lsh);
-    Uns32T maxs = index_to_trackID(lsh->get_maxp(), lsh_n_point_bits)+1;
+    Uns32T maxs = audiodb_index_to_track_id(lsh->get_maxp(), audiodb_lsh_n_point_bits(adb))+1;
     delete lsh;
     lsh = 0;
 
@@ -239,6 +327,28 @@ void audioDB::index_index_db(const char* dbName){
 }
 
 
+void audioDB::insertPowerData(unsigned numVectors, int powerfd, double *powerdata) {
+  if(usingPower){
+    int one;
+    unsigned int count;
+    
+    count = read(powerfd, &one, sizeof(unsigned int));
+    if (count != sizeof(unsigned int)) {
+      error("powerfd read failed", "int", "read");
+    }
+    if (one != 1) {
+      error("dimensionality of power file not 1", powerFileName);
+    }
+    
+    // FIXME: should check that the powerfile is the right size for
+    // this.  -- CSR, 2007-10-30
+    count = read(powerfd, powerdata, numVectors * sizeof(double));
+    if (count != numVectors * sizeof(double)) {
+      error("powerfd read failed", "double", "read");
+    }
+  }
+}
+
 // initialize auxillary track data from filesystem
 // pre-conditions:
 // dbH->flags & O2_FLAG_LARGE_ADB
@@ -281,17 +391,17 @@ void audioDB::init_track_aux_data(Uns32T trackID, double* fvp, double** sNormpp,
       close(powerfd);
     }
     
-    sequence_sum(*sPowerp, trackTable[trackID], sequenceLength);
-    sequence_average(*sPowerp, trackTable[trackID], sequenceLength);
+    audiodb_sequence_sum(*sPowerp, trackTable[trackID], sequenceLength);
+    audiodb_sequence_average(*sPowerp, trackTable[trackID], sequenceLength);
     powerTable = 0;
 
     // Allocate and calculate the l2norm sequence
     *sNormpp = new double[trackTable[trackID]];
     assert(*sNormpp);
     *snPtrp = *sNormpp;
-    unitNorm(fvp, dbH->dim, trackTable[trackID], *sNormpp);
-    sequence_sum(*sNormpp, trackTable[trackID], sequenceLength);
-    sequence_sqrt(*sNormpp, trackTable[trackID], sequenceLength);
+    audiodb_l2norm_buffer(fvp, dbH->dim, trackTable[trackID], *sNormpp);
+    audiodb_sequence_sum(*sNormpp, trackTable[trackID], sequenceLength);
+    audiodb_sequence_sqrt(*sNormpp, trackTable[trackID], sequenceLength);
   }
 }
 
@@ -314,10 +424,11 @@ void audioDB::index_insert_tracks(Uns32T start_track, Uns32T end_track,
       prefix_name((char ** const) &prefixedString, adb_feature_root);
       if(prefixedString!=tmpStr)
 	delete[] tmpStr;
-      initInputFile(prefixedString, false); // nommap, file pointer at correct position
+      initInputFile(prefixedString);
       trackfd = infid;
     }
-    read_data(trackfd, trackID, &fvp, &nfv); // over-writes fvp and nfv
+    if(audiodb_read_data(adb, trackfd, trackID, &fvp, &nfv))
+      error("failed to read data");
     *fvpp = fvp; // Protect memory allocation and free() for track data
     
     if( dbH->flags & O2_FLAG_LARGE_ADB )
@@ -355,17 +466,23 @@ int audioDB::index_insert_track(Uns32T trackID, double** fvpp, double** snpp, do
   
   Uns32T numVecsAboveThreshold = 0, collisionCount = 0; 
   if(numVecs){
-    vv = index_initialize_shingles(numVecs);
+    std::vector<std::vector<float> > *vv = audiodb_index_initialize_shingles(numVecs, dbH->dim, sequenceLength);
     
     for( Uns32T pointID = 0 ; pointID < numVecs; pointID++ )
-      index_make_shingle(vv, pointID, *fvpp, dbH->dim, sequenceLength);
-    
-    numVecsAboveThreshold = index_norm_shingles(vv, *snpp, *sppp);
+      audiodb_index_make_shingle(vv, pointID, *fvpp, dbH->dim, sequenceLength);
+    int vcount = audiodb_index_norm_shingles(vv, *snpp, *sppp, dbH->dim, sequenceLength, radius, normalizedDistance, use_absolute_threshold, absolute_threshold);
+    if(vcount == -1) {
+      audiodb_index_delete_shingles(vv);
+      error("failed to norm shingles");
+    }
+    numVecsAboveThreshold = vcount;
     collisionCount = index_insert_shingles(vv, trackID, *sppp);
+    audiodb_index_delete_shingles(vv);
   }
+
   float meanCollisionCount = numVecsAboveThreshold?(float)collisionCount/numVecsAboveThreshold:0;
 
-  /* index_norm_shingles() only goes as far as the end of the
+  /* audiodb_index_norm_shingles() only goes as far as the end of the
      sequence, which is right, but the space allocated is for the
      whole track.  */
 
@@ -389,270 +506,177 @@ Uns32T audioDB::index_insert_shingles(vector<vector<float> >* vv, Uns32T trackID
   cout << "[" << trackID << "]" << fileTable+trackID*O2_FILETABLE_ENTRY_SIZE;
   for( Uns32T pointID=0 ; pointID < (*vv).size(); pointID+=sequenceHop){
     if(!use_absolute_threshold || (use_absolute_threshold && (*spp >= absolute_threshold)))
-      collisionCount += lsh->insert_point((*vv)[pointID], index_from_trackInfo(trackID, pointID, lsh_n_point_bits));
+      collisionCount += lsh->insert_point((*vv)[pointID], audiodb_index_from_trackinfo(trackID, pointID, audiodb_lsh_n_point_bits(adb)));
     spp+=sequenceHop;
     }
   return collisionCount;
 }
 
-/********************* LSH shingle construction ***************************/
-
-// Construct shingles out of a feature matrix
-// inputs:
-// idx is vector index in feature matrix
-// fvp is base feature matrix pointer double* [numVecs x dbH->dim]
-//
-// pre-conditions: 
-// dbH->dim 
-// sequenceLength
-// idx < numVectors - sequenceLength + 1
-//
-// post-conditions:
-// (*vv)[idx] contains a shingle with dbH->dim*sequenceLength float values
-
-void audioDB::index_make_shingle(vector<vector<float> >* vv, Uns32T idx, double* fvp, Uns32T dim, Uns32T seqLen){
-  assert(idx<(*vv).size());
-  vector<float>::iterator ve = (*vv)[idx].end();
-  vi=(*vv)[idx].begin();        // shingle iterator  
-  // First feature vector in shingle
-  if(idx==0){
-    while(vi!=ve)
-      *vi++ = (float)(*fvp++);
-  }
-  // Not first feature vector in shingle
-  else{
-    vector<float>::iterator ui=(*vv)[idx-1].begin() + dim; // previous shingle iterator
-    // Previous seqLen-1 dim-vectors
-    while(vi!=ve-dim)
-      *vi++=*ui++;
-    // Move data pointer to next feature vector
-    fvp += ( seqLen + idx - 1 ) * dim ;
-    // New d-vector
-    while(vi!=ve)
-      *vi++ = (float)(*fvp++);
-  }
-}
-
-// norm shingles
-// in-place norming, no deletions
-// If using power, return number of shingles above power threshold
-int audioDB::index_norm_shingles(vector<vector<float> >* vv, double* snp, double* spp){  
-  int z = 0; // number of above-threshold shingles
-  float l2norm;
-  double power;
-  float oneOverRadius = 1./(float)sqrt(radius); // Passed radius is really radius^2
-  float oneOverSqrtl2NormDivRad = oneOverRadius;
-  if(!spp)
-    error("LSH indexing and query requires a power feature using -w or -W");
-  Uns32T shingleSize = sequenceLength*dbH->dim;
-  for(Uns32T a=0; a<(*vv).size(); a++){
-    l2norm = (float)(*snp++);
-    if(audioDB::normalizedDistance)
-      oneOverSqrtl2NormDivRad = (1./l2norm)*oneOverRadius;
-    
-    for(Uns32T b=0; b < shingleSize ; b++)
-      (*vv)[a][b]*=oneOverSqrtl2NormDivRad;
-
-    power = *spp++;
-    if(use_absolute_threshold){
-      if ( power >= absolute_threshold )
-	z++;
-    }
-    else
-      z++;	
-  }
-  return z;
-}
-  
-
 /*********************** LSH retrieval ****************************/
 
 
 // return true if indexed query performed else return false
-int audioDB::index_init_query(const char* dbName){
+int audiodb_index_init_query(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_internal_t *qstate, bool corep) {
 
-  if(!(index_exists(dbName, radius, sequenceLength)))
+  uint32_t sequence_length = spec->qid.sequence_length;
+  double radius = spec->refine.radius;
+  if(!(audiodb_index_exists(adb->path, radius, sequence_length)))
     return false;
 
-  char* indexName = index_get_name(dbName, radius, sequenceLength);  
-
-  // Test to see if file exists
-  if((lshfid = open (indexName, O_RDONLY)) < 0){
-    delete[] indexName;
-    return false;  
+  char *indexName = audiodb_index_get_name(adb->path, radius, sequence_length);
+  if(!indexName) {
+    return false;
   }
 
-  lsh = index_allocate(indexName, false); // Get the header only here
-  sequenceLength = lsh->get_lshHeader()->dataDim / dbH->dim; // shingleDim / vectorDim
-  
-  if(lsh!=SERVER_LSH_INDEX_SINGLETON){  
-    if( fabs(radius - lsh->get_radius())>fabs(O2_DISTANCE_TOLERANCE))
-      printf("*** Warning: adb_radius (%f) != lsh_radius (%f) ***\n", radius, lsh->get_radius());
-    VERB_LOG(1,"INDEX: dim %d\n", (int)dbH->dim);
-    VERB_LOG(1,"INDEX: R %f\n", lsh->get_radius());
-    VERB_LOG(1,"INDEX: seqlen %d\n", sequenceLength);
-    VERB_LOG(1,"INDEX: w %f\n", lsh->get_lshHeader()->get_binWidth());
-    VERB_LOG(1,"INDEX: k %d\n", lsh->get_lshHeader()->get_numFuns());
-    VERB_LOG(1,"INDEX: L (m*(m-1))/2 %d\n", lsh->get_lshHeader()->get_numTables());
-    VERB_LOG(1,"INDEX: N %d\n", lsh->get_lshHeader()->get_numRows());
-    VERB_LOG(1,"INDEX: s %d\n", index_to_trackID(lsh->get_maxp(), lsh_n_point_bits));
-    VERB_LOG(1,"INDEX: Opened LSH index file %s\n", indexName);
+  qstate->lsh = audiodb_index_allocate(adb, indexName, corep);
+
+  /* FIXME: it would be nice if the LSH library didn't make me do
+   * this. */
+  if((!corep) && (qstate->lsh->get_lshHeader()->flags & O2_SERIAL_FILEFORMAT2)) {
+    delete qstate->lsh;
+    qstate->lsh = audiodb_index_allocate(adb, indexName, true);
   }
 
-  // Check to see if we are loading hash tables into core, and do so if true
-  if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core){
-    if(SERVER_LSH_INDEX_SINGLETON)
-      fprintf(stderr,"INDEX: using persistent hash tables: %s\n", lsh->get_indexName());
-    else
-      VERB_LOG(1,"INDEX: loading hash tables into core %s\n", (lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2)?"FORMAT2":"FORMAT1");
-    lsh = index_allocate(indexName, true);
-  }
-  
   delete[] indexName;
   return true;
 }
 
-// *Static* exact NN point reporter callback method for lshlib
-void audioDB::index_add_point(void* instancePtr, Uns32T pointID, Uns32T qpos, float dist){
-  assert(instancePtr); // We need an instance for this callback
-  audioDB* myself = (audioDB*) instancePtr; // Use explicit cast to recover "this" instance  
-  Uns32T trackID = index_to_trackID(pointID, myself->lsh_n_point_bits);
-  Uns32T spos = index_to_trackPos(pointID, myself->lsh_n_point_bits);
-  // Skip identity in query_from_key
-  if( (!myself->query_from_key || (myself->query_from_key && ( trackID != myself->query_from_key_index ))) 
-      && (!myself->trackFile || myself->is_in_allowed_keys(trackID)) )
-    if(myself->lsh_exact)
-      myself->index_insert_exact_evaluation_queue(trackID, qpos, spos);
-    else    
-      myself->reporter->add_point(trackID, qpos, spos, dist);
-}      
-
-int audioDB::is_in_allowed_keys(Uns32T trackID){
-  std::set<Uns32T>::iterator it;
-  if(!allowed_keys)
-    return 0;
-  it = allowed_keys->find(trackID);
-  if(it == allowed_keys->end())
-    return 0;
-  else
-    return 1;
+void audiodb_index_add_point_approximate(void *user_data, Uns32T pointID, Uns32T qpos, float dist) {
+  adb_qcallback_t *data = (adb_qcallback_t *) user_data;
+  adb_t *adb = data->adb;
+  adb_qstate_internal_t *qstate = data->qstate;
+  uint32_t nbits = audiodb_lsh_n_point_bits(adb);
+  uint32_t trackID = audiodb_index_to_track_id(pointID, nbits);
+  uint32_t spos = audiodb_index_to_track_pos(pointID, nbits);
+  std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
+  if(qstate->allowed_keys->find((*adb->keys)[trackID]) != keys_end) {
+    adb_result_t r;
+    r.key = (*adb->keys)[trackID].c_str();
+    r.dist = dist;
+    r.qpos = qpos;
+    r.ipos = spos;
+    qstate->accumulator->add_point(&r);
+  }
 }
 
-void audioDB::initialize_exact_evalutation_queue(){
-  if(exact_evaluation_queue)
-    delete exact_evaluation_queue;
-  exact_evaluation_queue = new priority_queue<PointPair, std::vector<PointPair>, std::less<PointPair> >;
+// Maintain a queue of points to pass to audiodb_query_queue_loop()
+// for exact evaluation
+void audiodb_index_add_point_exact(void *user_data, Uns32T pointID, Uns32T qpos, float dist) {
+  adb_qcallback_t *data = (adb_qcallback_t *) user_data;
+  adb_t *adb = data->adb;
+  adb_qstate_internal_t *qstate = data->qstate;
+  uint32_t nbits = audiodb_lsh_n_point_bits(adb);
+  uint32_t trackID = audiodb_index_to_track_id(pointID, nbits);
+  uint32_t spos = audiodb_index_to_track_pos(pointID, nbits);
+  std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
+  if(qstate->allowed_keys->find((*adb->keys)[trackID]) != keys_end) {
+    PointPair p(trackID, qpos, spos);
+    qstate->exact_evaluation_queue->push(p);
+  }
 }
 
-void audioDB::initialize_allowed_keys(std::ifstream* trackFile){
-  Uns32T trackIndex;
-  char nextKey[MAXSTR];
-
-  allowed_keys = new std::set<Uns32T>;
-  // Read keys from file, look up the index for each and insert in allowed_keys set
-  do {
-    trackFile->getline(nextKey,MAXSTR);
-    if(!trackFile->eof()) {
-      trackIndex = getKeyPos(nextKey);
-      allowed_keys->insert(trackIndex);
-    }
-  } while(!trackFile->eof());
-} 
-
-void audioDB::index_insert_exact_evaluation_queue(Uns32T trackID, Uns32T qpos, Uns32T spos){
-  PointPair p(trackID, qpos, spos);
-  exact_evaluation_queue->push(p);
-}
-
+// return -1 on error
 // return 0: if index does not exist
 // return nqv: if index exists
-int audioDB::index_query_loop(const char* dbName, Uns32T queryIndex) {
+int audiodb_index_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_internal_t *qstate) {
   
-  unsigned int numVectors = 0;
   double *query = 0, *query_data = 0;
-  double *qNorm = 0, *qnPtr = 0, *qPower = 0, *qpPtr = 0;
-  double meanQdur = 0;
-  void (*add_point_func)(void*,Uns32T,Uns32T,float);
+  adb_qpointers_internal_t qpointers = {0};
   
-  // Set the point-reporter callback based on the value of lsh_exact
-  if(lsh_exact)
-    initialize_exact_evalutation_queue();
-  add_point_func = &index_add_point;
+  adb_qcallback_t callback_data;
+  callback_data.adb = adb;
+  callback_data.qstate = qstate;
 
-  if(!index_init_query(dbName)) // sets-up LSH index structures for querying
+  void (*add_point_func)(void *, uint32_t, uint32_t, float);
+
+  uint32_t sequence_length = spec->qid.sequence_length;
+  bool normalized = (spec->params.distance == ADB_DISTANCE_EUCLIDEAN_NORMED);
+  double radius = spec->refine.radius;
+  bool use_absolute_threshold = spec->refine.flags & ADB_REFINE_ABSOLUTE_THRESHOLD;
+  double absolute_threshold = spec->refine.absolute_threshold;
+
+  if(spec->qid.flags & ADB_QID_FLAG_ALLOW_FALSE_POSITIVES) {
+    add_point_func = &audiodb_index_add_point_approximate;  
+  } else {
+    qstate->exact_evaluation_queue = new std::priority_queue<PointPair>;
+    add_point_func = &audiodb_index_add_point_exact;
+  }
+
+  /* FIXME: this hardwired lsh_in_core is here to allow for a
+   * transition period while the need for the argument is worked
+   * through.  Hopefully it will disappear again eventually. */
+  bool lsh_in_core = true;
+
+  if(!audiodb_index_init_query(adb, spec, qstate, lsh_in_core)) {
     return 0;
+  }
 
-  char* database = index_get_name(dbName, radius, sequenceLength);
+  char *database = audiodb_index_get_name(adb->path, radius, sequence_length);
+  if(!database) {
+    return -1;
+  }
 
-  if(query_from_key)
-    set_up_query_from_key(&query_data, &query, &qNorm, &qnPtr, &qPower, &qpPtr, &meanQdur, &numVectors, queryIndex);
-  else
-    set_up_query(&query_data, &query, &qNorm, &qnPtr, &qPower, &qpPtr, &meanQdur, &numVectors); // get query vectors
+  if(audiodb_query_spec_qpointers(adb, spec, &query_data, &query, &qpointers)) {
+    delete [] database;
+    return -1;
+  }
 
-  close(infid); // Free up this file handle
-  VERB_LOG(1, "retrieving tracks...");
-  
-  assert(pointNN>0 && pointNN<=O2_MAXNN);
-  assert(trackNN>0 && trackNN<=O2_MAXNN);
-
-  gettimeofday(&tv1, NULL);   
-  // query vector index
-  Uns32T Nq = (numVectors>O2_MAXTRACKLEN?O2_MAXTRACKLEN:numVectors) - sequenceLength + 1;
-  vv = index_initialize_shingles(Nq); // allocate memory to copy query vectors to shingles
-  VERB_LOG(1, "Nq=%d", Nq);
-
-  // restrictList initialization
-  if(trackFile)
-    initialize_allowed_keys(trackFile); // trackFile is list of valid keys to admit in search
+  uint32_t Nq = (qpointers.nvectors > O2_MAXTRACKLEN ? O2_MAXTRACKLEN : qpointers.nvectors) - sequence_length + 1;
+  std::vector<std::vector<float> > *vv = audiodb_index_initialize_shingles(Nq, adb->header->dim, sequence_length);
 
   // Construct shingles from query features  
-  for( Uns32T pointID = 0 ; pointID < Nq ; pointID++ ) 
-    index_make_shingle(vv, pointID, query, dbH->dim, sequenceLength);
+  for(uint32_t pointID = 0; pointID < Nq; pointID++) {
+    audiodb_index_make_shingle(vv, pointID, query, adb->header->dim, sequence_length);
+  }
   
   // Normalize query vectors
-  Uns32T numVecsAboveThreshold = index_norm_shingles( vv, qnPtr, qpPtr );
-  VERB_LOG(1, "Nq'=%d\n", numVecsAboveThreshold);
+  int vcount = audiodb_index_norm_shingles(vv, qpointers.l2norm, qpointers.power, adb->header->dim, sequence_length, radius, normalized, use_absolute_threshold, absolute_threshold);
+  if(vcount == -1) {
+    audiodb_index_delete_shingles(vv);
+    delete [] database;
+    return -1;
+  }
+  uint32_t numVecsAboveThreshold = vcount;
 
   // Nq contains number of inspected points in query file, 
   // numVecsAboveThreshold is number of points with power >= absolute_threshold
-  double* qpp = qpPtr; // Keep original qpPtr for possible exact evaluation
-  if(usingQueryPoint && numVecsAboveThreshold){
-    if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core)
-      lsh->retrieve_point((*vv)[0], queryPoint, add_point_func, (void*)this);
-    else
-      lsh->serial_retrieve_point(database, (*vv)[0], queryPoint, add_point_func, (void*)this);
-  }
-  else if(numVecsAboveThreshold)
-    for( Uns32T pointID = 0 ; pointID < Nq; pointID++ )
+  double *qpp = qpointers.power; // Keep original qpPtr for possible exact evaluation
+  if(!(spec->qid.flags & ADB_QID_FLAG_EXHAUSTIVE) && numVecsAboveThreshold) {
+    if((qstate->lsh->get_lshHeader()->flags & O2_SERIAL_FILEFORMAT2) || lsh_in_core) {
+      qstate->lsh->retrieve_point((*vv)[0], spec->qid.sequence_start, add_point_func, &callback_data);
+    } else {
+      qstate->lsh->serial_retrieve_point(database, (*vv)[0], spec->qid.sequence_start, add_point_func, &callback_data);
+    }
+  } else if(numVecsAboveThreshold) {
+    for(uint32_t pointID = 0; pointID < Nq; pointID++) {
       if(!use_absolute_threshold || (use_absolute_threshold && (*qpp++ >= absolute_threshold))) {
-	if((lsh->get_lshHeader()->flags&O2_SERIAL_FILEFORMAT2) || lsh_in_core) {
-	  lsh->retrieve_point((*vv)[pointID], pointID, add_point_func, (void*)this);
+	if((qstate->lsh->get_lshHeader()->flags & O2_SERIAL_FILEFORMAT2) || lsh_in_core) {
+	  qstate->lsh->retrieve_point((*vv)[pointID], pointID, add_point_func, &callback_data);
         } else {
-	  lsh->serial_retrieve_point(database, (*vv)[pointID], pointID, add_point_func, (void*)this);   
+	  qstate->lsh->serial_retrieve_point(database, (*vv)[pointID], pointID, add_point_func, &callback_data);   
         }
       }
+    }
+  }
+  audiodb_index_delete_shingles(vv);
 
-  if(lsh_exact)
-    // Perform exact distance computation on point pairs in exact_evaluation_queue
-    query_loop_points(query, qnPtr, qpPtr, meanQdur, numVectors); 
+  if(!(spec->qid.flags & ADB_QID_FLAG_ALLOW_FALSE_POSITIVES)) {
+    audiodb_query_queue_loop(adb, spec, qstate, query, &qpointers);
+  }
   
-  gettimeofday(&tv2,NULL);
-  VERB_LOG(1,"elapsed time: %ld msec\n",
-           (tv2.tv_sec*1000 + tv2.tv_usec/1000) - 
-           (tv1.tv_sec*1000 + tv1.tv_usec/1000))
-
-  // Close the index file
-  close(lshfid);
-    
  // Clean up
   if(query_data)
     delete[] query_data;
-  if(qNorm)
-    delete[] qNorm;
-  if(qPower)
-    delete[] qPower;
+  if(qpointers.l2norm_data)
+    delete[] qpointers.l2norm_data;
+  if(qpointers.power_data)
+    delete[] qpointers.power_data;
+  if(qpointers.mean_duration)
+    delete[] qpointers.mean_duration;
   if(database)
     delete[] database;
+  if(qstate->lsh != adb->cached_lsh)
+    delete qstate->lsh;
 
   return Nq;
 }

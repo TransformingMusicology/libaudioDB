@@ -8,10 +8,8 @@ GSOAP_INCLUDE=
 
 SHARED_LIB_FLAGS=-shared -Wl,-soname,
 
-
-
-LIBOBJS=insert.o create.o common.o dump.o query.o sample.o index.o lshlib.o cmdline.o
-OBJS=$(LIBOBJS) soap.o audioDB.o
+LIBOBJS=query.o index.o insert.o create.o common.o open.o close.o status.o dump.o power.o l2norm.o lshlib.o lock.o pointpair.o
+OBJS=$(LIBOBJS) soap.o liszt.o sample.o cmdline.o audioDB.o common.o
 
 
 EXECUTABLE=audioDB
@@ -50,20 +48,16 @@ cmdline.c cmdline.h: gengetopt.in
 soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 	$(SOAPCPP2) audioDBws.h
 
-%.o: %.cpp audioDB.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
+%.o: %.cpp audioDB.h audioDB_API.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
 	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) $(GSL_INCLUDE) -Wall  $<
 
 cmdline.o: cmdline.c cmdline.h
 	gcc -c $(CFLAGS) $<
 
-audioDB_library.o: audioDB.cpp
-	g++ -c -o $@ $(CFLAGS) $(GSOAP_INCLUDE) -Wall -DLIBRARY $< 
-
 $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 	g++ -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
-
-$(LIBRARY): $(LIBOBJS) audioDB_library.o
+$(LIBRARY): $(LIBOBJS)
 	g++ $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
 
 tags:
@@ -79,7 +73,7 @@ clean:
 	-rm xthresh
 	-sh -c "cd tests && sh ./clean.sh"
 	-sh -c "cd libtests && sh ./clean.sh"
-	-rm $(LIBRARY) audioDB_library.o
+	-rm $(LIBRARY)
 	-rm tags
 
 distclean: clean
@@ -99,4 +93,3 @@ install:
 	ln -sf /usr/local/lib/lib$(EXECUTABLE).so.$(SOVERSION) /usr/local/lib/lib$(EXECUTABLE).so
 	ldconfig
 	cp audioDB_API.h /usr/local/include/
-

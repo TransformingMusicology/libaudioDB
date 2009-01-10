@@ -1,546 +1,443 @@
 #include "audioDB.h"
-
-bool audioDB::enough_per_file_space_free() {
-  unsigned int fmaxfiles, tmaxfiles;
-  unsigned int maxfiles;
-
-  fmaxfiles = fileTableLength / O2_FILETABLE_ENTRY_SIZE;
-  tmaxfiles = trackTableLength / O2_TRACKTABLE_ENTRY_SIZE;
-  maxfiles = fmaxfiles > tmaxfiles ? tmaxfiles : fmaxfiles;
-  return(dbH->numFiles < maxfiles);
+extern "C" {
+#include "audioDB_API.h"
 }
+#include "audioDB-internals.h"
 
-bool audioDB::enough_data_space_free(off_t size) {
-    return(dbH->timesTableOffset > dbH->dataOffset + dbH->length + size);
-}
-
-void audioDB::insert_data_vectors(off_t offset, void *buffer, size_t size) {
-  if(lseek(dbfid, dbH->dataOffset + offset, SEEK_SET) == (off_t) -1) {
-    error("error seeking to offset", "", "lseek");
-  }
-  CHECKED_WRITE(dbfid, buffer, size);
-}
-
-void audioDB::insert(const char* dbName, const char* inFile) {
-  forWrite = true;
-  initTables(dbName, inFile);
-
-  if(dbH->flags & O2_FLAG_LARGE_ADB)
-    error("Single-feature inserts not allowed with LARGE audioDB instances");
-
-  if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
-    error("Must use timestamps with timestamped database","use --times");
-
-  if(!usingPower && (dbH->flags & O2_FLAG_POWER))
-    error("Must use power with power-enabled database", dbName);
-
-  if(!enough_per_file_space_free()) {
-    error("Insert failed: no more room for metadata", inFile);
-  }
-
-  if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
-    error("Insert failed: no more room in database", inFile);
-  }
-
-  if(!key)
-    key=inFile;
-  // Linear scan of filenames check for pre-existing feature
-  unsigned alreadyInserted=0;
-  for(unsigned k=0; k<dbH->numFiles; k++)
-    if(strncmp(fileTable + k*O2_FILETABLE_ENTRY_SIZE, key, strlen(key)+1)==0){
-      alreadyInserted=1;
-      break;
-    }
-
-  if(alreadyInserted) {
-    VERB_LOG(0, "key already exists in database; ignoring: %s\n", inFile);
-    // FIXME: Do we need to munmap here (see below) ? MKC 18/08/08
-    return;
-  }
-  
-  // Make a track index table of features to file indexes
-  unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-  if(!numVectors) {
-    VERB_LOG(0, "ignoring zero-length feature vector file: %s\n", key);
-
-    // CLEAN UP
-    munmap(indata,statbuf.st_size);
-    munmap(db,dbH->dbSize);
-    close(infid);
-    return;
-  }
-
-  INSERT_FILETABLE_STRING(fileTable, key);
-
-  off_t insertoffset = dbH->length;// Store current state
-
-  // Check times status and insert times from file
-  unsigned indexoffset = insertoffset/(dbH->dim*sizeof(double));
-  double *timesdata = timesTable + 2*indexoffset;
-
-  if(2*(indexoffset + numVectors) > timesTableLength) {
-    error("out of space for times", key);
-  }
-  
-  if (usingTimes) {
-    insertTimeStamps(numVectors, timesFile, timesdata);
-  }
-
-  double *powerdata = powerTable + indexoffset;
-  insertPowerData(numVectors, powerfd, powerdata);
-
-  // Increment file count
-  dbH->numFiles++;
-
-  // Update Header information
-  dbH->length+=(statbuf.st_size-sizeof(int));
-
-  // Update track to file index map
-  memcpy(trackTable + dbH->numFiles - 1, &numVectors, sizeof(unsigned));  
-
-  insert_data_vectors(insertoffset, indata + sizeof(int), statbuf.st_size - sizeof(int));
-  
-  // Norm the vectors on input if the database is already L2 normed
-  if(dbH->flags & O2_FLAG_L2NORM)
-    unitNormAndInsertL2((double *)(indata + sizeof(int)), dbH->dim, numVectors, 1); // append
-
-  // Report status
-  status(dbName);
-  VERB_LOG(0, "%s %s %u vectors %jd bytes.\n", COM_INSERT, dbName, numVectors, (intmax_t) (statbuf.st_size - sizeof(int)));
-
-  // Copy the header back to the database
-  memcpy (db, dbH, sizeof(dbTableHeaderT));  
-
-  // CLEAN UP
-  munmap(indata,statbuf.st_size);
-  close(infid);
-}
-
-void audioDB::insertTimeStamps(unsigned numVectors, std::ifstream *timesFile, double *timesdata) {
-  assert(usingTimes);
-
-  unsigned numtimes = 0;
-
-  if(!(dbH->flags & O2_FLAG_TIMES) && !dbH->numFiles) {
-    dbH->flags=dbH->flags|O2_FLAG_TIMES;
-  } else if(!(dbH->flags & O2_FLAG_TIMES)) {
-    error("Timestamp file used with non-timestamped database", timesFileName);
-  }
-   
-  if(!timesFile->is_open()) {
-    error("problem opening times file on timestamped database", timesFileName);
-  }
-
-  double timepoint, next;
-  *timesFile >> timepoint;
-  if (timesFile->eof()) {
-    error("no entries in times file", timesFileName);
-  }
-  numtimes++;
-  do {
-    *timesFile >> next;
-    if (timesFile->eof()) {
-      break;
-    }
-    numtimes++;
-    timesdata[0] = timepoint;
-    timepoint = (timesdata[1] = next);
-    timesdata += 2;
-  } while (numtimes < numVectors + 1);
-
-  if (numtimes < numVectors + 1) {
-    error("too few timepoints in times file", timesFileName);
-  }
-
-  *timesFile >> next;
-  if (!timesFile->eof()) {
-    error("too many timepoints in times file", timesFileName);
+static bool audiodb_enough_data_space_free(adb_t *adb, off_t size) {
+  adb_header_t *header = adb->header;
+  if(header->flags & O2_FLAG_LARGE_ADB) {
+    return true;
+  } else {
+    /* FIXME: timesTableOffset isn't necessarily the next biggest
+     * offset after dataOffset.  Maybe make the offsets into an array
+     * that we can iterate over... */
+    return (header->timesTableOffset > 
+            (header->dataOffset + header->length + size));
   }
 }
 
-void audioDB::insertPowerData(unsigned numVectors, int powerfd, double *powerdata) {
-  if(usingPower){
-    if (!(dbH->flags & O2_FLAG_POWER)) {
-      error("Cannot insert power data on non-power DB", dbName);
-    }
-    
-    int one;
-    unsigned int count;
-    
-    count = read(powerfd, &one, sizeof(unsigned int));
-    if (count != sizeof(unsigned int)) {
-      error("powerfd read failed", "int", "read");
-    }
-    if (one != 1) {
-      error("dimensionality of power file not 1", powerFileName);
-    }
-    
-    // FIXME: should check that the powerfile is the right size for
-    // this.  -- CSR, 2007-10-30
-    count = read(powerfd, powerdata, numVectors * sizeof(double));
-    if (count != numVectors * sizeof(double)) {
-      error("powerfd read failed", "double", "read");
-    }
+static bool audiodb_enough_per_file_space_free(adb_t *adb) {
+  /* FIXME: the comment above about the ordering of the tables applies
+     here too. */
+  adb_header_t *header = adb->header;
+  off_t file_table_length = header->trackTableOffset - header->fileTableOffset;
+  off_t track_table_length = header->dataOffset - header->trackTableOffset;
+  int fmaxfiles = file_table_length / O2_FILETABLE_ENTRY_SIZE;
+  int tmaxfiles = track_table_length / O2_TRACKTABLE_ENTRY_SIZE;
+  /* maxfiles is the _minimum_ of the two.  Do not be confused... */
+  int maxfiles = fmaxfiles > tmaxfiles ? tmaxfiles : fmaxfiles;
+  if(header->flags & O2_FLAG_LARGE_ADB) {
+    /* by default, these tables are created with the same size as the
+     * fileTable (which should be called key_table); relying on that
+     * always being the case, though, smacks of optimism, so instead
+     * we code defensively... */
+    off_t data_table_length = header->timesTableOffset - header->dataOffset;
+    off_t times_table_length = header->powerTableOffset - header->timesTableOffset;
+    off_t power_table_length = header->dbSize - header->powerTableOffset;
+    int dmaxfiles = data_table_length / O2_FILETABLE_ENTRY_SIZE;
+    int timaxfiles = times_table_length / O2_FILETABLE_ENTRY_SIZE;
+    int pmaxfiles = power_table_length / O2_FILETABLE_ENTRY_SIZE;
+    /* ... even though it means a certain amount of tedium. */
+    maxfiles = maxfiles > dmaxfiles ? dmaxfiles : maxfiles;
+    maxfiles = maxfiles > timaxfiles ? timaxfiles : maxfiles;
+    maxfiles = maxfiles > pmaxfiles ? pmaxfiles : maxfiles;
   }
+  return (header->numFiles < (unsigned int) maxfiles);
 }
 
-void audioDB::batchinsert(const char* dbName, const char* inFile) {
+/*
+ * Hey, look, a comment.  Normally I wouldn't bother, as the code
+ * should be self-documenting, but a lot of logic is concentrated in
+ * this one place, so let's give an overview beforehand.  To insert a
+ * datum into the database, we:
+ *
+ *  1. check write permission;
+ *  2. check for enough space;
+ *  3. check that datum->dim and adb->header->dim agree (or that the
+ *     header dimension is zero, in which case write datum->dim to
+ *     adb->header->dim).
+ *  4. check for presence of datum->key in adb->keymap;
+ *  5. check for consistency between power and O2_FLAG_POWER, and 
+ *     times and O2_FLAG_TIMES;
+ *  6. write in data, power, times as appropriate; add to track
+ *     and key tables too;
+ *  7. if O2_FLAG_L2NORM and !O2_FLAG_LARGE_ADB, compute norms and fill
+ *     in table;
+ *  8. update adb->keys, adb->keymap, adb->track_lengths,
+ *     adb->track_offsets and adb->header;
+ *  9. sync adb->header with disk.
+ *
+ * Step 9 essentially commits the transaction; until we update
+ * header->length, nothing will recognize the newly-written data.  In
+ * principle, if it fails, we should roll back, which we can in fact
+ * do on the assumption that nothing in step 8 can ever fail; on the
+ * other hand, if it's failed, then it's unlikely that rolling back by
+ * syncing the original header back to disk is going to work
+ * desperately well.  We should perhaps take an operating-system lock
+ * around step 9, so that we can't be interrupted part-way through
+ * (except of course for SIGKILL, but if we're hit with that we will
+ * always lose).
+ */
+static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum) {
 
-  forWrite = true;
-  initDBHeader(dbName);
+  off_t size, offset, nfiles;
+  double *l2norm_buffer = NULL;
 
-  // Treat large ADB instances differently
-  if( dbH->flags & O2_FLAG_LARGE_ADB ){
-    batchinsert_large_adb(dbName, inFile) ;
-    return;
+  /* 1. check write permission; */
+  if(!(adb->flags & O_RDWR)) {
+    return 1;
   }
-    
-  if(!key)
-    key=inFile;
-  std::ifstream *filesIn = 0;
-  std::ifstream *keysIn = 0;
-  std::ifstream* thisTimesFile = 0;
-  int thispowerfd = 0;
-
-  if(!(filesIn = new std::ifstream(inFile)))
-    error("Could not open batch in file", inFile);
-  if(key && key!=inFile)
-    if(!(keysIn = new std::ifstream(key)))
-      error("Could not open batch key file",key);
-  
-  if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
-    error("Must use timestamps with timestamped database","use --times");
-
-  if(!usingPower && (dbH->flags & O2_FLAG_POWER))
-    error("Must use power with power-enabled database", dbName);
-
-  unsigned totalVectors=0;
-  char *thisFile = new char[MAXSTR];
-  char *thisKey = 0;
-  if (key && (key != inFile)) {
-    thisKey = new char[MAXSTR];
+  /* 2. check for enough space; */
+  size = sizeof(double) * datum->nvectors * datum->dim;
+  if(!audiodb_enough_data_space_free(adb, size)) {
+    return 1;
   }
-  char *thisTimesFileName = new char[MAXSTR];
-  char *thisPowerFileName = new char[MAXSTR];
-
-  std::set<std::string> s;
-
-  for (unsigned k = 0; k < dbH->numFiles; k++) {
-    s.insert(fileTable + k*O2_FILETABLE_ENTRY_SIZE);
+  if(!audiodb_enough_per_file_space_free(adb)) {
+    return 1;
   }
-
-  do {
-    filesIn->getline(thisFile,MAXSTR);
-    if(key && key!=inFile) {
-      keysIn->getline(thisKey,MAXSTR);
+  /* 3. check that datum->dim and adb->header->dim agree (or that the
+   *    header dimension is zero, in which case write datum->dim to
+   *    adb->header->dim).
+   */
+  if(adb->header->dim == 0) {
+    adb->header->dim = datum->dim;
+  } else if (adb->header->dim != datum->dim) {
+    return 1;
+  }
+  /* 4. check for presence of datum->key in adb->keymap; */
+  if(adb->keymap->count(datum->key)) {
+    /* not part of an explicit API/ABI, but we need a distinguished
+       value in this circumstance to preserve somewhat wonky behaviour
+       of audioDB::batchinsert. */
+    return 2;
+  }
+  /* 5. check for consistency between power and O2_FLAG_POWER, and
+   *    times and O2_FLAG_TIMES; 
+   */
+  if((datum->power && !(adb->header->flags & O2_FLAG_POWER)) ||
+     ((adb->header->flags & O2_FLAG_POWER) && !datum->power)) {
+    return 1;
+  }
+  if(datum->times && !(adb->header->flags & O2_FLAG_TIMES)) {
+    if(adb->header->numFiles == 0) {
+      adb->header->flags |= O2_FLAG_TIMES;
     } else {
-      thisKey = thisFile;
+      return 1;
     }
-    if(usingTimes) {
-      timesFile->getline(thisTimesFileName,MAXSTR);
-    }
-    if(usingPower) {
-      powerFile->getline(thisPowerFileName, MAXSTR);
-    }
-    
-    if(filesIn->eof()) {
-      break;
-    }
-    initInputFile(thisFile);
+  } else if ((adb->header->flags & O2_FLAG_TIMES) && !datum->times) {
+    return 1;
+  }
+  /* 6. write in data, power, times as appropriate; add to track
+   *    and key tables too;
+   */
+  offset = adb->header->length;
+  nfiles = adb->header->numFiles;
 
-    if(!enough_per_file_space_free()) {
-      error("batchinsert failed: no more room for metadata", thisFile);
-    }
+  /* FIXME: checking for all these lseek()s */
+  lseek(adb->fd, adb->header->fileTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+  write_or_goto_error(adb->fd, datum->key, strlen(datum->key)+1);
+  lseek(adb->fd, adb->header->trackTableOffset + nfiles * O2_TRACKTABLE_ENTRY_SIZE, SEEK_SET);
+  write_or_goto_error(adb->fd, &datum->nvectors, O2_TRACKTABLE_ENTRY_SIZE);
+  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+    char cwd[PATH_MAX];
+    char slash = '/';
 
-    if(!enough_data_space_free(statbuf.st_size - sizeof(int))) {
-      error("batchinsert failed: no more room in database", thisFile);
+    if(!getcwd(cwd, PATH_MAX)) {
+      goto error;
     }
-    
-    if(s.count(thisKey)) {
-      VERB_LOG(0, "key already exists in database: %s\n", thisKey);
-    } else {
-      s.insert(thisKey);
-      // Make a track index table of features to file indexes
-      unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-      if(!numVectors) {
-        VERB_LOG(0, "ignoring zero-length feature vector file: %s\n", thisKey);
+    lseek(adb->fd, adb->header->dataOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+    if(*((char *) datum->data) != '/') {
+      write_or_goto_error(adb->fd, cwd, strlen(cwd));
+      write_or_goto_error(adb->fd, &slash, 1);
+    }
+    write_or_goto_error(adb->fd, datum->data, strlen((const char *) datum->data)+1);
+    if(datum->power) {
+      lseek(adb->fd, adb->header->powerTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      if(*((char *) datum->power) != '/') {
+        write_or_goto_error(adb->fd, cwd, strlen(cwd));
+        write_or_goto_error(adb->fd, &slash, 1);
       }
-      else{
-	if(usingTimes){
-	  if(timesFile->eof()) {
-	    error("not enough timestamp files in timesList", timesFileName);
-	  }
-	  thisTimesFile = new std::ifstream(thisTimesFileName,std::ios::in);
-	  if(!thisTimesFile->is_open()) {
-	    error("Cannot open timestamp file", thisTimesFileName);
-	  }
-	  off_t insertoffset = dbH->length;
-	  unsigned indexoffset = insertoffset / (dbH->dim*sizeof(double));
-	  double *timesdata = timesTable + 2*indexoffset;
-          if(2*(indexoffset + numVectors) > timesTableLength) {
-            error("out of space for times", key);
-          }
-	  insertTimeStamps(numVectors, thisTimesFile, timesdata);
-	  if(thisTimesFile)
-	    delete thisTimesFile;
-	}
-        
-        if (usingPower) {
-          if(powerFile->eof()) {
-            error("not enough power files in powerList", powerFileName);
-          }
-          thispowerfd = open(thisPowerFileName, O_RDONLY);
-          if (thispowerfd < 0) {
-            error("failed to open power file", thisPowerFileName);
-          }
-          off_t insertoffset = dbH->length;
-          unsigned poweroffset = insertoffset / (dbH->dim * sizeof(double));
-          double *powerdata = powerTable + poweroffset;
-          insertPowerData(numVectors, thispowerfd, powerdata);
-          if (0 < thispowerfd) {
-            close(thispowerfd);
-          }
-        }
+      write_or_goto_error(adb->fd, datum->power, strlen((const char *) datum->power)+1);
+    }
+    if(datum->times) {
+      lseek(adb->fd, adb->header->timesTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      if(*((char *) datum->times) != '/') {
+        write_or_goto_error(adb->fd, cwd, strlen(cwd));
+        write_or_goto_error(adb->fd, &slash, 1);
+      }
+      write_or_goto_error(adb->fd, datum->times, strlen((const char *) datum->times)+1);
+    }
+  } else {
+    lseek(adb->fd, adb->header->dataOffset + offset, SEEK_SET);
+    write_or_goto_error(adb->fd, datum->data, sizeof(double) * datum->nvectors * datum->dim);
+    if(datum->power) {
+      lseek(adb->fd, adb->header->powerTableOffset + offset / datum->dim, SEEK_SET);
+      write_or_goto_error(adb->fd, datum->power, sizeof(double) * datum->nvectors);
+    }
+    if(datum->times) {
+      lseek(adb->fd, adb->header->timesTableOffset + offset / datum->dim * 2, SEEK_SET);
+      write_or_goto_error(adb->fd, datum->times, sizeof(double) * datum->nvectors * 2);
+    }
+  }
 
-	INSERT_FILETABLE_STRING(fileTable, thisKey);
+  /* 7. if O2_FLAG_L2NORM and !O2_FLAG_LARGE_ADB, compute norms and fill
+   *    in table;
+   */
+  if((adb->header->flags & O2_FLAG_L2NORM) &&
+     !(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+    l2norm_buffer = (double *) malloc(datum->nvectors * sizeof(double));
+    
+    audiodb_l2norm_buffer((double *) datum->data, datum->dim, datum->nvectors, l2norm_buffer);
+    lseek(adb->fd, adb->header->l2normTableOffset + offset / datum->dim, SEEK_SET);
+    write_or_goto_error(adb->fd, l2norm_buffer, sizeof(double) * datum->nvectors);
+    free(l2norm_buffer);
+    l2norm_buffer = NULL;
+  }
 
-	off_t insertoffset = dbH->length;// Store current state
+  /* 8. update adb->keys, adb->keymap, adb->track_lengths,
+   *    adb->track_offsets and adb->header;
+   */
+  adb->keys->push_back(datum->key);
+  (*adb->keymap)[datum->key] = adb->header->numFiles;
+  adb->track_lengths->push_back(datum->nvectors);
+  adb->track_offsets->push_back(offset);
+  adb->header->numFiles += 1;
+  adb->header->length += sizeof(double) * datum->nvectors * datum->dim;
 
-	// Increment file count
-	dbH->numFiles++;  
-  
-	// Update Header information
-	dbH->length+=(statbuf.st_size-sizeof(int));
-  
-	// Update track to file index map
-	memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
+  /* 9. sync adb->header with disk. */
+  return audiodb_sync_header(adb);
 
-	insert_data_vectors(insertoffset, indata + sizeof(int), statbuf.st_size - sizeof(int));
-	
-	// Norm the vectors on input if the database is already L2 normed
-	if(dbH->flags & O2_FLAG_L2NORM)
-	  unitNormAndInsertL2((double *)(indata + sizeof(int)), dbH->dim, numVectors, 1); // append
-	
-	totalVectors+=numVectors;
+ error:
+  if(l2norm_buffer) {
+    free(l2norm_buffer);
+  }
+  return 1;
+}
 
-	// Copy the header back to the database
-	memcpy (db, dbH, sizeof(dbTableHeaderT));  
+int audiodb_insert_datum(adb_t *adb, const adb_datum_t *datum) {
+  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+    return 1;
+  } else {
+    adb_datum_internal_t d;
+    d.nvectors = datum->nvectors;
+    d.dim = datum->dim;
+    d.key = datum->key;
+    d.data = datum->data;
+    d.times = datum->times;
+    d.power = datum->power;
+    return audiodb_insert_datum_internal(adb, &d);
+  }
+}
+
+int audiodb_insert_reference(adb_t *adb, const adb_reference_t *reference) {
+  if(!(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+    return 1;
+  } else {
+    adb_datum_internal_t d;
+    struct stat st;
+    int fd;
+    off_t size;
+    
+    if((fd = open(reference->features, O_RDONLY)) == -1) {
+      return 1;
+    }
+    if(fstat(fd, &st)) {
+      goto error;
+    }
+    read_or_goto_error(fd, &(d.dim), sizeof(uint32_t));
+    close(fd);
+    fd = 0;
+    size = st.st_size - sizeof(uint32_t);
+    d.nvectors = size / (sizeof(double) * d.dim);
+    d.data = (void *) reference->features;
+    if(reference->power) {
+      if(stat(reference->power, &st)) {
+        return 1;
       }
     }
-
-    // CLEAN UP
-    munmap(indata,statbuf.st_size);
-    indata = NULL;
-    close(infid);
-    infid = 0;
-  } while(!filesIn->eof());
-
-  VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * dbH->dim * sizeof(double)));
-
-  delete [] thisPowerFileName;
-  if(key && (key != inFile)) {
-    delete [] thisKey;
+    d.power = (void *) reference->power;
+    if(reference->times) {
+      if(stat(reference->times, &st)) {
+        return 1;
+      }
+    }
+    d.times = (void *) reference->times;
+    d.key = reference->key ? reference->key : reference->features;
+    return audiodb_insert_datum_internal(adb, &d);
+  error:
+    if(fd) {
+      close(fd);
+    }
+    return 1;
   }
-  delete [] thisFile;
-  delete [] thisTimesFileName;
-  
-  delete filesIn;
-  delete keysIn;
-
-  // Report status
-  status(dbName);
 }
 
-
-// BATCHINSERT_LARGE_ADB
-//
-// This method inserts file pointers into the ADB instance rather than the actual feature data
-//
-// This method is intended for databases that are large enough to only support indexed query
-// So exhaustive searching across all feature vectors will not be performed
-//
-// We insert featureFileName, [powerFileName], [timesFileName]
-//
-// l2norms and power sequence sums are calculated on-the-fly at INDEX and --lsh_exact QUERY time
-//
-// LIMITS:
-//
-// We impose an upper limit of 1M keys, 1M featureFiles, 1M powerFiles and 1M timesFiles
-//
-void audioDB::batchinsert_large_adb(const char* dbName, const char* inFile) {
-
-  if(!key)
-    key=inFile;
-  std::ifstream *filesIn = 0;
-  std::ifstream *keysIn = 0;
-  std::ifstream* thisTimesFile = 0;
-  int thispowerfd = 0;
-
-  if(!(filesIn = new std::ifstream(inFile)))
-    error("Could not open batch in file", inFile);
-  if(key && key!=inFile)
-    if(!(keysIn = new std::ifstream(key)))
-      error("Could not open batch key file",key);
-  
-  if(!usingTimes && (dbH->flags & O2_FLAG_TIMES))
-    error("Must use timestamps with timestamped database","use --times");
-
-  if(!usingPower && (dbH->flags & O2_FLAG_POWER))
-    error("Must use power with power-enabled database", dbName);
-
-  char *cwd = new char[PATH_MAX];
-
-  if ((getcwd(cwd, PATH_MAX)) == 0) {
-    error("error getting working directory", "", "getcwd");
+int audiodb_free_datum(adb_datum_t *datum) {
+  if(datum->data) {
+    free(datum->data);
+    datum->data = NULL;
   }
-
-  unsigned totalVectors=0;
-  char *thisFile = new char[MAXSTR];
-  char *thisKey = 0;
-  if (key && (key != inFile)) {
-    thisKey = new char[MAXSTR];
+  if(datum->power) {
+    free(datum->power);
+    datum->power = NULL;
   }
-  char *thisTimesFileName = new char[MAXSTR];
-  char *thisPowerFileName = new char[MAXSTR];
-
-  std::set<std::string> s;
-
-  for (unsigned k = 0; k < dbH->numFiles; k++) {
-    s.insert(fileTable + k*O2_FILETABLE_ENTRY_SIZE);
+  if(datum->times) {
+    free(datum->times);
+    datum->times = NULL;
   }
+  return 0;
+}
 
-  do {
-    filesIn->getline(thisFile,MAXSTR);
-    if(key && key!=inFile) {
-      keysIn->getline(thisKey,MAXSTR);
-    } else {
-      thisKey = thisFile;
-    }
-    if(usingTimes) {
-      timesFile->getline(thisTimesFileName,MAXSTR);
-    }
-    if(usingPower) {
-      powerFile->getline(thisPowerFileName, MAXSTR);
-    }
-    
-    if(filesIn->eof()) {
-      break;
-    }
-    
-    initInputFile(thisFile, false);
+int audiodb_insert_create_datum(adb_insert_t *insert, adb_datum_t *datum) {
+  int fd = 0;
+  FILE *file = NULL;
+  struct stat st;
+  off_t size;
 
-    if(!enough_per_file_space_free()) {
-      error("batchinsert failed: no more room for metadata", thisFile);
+  datum->data = NULL;
+  datum->power = NULL;
+  datum->times = NULL;
+  if((fd = open(insert->features, O_RDONLY)) == -1) {
+    goto error;
+  }
+  if(fstat(fd, &st)) {
+    goto error;
+  }
+  read_or_goto_error(fd, &(datum->dim), sizeof(uint32_t));
+  size = st.st_size - sizeof(uint32_t);
+  datum->nvectors = size / (sizeof(double) * datum->dim);
+  datum->data = (double *) malloc(size);
+  if(!datum->data) {
+    goto error;
+  }
+  read_or_goto_error(fd, datum->data, size);
+  close(fd);
+  fd = 0;
+  if(insert->power) {
+    int dim;
+    if((fd = open(insert->power, O_RDONLY)) == -1) {
+      goto error;
     }
-
-    if(s.count(thisKey)) {
-      VERB_LOG(0, "key already exists in database: %s\n", thisKey);
-    } else {
-      s.insert(thisKey);
-      // Make a track index table of features to file indexes
-      unsigned numVectors = (statbuf.st_size-sizeof(int))/(sizeof(double)*dbH->dim);
-      if(!numVectors) {
-        VERB_LOG(0, "ignoring zero-length feature vector file: %s\n", thisKey);
+    if(fstat(fd, &st)) {
+      goto error;
+    }
+    /* This cast is so non-trivial that it deserves a comment.
+     *
+     * The data types in this expression, left to right, are: off_t,
+     * size_t, off_t, uint32_t.  The rules for conversions in
+     * arithmetic expressions with mixtures of integral types are
+     * essentially that the widest type wins, with unsigned types
+     * winning on a tie-break.
+     *
+     * Because we are enforcing (through the use of sufficient
+     * compiler flags, if necessary) that off_t be a (signed) 64-bit
+     * type, the only variability in this set of types is in fact the
+     * size_t.  On 32-bit machines, size_t is uint32_t and so the
+     * coercions on both sides of the equality end up promoting
+     * everything to int64_t, which is fine.  On 64-bit machines,
+     * however, the left hand side is promoted to a uint64_t, while
+     * the right hand side remains int64_t.
+     *
+     * The mixture of signed and unsigned types in comparisons is Evil
+     * Bad and Wrong, and gcc complains about it.  (It's right to do
+     * so, actually).  Of course in this case it will never matter
+     * because of the particular relationships between all of these
+     * numbers, so we just cast the left hand side to off_t, which
+     * will do the right thing for us on all platforms.
+     *
+     * I hate C.
+     */
+    if(((off_t) (st.st_size - sizeof(uint32_t))) != (size / datum->dim)) {
+      goto error;
+    }
+    read_or_goto_error(fd, &dim, sizeof(uint32_t));
+    if(dim != 1) {
+      goto error;
+    }
+    datum->power = (double *) malloc(size / datum->dim);
+    if(!datum->power) {
+      goto error;
+    }
+    read_or_goto_error(fd, datum->power, size / datum->dim);
+    close(fd);
+  }
+  if(insert->times) {
+    double t, *tp;
+    if(!(file = fopen(insert->times, "r"))) {
+      goto error;
+    }
+    datum->times = (double *) malloc(2 * size / datum->dim);
+    if(!datum->times) {
+      goto error;
+    }
+    if(fscanf(file, " %lf", &t) != 1) {
+      goto error;
+    }
+    tp = datum->times;
+    *tp++ = t;
+    for(unsigned int n = 0; n < datum->nvectors - 1; n++) {
+      if(fscanf(file, " %lf", &t) != 1) {
+        goto error;
       }
-      else{
-	// Check that time-stamp file exists
-	if(usingTimes){
-	  if(timesFile->eof()) {
-	    error("not enough timestamp files in timesList", timesFileName);
-	  }
-	  thisTimesFile = new std::ifstream(thisTimesFileName,std::ios::in);
-	  if(!thisTimesFile->is_open()) {
-	    error("Cannot open timestamp file", thisTimesFileName);
-	  }
-	  if(thisTimesFile)
-	    delete thisTimesFile;
-	}
-
-	// Check that power file exists        
-        if (usingPower) {
-          if(powerFile->eof()) {
-            error("not enough power files in powerList", powerFileName);
-          }
-          thispowerfd = open(thisPowerFileName, O_RDONLY);
-          if (thispowerfd < 0) {
-            error("failed to open power file", thisPowerFileName);
-          }
-          if (0 < thispowerfd) {
-            close(thispowerfd);
-          }
-        }
-
-	// persist links to the feature files for reading from filesystem later
-	
-	// Primary Keys
-	INSERT_FILETABLE_STRING(fileTable, thisKey);
-
-	if(*thisFile != '/') {
-	  /* FIXME: MAXSTR and O2_FILETABLE_ENTRY_SIZE should probably
-	     be the same thing.  Also, both are related to PATH_MAX,
-	     which admittedly is not always defined or a
-	     constant... */
-	  char tmp[MAXSTR];
-	  strncpy(tmp, thisFile, MAXSTR);
-	  snprintf(thisFile, MAXSTR, "%s/%s", cwd, tmp);
-	}
-	// Feature Vector fileNames
-	INSERT_FILETABLE_STRING(featureFileNameTable, thisFile);
-	
-	// Time Stamp fileNames
-	if(usingTimes) {
-	  if(*thisTimesFileName != '/') {
-	    char tmp[MAXSTR];
-	    strncpy(tmp, thisTimesFileName, MAXSTR);
-	    snprintf(thisTimesFileName, MAXSTR, "%s/%s", cwd, tmp);
-	  }
-	  INSERT_FILETABLE_STRING(timesFileNameTable, thisTimesFileName);
-	}
-
-	// Power fileNames
-	if(usingPower) {
-	  if(*thisPowerFileName != '/') {
-	    char tmp[MAXSTR];
-	    strncpy(tmp, thisPowerFileName, MAXSTR);
-	    snprintf(thisPowerFileName, MAXSTR, "%s/%s", cwd, tmp);
-	  }
-	  INSERT_FILETABLE_STRING(powerFileNameTable, thisPowerFileName);
-	}
-
-	// Increment file count
-	dbH->numFiles++;  
-  
-	// Update Header information
-	dbH->length+=(statbuf.st_size-sizeof(int));
-  
-	// Update track to file index map
-	memcpy (trackTable+dbH->numFiles-1, &numVectors, sizeof(unsigned));  
-
-	totalVectors+=numVectors;
-
-	// Copy the header back to the database
-	memcpy (db, dbH, sizeof(dbTableHeaderT));  
-      }
+      *tp++ = t;
+      *tp++ = t;
     }
-    // CLEAN UP
-    if(indata)
-      munmap(indata,statbuf.st_size);
-    if(infid>0)
-      close(infid);
-  } while(!filesIn->eof());
-
-  VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * dbH->dim * sizeof(double)));
-
-  delete [] thisPowerFileName;
-  if(key && (key != inFile)) {
-    delete [] thisKey;
+    if(fscanf(file, " %lf", &t) != 1) {
+      goto error;
+    }
+    *tp = t;
+    fclose(file);
   }
-  delete [] thisFile;
-  delete [] thisTimesFileName;
-  
-  delete filesIn;
-  delete keysIn;
+  datum->key = insert->key ? insert->key : insert->features;
+  return 0;
 
-  // Report status
-  status(dbName);
+ error:
+  if(fd > 0) {
+    close(fd);
+  }
+  if(file) {
+    fclose(file);
+  }
+  audiodb_free_datum(datum);
+  return 1;
+}
+
+int audiodb_insert(adb_t *adb, adb_insert_t *insert) {
+  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+    adb_reference_t *reference = insert;
+    int err;
+    err = audiodb_insert_reference(adb, reference);
+
+    if(err == 2) {
+      return 0;
+    } else {
+      return err;
+    }
+  } else {
+    adb_datum_t datum;
+    int err;
+
+    if(audiodb_insert_create_datum(insert, &datum)) {
+      return 1;
+    }
+    err = audiodb_insert_datum(adb, &datum);
+    audiodb_free_datum(&datum);
+
+    if(err == 2) {
+      return 0;
+    } else {
+      return err;
+    }
+  }
+}
+
+int audiodb_batchinsert(adb_t *adb, adb_insert_t *insert, unsigned int size) {
+  int err;
+  for(unsigned int n = 0; n < size; n++) {
+    if((err = audiodb_insert(adb, &(insert[n])))) {
+      return err;
+    }
+  }
+  return 0;
 }

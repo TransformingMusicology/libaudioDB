@@ -1,91 +1,39 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <sys/stat.h>
-/*
- *  * #define NDEBUG
- *   * */
-#include <assert.h>
+#include "audioDB_API.h"
+#include "test_utils_lib.h"
 
-#include "../../audioDB_API.h"
-#include "../test_utils_lib.h"
+int main(int argc, char **argv) {
+  adb_t *adb;
 
+  clean_remove_db(TESTDB);
+  if(!(adb = audiodb_create(TESTDB, 0, 0, 0)))
+    return 1;
+  if(audiodb_l2norm(adb))
+    return 1;
 
-int main(int argc, char **argv){
+  adb_datum_t datum = {1, 1, "testfeature", (double[1]) {1}, NULL, NULL};
+  if(audiodb_insert_datum(adb, &datum))
+    return 1;
 
-    int returnval=0;
-    adb_ptr mydbp={0};
-    int ivals[10]={0};
-    double dvals[10]={0.0};
-    adb_insert_t myinsert={0};
-    unsigned int myerr=0;
-    adb_query_t myadbquery={0};
-    adb_queryresult_t myadbqueryresult={0};
-    char * databasename="testdb";
-    int size=0;
+  adb_query_id_t qid = {0};
+  qid.datum = &datum;
+  qid.sequence_length = 1;
+  qid.sequence_start = 0;
+  adb_query_parameters_t parms = 
+    {ADB_ACCUMULATION_DB, ADB_DISTANCE_DOT_PRODUCT, 10, 0};
+  adb_query_refine_t refine = {0};
+  refine.hopsize = 1;
 
+  adb_query_spec_t spec;
+  spec.qid = qid;
+  spec.params = parms;
+  spec.refine = refine;
 
-    /* remove old directory */
-    //if [ -f testdb ]; then rm -f testdb; fi
-    //
-    clean_remove_db(databasename);
+  adb_query_results_t *results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 1) return 1;
+  result_present_or_fail(results, "testfeature", 1, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
+  audiodb_close(adb);
 
-    /* create new db */
-    //${AUDIODB} -d testdb -N
-    mydbp=audiodb_create(databasename,0,0,0);
-
-    /* turn on l2norm */
-    //# point query now implemented as sequence search
-    //${AUDIODB} -d testdb -L
-    audiodb_l2norm(mydbp);
-
-    /* make a test file */
-    //# FIXME: endianness!
-    //intstring 1 > testfeature
-    //floatstring 1 >> testfeature
-    ivals[0]=1;
-    dvals[0]=1;
-    maketestfile("testfeature",ivals,dvals,1);
-    
-    /* insert */ 
-    //${AUDIODB} -d testdb -I -f testfeature
-    myinsert.features="testfeature";
-    myerr=audiodb_insert(mydbp,&myinsert);   
-    
-    /* query */ 
-    //${AUDIODB} -d testdb -Q point -f testfeature > test-query-output
-    myadbquery.querytype="point"; 
-    myadbquery.feature="testfeature"; 
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    
-    /* check the test values */
-    //echo testfeature 1 0 0 > test-expected-query-output
-    //cmp test-query-output test-expected-query-output
-    size=myadbqueryresult.sizeRlist;
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,0,0)) {returnval = -1;};   
-    
-
-//#
-//## failure cases
-//expect_clean_error_exit ${AUDIODB} -d testdb -I
-//expect_clean_error_exit ${AUDIODB} -d testdb -f testfeature
-//expect_clean_error_exit ${AUDIODB} -I -f testfeature
-//expect_clean_error_exit ${AUDIODB} -d testdb -Q notpoint -f testfeature
-//expect_clean_error_exit ${AUDIODB} -Q point -f testfeature
-/* all of these will fail at compile time because of API */
-
-    audiodb_close(mydbp);
-      
-    return(returnval);
+  return 104;
 }
-
-
-
-
-

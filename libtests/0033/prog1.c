@@ -1,206 +1,92 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <sys/stat.h>
-/*
- *  * #define NDEBUG
- *   * */
-#include <assert.h>
+#include "audioDB_API.h"
+#include "test_utils_lib.h"
 
-#include "../../audioDB_API.h"
-#include "../test_utils_lib.h"
+int main(int argc, char **argv) {
+  adb_t *adb;
+  const char *keys[2];
 
+  clean_remove_db(TESTDB);
+  if(!(adb = audiodb_create(TESTDB, 0, 0, 0)))
+    return 1;
+  adb_datum_t datum1 = {1, 2, "testfeature01", (double[2]) {0, 1}};
+  adb_datum_t datum2 = {1, 2, "testfeature10", (double[2]) {1, 0}};
+  if(audiodb_insert_datum(adb, &datum1))
+    return 1;
+  if(audiodb_insert_datum(adb, &datum2))
+    return 1;
+  if(audiodb_l2norm(adb))
+    return 1;
 
-int main(int argc, char **argv){
+  adb_datum_t query = {1, 2, "testquery", (double[2]) {0, 0.5}};
 
-    int returnval=0;
-    adb_ptr mydbp={0};
-    int ivals[10];
-    double dvals[10];
-    adb_insert_t myinsert={0};
-    char * databasename="testdb";
-    adb_query_t myadbquery={0};
-    adb_queryresult_t myadbqueryresult={0};
-    int size=0;
+  adb_query_id_t qid = {0};
+  qid.datum = &query;
+  qid.sequence_length = 1;
+  qid.sequence_start = 0;
+  adb_query_parameters_t parms =
+    {ADB_ACCUMULATION_PER_TRACK, ADB_DISTANCE_EUCLIDEAN_NORMED, 10, 10};
+  adb_query_refine_t refine = {0};
+  refine.flags |= ADB_REFINE_RADIUS;
+  refine.radius = 5;
+  refine.hopsize = 1;
 
-    /* remove old directory */
-//if [ -f testdb ]; then rm -f testdb; fi
-    clean_remove_db(databasename);
+  adb_query_spec_t spec;
+  spec.qid = qid;
+  spec.params = parms;
+  spec.refine = refine;
 
-    /* create new db */
-//${AUDIODB} -d testdb -N
-    mydbp=audiodb_create(databasename,0,0,0);
+  adb_query_results_t *results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 2) return 1;
+  result_present_or_fail(results, "testfeature01", 0, 0, 0);
+  result_present_or_fail(results, "testfeature10", 2, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
-//intstring 2 > testfeature01
-//floatstring 0 1 >> testfeature01
-//intstring 2 > testfeature10
-//floatstring 1 0 >> testfeature10
-    ivals[0]=2;
-    dvals[0]=0; dvals[1]=1;
-    maketestfile("testfeature01",ivals,dvals,2);
-    ivals[0]=2;
-    dvals[0]=1; dvals[1]=0;
-    maketestfile("testfeature10",ivals,dvals,2);
+  /* the test in the original test suite for
+   * audioDB-the-command-line-program alters the parms.ntracks, which
+   * is not very meaningful in this context (given that we don't do
+   * aggregation, but simply return valid points); here instead we
+   * check that radius filtering works. */
+  spec.refine.radius = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 1) return 1;
+  result_present_or_fail(results, "testfeature01", 0, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -I -f testfeature01
-//${AUDIODB} -d testdb -I -f testfeature10
-    myinsert.features="testfeature01";
-    if(audiodb_insert(mydbp,&myinsert)) {returnval = -1; };   
-    myinsert.features="testfeature10";
-    if(audiodb_insert(mydbp,&myinsert)) {returnval = -1; };   
+  spec.refine.radius = 5;
+  spec.refine.flags |= ADB_REFINE_INCLUDE_KEYLIST;
+  spec.refine.include.nkeys = 0;
+  spec.refine.include.keys = keys;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 0) return 1;
+  audiodb_query_free_results(adb, &spec, results);
 
-//# sequence queries require L2NORM
-//${AUDIODB} -d testdb -L
-    if (audiodb_l2norm(mydbp)) {returnval=-1;};
+  spec.refine.include.nkeys = 1;
+  spec.refine.include.keys[0] = "testfeature01";
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 1) return 1;
+  result_present_or_fail(results, "testfeature01", 0, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
-//echo "query point (0.0,0.5)"
-//intstring 2 > testquery
-//floatstring 0 0.5 >> testquery
-    ivals[0]=2;
-    dvals[0]=0; dvals[1]=0.5;
-    maketestfile("testquery",ivals,dvals,2);
+  spec.refine.radius = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 1) return 1;
+  result_present_or_fail(results, "testfeature01", 0, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-//audioDB -Q sequence -d testdb -f testquery -R 5 -l 1
-//echo testfeature01 1 > test-expected-output
-//echo testfeature10 1 >> test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
+  spec.refine.radius = 5;
+  spec.refine.include.keys[0] = "testfeature10";
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 1) return 1;
+  result_present_or_fail(results, "testfeature10", 2, 0, 0);
+  audiodb_query_free_results(adb, &spec, results);
 
-    /* check the test values */
-    if (size != 2) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature01",1)) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,1,"testfeature10",1)) {returnval = -1;};
+  spec.refine.radius = 1;
+  spec.refine.include.keys[0] = "testfeature10";
+  results = audiodb_query_spec(adb, &spec);
+  if(!results ||  results->nresults != 0) return 1;
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -K /dev/null -R 5 > testoutput
-//cat /dev/null > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist="/dev/null";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
+  audiodb_close(adb);
 
-    /* check the test values */
-    if (size != 0) {returnval = -1;};
-
-
-
-//echo testfeature01 > testkl.txt
-    makekeylistfile("testkl.txt","testfeature01");
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -K testkl.txt -R 5 > testoutput
-//echo testfeature01 1 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist="testkl.txt";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature01",1)) {returnval = -1;};
-
-//echo testfeature10 > testkl.txt
-    makekeylistfile("testkl.txt","testfeature10");
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -K testkl.txt -R 5 > testoutput
-//echo testfeature10 1 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist="testkl.txt";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature10",1)) {returnval = -1;};
-
-//echo testfeature10 > testkl.txt
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -K testkl.txt -r 1 -R 5 > testoutput
-//echo testfeature10 1 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist="testkl.txt";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    myadbquery.resultlength="1";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature10",1)) {returnval = -1;};
-
-
-//# NB: one might be tempted to insert a test here for having both keys
-//# in the keylist, but in non-database order, and then checking that
-//# the result list is also in that non-database order.  I think that
-//# would be misguided, as the efficient way of dealing with such a
-//# keylist is to advance as-sequentially-as-possible through the
-//# database; it just so happens that our current implementation is not
-//# so smart.
-
-//echo "query point (0.5,0.0)"
-//intstring 2 > testquery
-//floatstring 0.5 0 >> testquery
-    ivals[0]=2;
-    dvals[0]=0.5; dvals[1]=0.0;
-    maketestfile("testquery",ivals,dvals,2);
-
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-//echo testfeature01 1 > test-expected-output
-//echo testfeature10 1 >> test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist=NULL;
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    myadbquery.resultlength=NULL;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 2) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature01",1)) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,1,"testfeature10",1)) {returnval = -1;};
-
-//echo testfeature10 > testkl.txt
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -K testkl.txt -r 1 -R 5 > testoutput
-//echo testfeature10 1 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.keylist="testkl.txt";
-    myadbquery.sequencelength="1";
-    myadbquery.radius="5";
-    myadbquery.resultlength="1";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneradiusresult(&myadbqueryresult,0,"testfeature10",1)) {returnval = -1;};
-
-
-    //fprintf(stderr,"returnval:%d\n",returnval); 
-    return(returnval);
+  return 104;
 }
-

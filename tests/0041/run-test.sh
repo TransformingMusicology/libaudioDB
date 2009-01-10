@@ -86,10 +86,11 @@ cmp testoutput test-expected-output
 ${AUDIODB} -d testdb -X -l 1 -R 0.9 --lsh_k 1 --no_unit_norming
 
 ${AUDIODB} -c localhost:${WSPORT} -d testdb -Q nsequence -l 1 -f testquery -w testpower -p 0 -R 0.9 -n 2 --no_unit_norming --lsh_exact > testoutput
-echo testfeature 3 > test-expected-output
-echo testfeature 0 >> test-expected-output
-cmp testoutput test-expected-output
-
+echo testfeature 3 > test-expected-output1
+echo testfeature 0 >> test-expected-output1
+echo testfeature 0 > test-expected-output2
+echo testfeature 3 >> test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 
 stop_server $!
 

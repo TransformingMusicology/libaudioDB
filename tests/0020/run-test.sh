@@ -24,12 +24,15 @@ intstring 2 > testquery
 floatstring 0 0.5 >> testquery
 
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-echo testfeature10 1 >> test-expected-output
-cmp testoutput test-expected-output
+echo testfeature01 1 > test-expected-output1
+echo testfeature10 1 >> test-expected-output1
+echo testfeature10 1 > test-expected-output2
+echo testfeature01 1 >> test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -r 1 -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-cmp testoutput test-expected-output
+echo testfeature01 1 > test-expected-output1
+echo testfeature10 1 > test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 
 check_server $!
 
@@ -37,18 +40,16 @@ echo "query point (0.5,0.0)"
 intstring 2 > testquery
 floatstring 0.5 0 >> testquery
 
-# FIXME: because there's only one point in each track (and the query),
-# the ordering is essentially database order.  We need these test
-# cases anyway because we need to test non-segfaulting, non-empty
-# results...
-
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-echo testfeature10 1 >> test-expected-output
-cmp testoutput test-expected-output
+echo testfeature01 1 > test-expected-output1
+echo testfeature10 1 >> test-expected-output1
+echo testfeature10 1 > test-expected-output2
+echo testfeature01 1 >> test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 ${AUDIODB} -c localhost:10020 -d testdb -Q sequence -l 1 -f testquery -r 1 -R 5 > testoutput
-echo testfeature01 1 > test-expected-output
-cmp testoutput test-expected-output
+echo testfeature01 1 > test-expected-output1
+echo testfeature10 1 > test-expected-output2
+cmp testoutput test-expected-output1 || cmp testoutput test-expected-output2
 
 stop_server $!
 

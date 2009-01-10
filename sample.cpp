@@ -60,7 +60,6 @@ void audioDB::sample(const char *dbName) {
     error("error: sample not yet supported for LARGE_ADB");
   }
     
-  // build track offset table (FIXME: cut'n'pasted from query.cpp)
   off_t *trackOffsetTable = new off_t[dbH->numFiles];
   unsigned cumTrack=0;
   for(unsigned int k = 0; k < dbH->numFiles; k++){

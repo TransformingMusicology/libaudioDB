@@ -44,10 +44,9 @@ public:
   // FIXME: this interface is a bit wacky: a relic of previous, more
   // confused times.  Really it might make sense to have separate
   // reporter classes for WS and for stdout, rather than passing this
-  // adbQueryResponse thing everywhere; the fileTable argument is
-  // there solely for convertion trackIDs into names.  -- CSR,
-  // 2007-12-10.
-  virtual void report(char *fileTable, void* adbQueryResponse) = 0;
+  // adbQueryResponse thing everywhere; the adb argument is there
+  // solely for converting trackIDs into names.  -- CSR, 2007-12-10.
+  virtual void report(adb_t *adb, void* adbQueryResponse) = 0;
 };
 
 template <class T> class pointQueryReporter : public Reporter {
@@ -55,7 +54,7 @@ public:
   pointQueryReporter(unsigned int pointNN);
   ~pointQueryReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(char *fileTable, void* adbQueryResponse);
+  void report(adb_t *adb, void* adbQueryResponse);
 private:
   unsigned int pointNN;
   std::priority_queue< NNresult, std::vector< NNresult >, T> *queue;
@@ -84,7 +83,7 @@ template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, u
   }
 }
 
-template <class T> void pointQueryReporter<T>::report(char *fileTable, void *adbQueryResponse) {
+template <class T> void pointQueryReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
   NNresult r;
   std::vector<NNresult> v;
   unsigned int size = queue->size();
@@ -98,32 +97,33 @@ template <class T> void pointQueryReporter<T>::report(char *fileTable, void *adb
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      if(fileTable)
-	std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
       std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
     }
   } else {
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
+    response->result.__sizeRlist=size;
+    response->result.__sizeDist=size;
+    response->result.__sizeQpos=size;
+    response->result.__sizeSpos=size;
+    response->result.Rlist= new char*[size];
+    response->result.Dist = new double[size];
+    response->result.Qpos = new unsigned int[size];
+    response->result.Spos = new unsigned int[size];
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = r.dist;
-      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = r.qpos;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = r.spos;
-      if(fileTable)
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Dist[k] = r.dist;
+      response->result.Qpos[k] = r.qpos;
+      response->result.Spos[k] = r.spos;
+      if(adb)
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
       else
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
     }
   }
 }
@@ -133,7 +133,7 @@ template <class T> class trackAveragingReporter : public Reporter {
   trackAveragingReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackAveragingReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(char *fileTable, void *adbQueryResponse);
+  void report(adb_t *adb, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -164,7 +164,7 @@ template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackI
   }
 }
 
-template <class T> void trackAveragingReporter<T>::report(char *fileTable, void *adbQueryResponse) {
+template <class T> void trackAveragingReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
@@ -205,32 +205,33 @@ template <class T> void trackAveragingReporter<T>::report(char *fileTable, void 
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      if(fileTable)
-	std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
       std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
     }
   } else {
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
+    response->result.__sizeRlist=size;
+    response->result.__sizeDist=size;
+    response->result.__sizeQpos=size;
+    response->result.__sizeSpos=size;
+    response->result.Rlist= new char*[size];
+    response->result.Dist = new double[size];
+    response->result.Qpos = new unsigned int[size];
+    response->result.Spos = new unsigned int[size];
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = r.dist;
-      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = r.qpos;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = r.spos;
-      if(fileTable)
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Dist[k] = r.dist;
+      response->result.Qpos[k] = r.qpos;
+      response->result.Spos[k] = r.spos;
+      if(adb)
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
       else
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
     }
   }
 }
@@ -244,13 +245,13 @@ template <class T> class trackSequenceQueryNNReporter : public trackAveragingRep
   using trackAveragingReporter<T>::pointNN;
  public:
   trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
-  void report(char *fileTable, void *adbQueryResponse);
+  void report(adb_t *adb, void *adbQueryResponse);
 };
 
 template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles)
 :trackAveragingReporter<T>(pointNN, trackNN, numFiles){}
 
-template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable, void *adbQueryResponse) {
+template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues 
     = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
@@ -297,11 +298,11 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      if(fileTable)
-	std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
-	std::cout << r.dist << std::endl;
+      std::cout << r.dist << std::endl;
       unsigned int qsize = point_queues[r.trackID].size();
       // Reverse the order of the points stored in point_queues
       for(unsigned int k=0; k < qsize; k++){
@@ -316,14 +317,15 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
       }
     }
   } else {
-   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size*pointNN];
+    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
+    response->result.__sizeRlist=size*pointNN;
+    response->result.__sizeDist=size*pointNN;
+    response->result.__sizeQpos=size*pointNN;
+    response->result.__sizeSpos=size*pointNN;
+    response->result.Rlist= new char*[size*pointNN];
+    response->result.Dist = new double[size*pointNN];
+    response->result.Qpos = new unsigned int[size*pointNN];
+    response->result.Spos = new unsigned int[size*pointNN];
     unsigned int k = 0;
     // Loop over returned tracks
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
@@ -345,20 +347,20 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(char *fileTable,
 	  rk.spos = 0xFFFFFFFF;
 	}
 	  
-	((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-	((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
-	((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
-	((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
+	response->result.Rlist[k] = new char[O2_MAXFILESTR];
+	response->result.Dist[k] = rk.dist;
+	response->result.Qpos[k] = rk.qpos;
+	response->result.Spos[k] = rk.spos;
 	if(qsize){
-	  if(fileTable)
-	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+	  if(adb)
+	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
 	  else
-	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
+	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
 	  point_queue.pop();
 	  qsize--;
 	}
 	else
-	  snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "NULL");		  
+	  snprintf(response->result.Rlist[k], O2_MAXFILESTR, "NULL");		  
 	k++;
       }
     }
@@ -413,7 +415,7 @@ public:
   trackSequenceQueryRadReporter(unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(char *fileTable, void *adbQueryResponse);
+  void report(adb_t *adb, void *adbQueryResponse);
  protected:
   unsigned int trackNN;
   unsigned int numFiles;
@@ -460,7 +462,7 @@ void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int
   }
 }
 
-void trackSequenceQueryRadReporter::report(char *fileTable, void *adbQueryResponse) {
+void trackSequenceQueryRadReporter::report(adb_t *adb, void *adbQueryResponse) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -489,33 +491,33 @@ void trackSequenceQueryRadReporter::report(char *fileTable, void *adbQueryRespon
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      if(fileTable)
-	std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
       std::cout << r.count << std::endl;
     }
-  } 
- else {
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size];
+  } else {
+    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
+    response->result.__sizeRlist=size;
+    response->result.__sizeDist=size;
+    response->result.__sizeQpos=size;
+    response->result.__sizeSpos=size;
+    response->result.Rlist= new char*[size];
+    response->result.Dist = new double[size];
+    response->result.Qpos = new unsigned int[size];
+    response->result.Spos = new unsigned int[size];
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      ((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-      ((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = 0;
-      ((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = 0;
-      ((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = r.count;
-      if(fileTable)
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Dist[k] = 0;
+      response->result.Qpos[k] = 0;
+      response->result.Spos[k] = r.count;
+      if(adb)
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
       else
-	snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
+	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
     }
   }
 }
@@ -529,7 +531,7 @@ public:
   trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(char *fileTable, void *adbQueryResponse);
+  void report(adb_t *adb, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -592,7 +594,7 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
   }
 }
 
-void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporter::report(adb_t *adb, void *adbQueryResponse) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -634,7 +636,7 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
       }	
     }
     // Report
-    rep->report(fileTable, adbQueryResponse);
+    rep->report(adb, adbQueryResponse);
     // Exit
     delete[] point_queues;
     return;
@@ -648,8 +650,8 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
   if(adbQueryResponse==0) {
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
       r = *rit;
-      if(fileTable)
-	std::cout << fileTable + r.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
       std::cout << r.count << std::endl;
@@ -666,16 +668,16 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
 	point_queue.pop();
       }
     }
-  }
- else {
-   ((adb__queryResponse*)adbQueryResponse)->result.__sizeRlist=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeDist=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeQpos=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.__sizeSpos=size*pointNN;
-    ((adb__queryResponse*)adbQueryResponse)->result.Rlist= new char*[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Dist = new double[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Qpos = new unsigned int[size*pointNN];
-    ((adb__queryResponse*)adbQueryResponse)->result.Spos = new unsigned int[size*pointNN];
+  } else {
+    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
+    response->result.__sizeRlist=size*pointNN;
+    response->result.__sizeDist=size*pointNN;
+    response->result.__sizeQpos=size*pointNN;
+    response->result.__sizeSpos=size*pointNN;
+    response->result.Rlist= new char*[size*pointNN];
+    response->result.Dist = new double[size*pointNN];
+    response->result.Qpos = new unsigned int[size*pointNN];
+    response->result.Spos = new unsigned int[size*pointNN];
     unsigned int k = 0;
     // Loop over returned tracks
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
@@ -697,20 +699,20 @@ void trackSequenceQueryRadNNReporter::report(char *fileTable, void *adbQueryResp
 	  rk.spos = 0xFFFFFFFF;
 	}
 	  
-	((adb__queryResponse*)adbQueryResponse)->result.Rlist[k] = new char[O2_MAXFILESTR];
-	((adb__queryResponse*)adbQueryResponse)->result.Dist[k] = rk.dist;
-	((adb__queryResponse*)adbQueryResponse)->result.Qpos[k] = rk.qpos;
-	((adb__queryResponse*)adbQueryResponse)->result.Spos[k] = rk.spos;
+	response->result.Rlist[k] = new char[O2_MAXFILESTR];
+	response->result.Dist[k] = rk.dist;
+	response->result.Qpos[k] = rk.qpos;
+	response->result.Spos[k] = rk.spos;
 	if(qsize){
-	  if(fileTable)
-	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%s", fileTable+r.trackID*O2_FILETABLE_ENTRY_SIZE);
+	  if(adb)
+	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
 	  else
-	    snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
+	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
 	  point_queue.pop();
 	  qsize--;
 	}
 	else
-	  snprintf(((adb__queryResponse*)adbQueryResponse)->result.Rlist[k], O2_MAXFILESTR, "NULL");
+	  snprintf(response->result.Rlist[k], O2_MAXFILESTR, "NULL");
 	k++;
       }
     }
@@ -728,7 +730,7 @@ public:
   trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporterOneToOne();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(char *fileTable, void *adbQueryResponse);
+  void report(adb_t *adb, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -776,7 +778,7 @@ void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, un
 
 }
 
-void trackSequenceQueryRadNNReporterOneToOne::report(char *fileTable, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, void *adbQueryResponse) {
   if(adbQueryResponse==0) {
     std::vector< NNresult >::iterator vit;
     NNresult rk;
@@ -785,8 +787,8 @@ void trackSequenceQueryRadNNReporterOneToOne::report(char *fileTable, void *adbQ
       std::cout << rk.dist << " " 
 		<< rk.qpos << " " 
 		<< rk.spos << " ";
-      if(fileTable)
-	std::cout << fileTable + rk.trackID*O2_FILETABLE_ENTRY_SIZE << " ";
+      if(adb)
+	std::cout << audiodb_index_key(adb, rk.trackID) << " ";
       else
 	std::cout << rk.trackID << " "; 
       std::cout << std::endl;

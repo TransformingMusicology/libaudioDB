@@ -1,47 +1,95 @@
 #include "audioDB.h"
+extern "C" {
+#include "audioDB_API.h"
+#include "audioDB-internals.h"
+}
 
-void audioDB::dump(const char* dbName){
-  if(!dbH) {
-    initTables(dbName, 0);
-  }
+int audiodb_dump(adb_t *adb, const char *output) {
+  char *fileTable = 0; /* key_table */
+  double *timesTable = 0; /* timestamps_table */
+  double *powerTable = 0; /* power_table */
 
-  if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
-    error("error making output directory", output, "mkdir");
-  }
+  size_t fileTableLength = 0;
+  size_t timesTableLength = 0;
+  size_t powerTableLength = 0;
 
-  char *cwd = new char[PATH_MAX];
+  char *featureFileNameTable = 0;
+  char *powerFileNameTable = 0;
+  char *timesFileNameTable = 0;
+ 
+  char cwd[PATH_MAX];
+  int directory_changed = 0;
 
-  if ((getcwd(cwd, PATH_MAX)) == 0) {
-    error("error getting working directory", "", "getcwd");
-  }
+  int fLfd = 0, tLfd = 0, pLfd = 0, kLfd = 0;
+  FILE *fLFile = 0, *tLFile = 0, *pLFile = 0, *kLFile = 0;
 
-  if((chdir(output)) < 0) {
-    error("error changing working directory", output, "chdir");
-  }
+  int times, power;
 
-  int fLfd, tLfd = 0, pLfd = 0, kLfd;
-  FILE *fLFile, *tLFile = 0, *pLFile = 0, *kLFile;
+  char fName[256];
+  int ffd, pfd;
+  FILE *tFile;
+  unsigned pos = 0;
+  double *data_buffer;
+  size_t data_buffer_size;
+  FILE *scriptFile = 0;
 
-  if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-    error("error creating featureList file", "featureList.txt", "open");
-  }
+  unsigned nfiles = adb->header->numFiles;
 
-  int times = dbH->flags & O2_FLAG_TIMES;
-  if (times) {
-    if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-      error("error creating timesList file", "timesList.txt", "open");
+  if(adb->header->length > 0) {
+    fileTableLength = ALIGN_PAGE_UP(nfiles * O2_FILETABLE_ENTRY_SIZE);
+    if(!(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+      off_t length = adb->header->length;
+      unsigned dim = adb->header->dim;
+      timesTableLength = ALIGN_PAGE_UP(2*length/dim);
+      powerTableLength = ALIGN_PAGE_UP(length/dim);
+    }
+
+    mmap_or_goto_error(char *, fileTable, adb->header->fileTableOffset, fileTableLength);
+    if (adb->header->flags & O2_FLAG_LARGE_ADB) {
+      mmap_or_goto_error(char *, featureFileNameTable, adb->header->dataOffset, fileTableLength);
+      mmap_or_goto_error(char *, powerFileNameTable, adb->header->powerTableOffset, fileTableLength);
+      mmap_or_goto_error(char *, timesFileNameTable, adb->header->timesTableOffset, fileTableLength);
+    } else {
+      mmap_or_goto_error(double *, powerTable, adb->header->powerTableOffset, powerTableLength);
+      mmap_or_goto_error(double *, timesTable, adb->header->timesTableOffset, timesTableLength);
     }
   }
 
-  int power = dbH->flags & O2_FLAG_POWER;
+  if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
+    goto error;
+  }
+
+  if ((getcwd(cwd, PATH_MAX)) == 0) {
+    goto error;
+  }
+
+  /* FIXME: Hrm.  How does chdir(2) interact with threads?  Does each
+   * thread have its own working directory? */
+  if((chdir(output)) < 0) {
+    goto error;
+  }
+  directory_changed = 1;
+
+  if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+    goto error;
+  }
+
+  times = adb->header->flags & O2_FLAG_TIMES;
+  if (times) {
+    if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+      goto error;
+    }
+  }
+
+  power = adb->header->flags & O2_FLAG_POWER;
   if (power) {
     if ((pLfd = open("powerList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-      error("error creating powerList file", "powerList.txt", "open");
+      goto error;
     }
   }
 
   if ((kLfd = open("keyList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-    error("error creating keyList file", "keyList.txt", "open");
+    goto error;
   }
   
   /* can these fail?  I sincerely hope not. */
@@ -54,73 +102,65 @@ void audioDB::dump(const char* dbName){
   }
   kLFile = fdopen(kLfd, "w");
 
-  char *fName = new char[256];
-  int ffd, pfd;
-  FILE *tFile;
-  unsigned pos = 0;
-  lseek(dbfid, dbH->dataOffset, SEEK_SET);
-  double *data_buffer;
-  size_t data_buffer_size;
-  for(unsigned k = 0; k < dbH->numFiles; k++) {
+  lseek(adb->fd, adb->header->dataOffset, SEEK_SET);
+
+  for(unsigned k = 0; k < nfiles; k++) {
     fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLE_ENTRY_SIZE);
-    if(dbH->flags & O2_FLAG_LARGE_ADB) {
+    if(adb->header->flags & O2_FLAG_LARGE_ADB) {
       char *featureFileName = featureFileNameTable+k*O2_FILETABLE_ENTRY_SIZE;
-      fprintf(fLFile, "%s\n", featureFileName);
       if(*featureFileName != '/') {
-	error("relative path in LARGE_ADB", featureFileName);
+        goto error;
       }
+      fprintf(fLFile, "%s\n", featureFileName);
       if(times) {
 	char *timesFileName = timesFileNameTable + k*O2_FILETABLE_ENTRY_SIZE;
-	fprintf(tLFile, "%s\n", timesFileName);
 	if(*timesFileName != '/') {
-	  error("relative path in LARGE_ADB", timesFileName);	  
+          goto error;
 	}
+	fprintf(tLFile, "%s\n", timesFileName);
       }
       if(power) {
 	char *powerFileName = powerFileNameTable + k*O2_FILETABLE_ENTRY_SIZE;
-	fprintf(pLFile, "%s\n", powerFileName);
 	if(*powerFileName != '/') {
-	  error("relative path in LARGE_ADB", powerFileName);
+          goto error;
 	}
+	fprintf(pLFile, "%s\n", powerFileName);
       }
     } else {
       snprintf(fName, 256, "%05d.features", k);
       if ((ffd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-	error("error creating feature file", fName, "open");
+        goto error;
       }
-      if ((write(ffd, &dbH->dim, sizeof(uint32_t))) < 0) {
-	error("error writing dimensions", fName, "write");
-      }
+      write_or_goto_error(ffd, &(adb->header->dim), sizeof(uint32_t));
       
       /* FIXME: this repeated malloc()/free() of data buffers is
 	 inefficient. */
-      data_buffer_size = trackTable[k] * dbH->dim * sizeof(double);
+      data_buffer_size = (*adb->track_lengths)[k] * adb->header->dim * sizeof(double);
       
       {
 	void *tmp = malloc(data_buffer_size);
 	if (tmp == NULL) {
-	  error("error allocating data buffer");
+          goto error;
 	}
 	data_buffer = (double *) tmp;
       }
       
-      if ((read(dbfid, data_buffer, data_buffer_size)) != (ssize_t) data_buffer_size) {
-	error("error reading data", fName, "read");
+      if ((read(adb->fd, data_buffer, data_buffer_size)) != (ssize_t) data_buffer_size) {
+        goto error;
       }
       
-      if ((write(ffd, data_buffer, data_buffer_size)) < 0) {
-	error("error writing data", fName, "write");
-      }
+      write_or_goto_error(ffd, data_buffer, data_buffer_size);
       
       free(data_buffer);
       
       fprintf(fLFile, "%s\n", fName);
       close(ffd);
-      
+      ffd = 0;
+
       if (times) {
 	snprintf(fName, 256, "%05d.times", k);
 	tFile = fopen(fName, "w");
-	for(unsigned i = 0; i < trackTable[k]; i++) {
+	for(unsigned i = 0; i < (*adb->track_lengths)[k]; i++) {
 	  // KLUDGE: specifying 16 digits of precision after the decimal
 	  // point is (but check this!) sufficient to uniquely identify
 	  // doubles; however, that will cause ugliness, as that's
@@ -129,7 +169,8 @@ void audioDB::dump(const char* dbName){
 	  // -- CSR, 2007-10-19
 	  fprintf(tFile, "%.16e\n", *(timesTable + 2*pos + 2*i));
 	}
-	fprintf(tFile, "%.16e\n", *(timesTable + 2*pos + 2*trackTable[k]-1));
+	fprintf(tFile, "%.16e\n", *(timesTable + 2*pos + 2*(*adb->track_lengths)[k]-1));
+        fclose(tFile);
 	
 	fprintf(tLFile, "%s\n", fName);
       }
@@ -138,24 +179,20 @@ void audioDB::dump(const char* dbName){
 	uint32_t one = 1;
 	snprintf(fName, 256, "%05d.power", k);
 	if ((pfd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
-	  error("error creating power file", fName, "open");
+          goto error;
 	}
-	if ((write(pfd, &one, sizeof(uint32_t))) < 0) {
-	  error("error writing one", fName, "write");
-	}
-	if ((write(pfd, powerTable + pos, trackTable[k] * sizeof(double))) < 0) {
-	  error("error writing data", fName, "write");
-	}
+        write_or_goto_error(pfd, &one, sizeof(uint32_t));
+        write_or_goto_error(pfd, powerTable + pos, (*adb->track_lengths)[k] * sizeof(double));
 	fprintf(pLFile, "%s\n", fName);
 	close(pfd);
+        pfd = 0;
       } 
       
-      pos += trackTable[k];
-      std::cout << fileTable+k*O2_FILETABLE_ENTRY_SIZE << " " << trackTable[k] << std::endl;
+      pos += (*adb->track_lengths)[k];
+      std::cout << fileTable+k*O2_FILETABLE_ENTRY_SIZE << " " << (*adb->track_lengths)[k] << std::endl;
     }
   }
 
-  FILE *scriptFile;
   scriptFile = fopen("restore.sh", "w");
   fprintf(scriptFile, "\
 #! /bin/sh\n\
@@ -165,12 +202,12 @@ void audioDB::dump(const char* dbName){
 if [ -z \"${AUDIODB}\" ]; then echo set AUDIODB variable; exit 1; fi\n\
 if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
 \"${AUDIODB}\" -d \"$1\" -N --datasize=%d --ntracks=%d --datadim=%d\n",
-          (int) ((dbH->timesTableOffset - dbH->dataOffset) / (1024*1024)),
+          (int) ((adb->header->timesTableOffset - adb->header->dataOffset) / (1024*1024)),
           // fileTable entries (char[256]) are bigger than trackTable
           // (int), so the granularity of page aligning is finer.
-          (int) ((dbH->trackTableOffset - dbH->fileTableOffset) / O2_FILETABLE_ENTRY_SIZE),
-          (int) ceil(((double) (dbH->timesTableOffset - dbH->dataOffset)) / ((double) (dbH->dbSize - dbH->l2normTableOffset))));
-  if(dbH->flags & O2_FLAG_L2NORM) {
+          (int) ((adb->header->trackTableOffset - adb->header->fileTableOffset) / O2_FILETABLE_ENTRY_SIZE),
+          (int) ceil(((double) (adb->header->timesTableOffset - adb->header->dataOffset)) / ((double) (adb->header->dbSize - adb->header->l2normTableOffset))));
+  if(adb->header->flags & O2_FLAG_L2NORM) {
     fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
   }
   if(power) {
@@ -186,10 +223,6 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
   fprintf(scriptFile, "\n");
   fclose(scriptFile);
 
-  if((chdir(cwd)) < 0) {
-    error("error changing working directory", cwd, "chdir");
-  }
-
   fclose(fLFile);
   if(times) {
     fclose(tLFile);
@@ -198,40 +231,57 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
     fclose(pLFile);
   }
   fclose(kLFile);
-  delete[] fName;
     
-  status(dbName);
-}
+  maybe_munmap(fileTable, fileTableLength);
+  maybe_munmap(timesTable, timesTableLength);
+  maybe_munmap(powerTable, powerTableLength);
+  maybe_munmap(featureFileNameTable, fileTableLength);
+  maybe_munmap(timesFileNameTable, fileTableLength);
+  maybe_munmap(powerFileNameTable, fileTableLength);
 
-void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, adb__lisztResponse* adbLisztResponse){
-  if(!dbH) {
-    initTables(dbName, 0);
+  if((chdir(cwd)) < 0) {
+    /* don't goto error because the error handling will try to
+     * chdir() */
+    return 1;
   }
 
-  assert(trackTable && fileTable);
+  return 0;
 
-  if(offset>dbH->numFiles){
-    char tmpStr[MAXSTR];
-    sprintf(tmpStr, "numFiles=%u, lisztOffset=%u", dbH->numFiles, offset);
-    error("listKeys offset out of range", tmpStr);
+ error:
+  if(fLFile) {
+    fclose(fLFile);
+  } else if(fLfd) {
+    close(fLfd);
+  }
+  if(tLFile) {
+    fclose(tLFile);
+  } else if(tLfd) {
+    close(fLfd);
+  }
+  if(pLFile) {
+    fclose(pLFile);
+  } else if(pLfd) {
+    close(pLfd);
+  }
+  if(kLFile) {
+    fclose(kLFile);
+  } else if(kLfd) {
+    close(kLfd);
+  }
+  if(scriptFile) {
+    fclose(scriptFile);
   }
 
-  if(!adbLisztResponse){
-    for(Uns32T k=0; k<numLines && offset+k<dbH->numFiles; k++){
-      fprintf(stdout, "[%d] %s (%d)\n", offset+k, fileTable+(offset+k)*O2_FILETABLE_ENTRY_SIZE, trackTable[offset+k]);
-    }
+  maybe_munmap(fileTable, fileTableLength);
+  maybe_munmap(timesTable, timesTableLength);
+  maybe_munmap(powerTable, powerTableLength);
+  maybe_munmap(featureFileNameTable, fileTableLength);
+  maybe_munmap(timesFileNameTable, fileTableLength);
+  maybe_munmap(powerFileNameTable, fileTableLength);
+
+  if(directory_changed) {
+    int gcc_warning_workaround = chdir(cwd);
+    directory_changed = gcc_warning_workaround;
   }
-  else{
-    adbLisztResponse->result.Rkey = new char*[numLines];
-    adbLisztResponse->result.Rlen = new unsigned int[numLines];
-    Uns32T k = 0;
-    for( ; k<numLines && offset+k<dbH->numFiles; k++){    
-      adbLisztResponse->result.Rkey[k] = new char[MAXSTR];
-      snprintf(adbLisztResponse->result.Rkey[k], O2_MAXFILESTR, "%s", fileTable+(offset+k)*O2_FILETABLE_ENTRY_SIZE);
-      adbLisztResponse->result.Rlen[k] = trackTable[offset+k];
-    }
-    adbLisztResponse->result.__sizeRkey = k;
-    adbLisztResponse->result.__sizeRlen = k;
-  }
-  
+  return 1;
 }

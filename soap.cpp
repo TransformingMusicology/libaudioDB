@@ -1,4 +1,5 @@
 #include "audioDB.h"
+#include "audioDB-internals.h"
 #include "adb.nsmap"
 
 /* Command-line client definitions */
@@ -454,21 +455,12 @@ void audioDB::startServer(){
   else
     {
       fprintf(stderr, "Socket connection successful: master socket = %d\n", m);
-      // Make a global Web Services LSH Index (SINGLETON)
-      if(WS_load_index && dbName && !index_exists(dbName, radius, sequenceLength)){
-        error("Can't find requested index file:", index_get_name(dbName,radius,sequenceLength));
-      }
-      if(WS_load_index && dbName && index_exists(dbName, radius, sequenceLength)){
-	char* indexName = index_get_name(dbName, radius, sequenceLength);
-	fprintf(stderr, "Loading LSH hashtables: %s...\n", indexName);
-	lsh = new LSH(indexName, true);
-	assert(lsh);
-	SERVER_LSH_INDEX_SINGLETON = lsh;
-	fprintf(stderr, "LSH INDEX READY\n");
-	fflush(stderr);
-	delete[] indexName;
-      }
-      
+      /* FIXME: we used to have a global cache of a single LSH index
+       * here.  CSR removed it because it interacted badly with
+       * APIification of querying, replacing it with a per-open-adb
+       * cache; we should try to take advantage of that instead.
+       */
+
       // Server-side path prefix to databases and features
       if(adb_root)
 	SERVER_ADB_ROOT = (char*)adb_root; // Server-side database root

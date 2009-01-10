@@ -1,270 +1,133 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <sys/stat.h>
-/*
- *  * #define NDEBUG
- *   * */
-#include <assert.h>
+#include "audioDB_API.h"
+#include "test_utils_lib.h"
 
-#include "../../audioDB_API.h"
-#include "../test_utils_lib.h"
+int main(int argc, char **argv) {
+  adb_t *adb;
 
+  clean_remove_db(TESTDB);
+  if(!(adb = audiodb_create(TESTDB, 0, 0, 0)))
+    return 1;
 
-int main(int argc, char **argv){
+  adb_datum_t feature = {4, 2, "testfeature", 
+                         (double [8]) {0, 1, 1, 0, 1, 0, 0, 1},
+                         (double [4]) {-0.5, -1, -1, -0.5}};
+  if(!audiodb_insert_datum(adb, &feature))
+    return 1;
+  audiodb_power(adb);
+  feature.power = NULL;
+  if(!audiodb_insert_datum(adb, &feature))
+    return 1;
+  feature.power = (double [4]) {-0.5, -1, -1, -0.5};
+  if(audiodb_insert_datum(adb, &feature))
+    return 1;
 
-    int returnval=0;
-    adb_ptr mydbp={0};
-    int ivals[10];
-    double dvals[10];
-    adb_insert_t myinsert={0};
-    char * databasename="testdb";
-    adb_query_t myadbquery={0};
-    adb_queryresult_t myadbqueryresult={0};
-    int size=0;
+  if(audiodb_l2norm(adb))
+    return 1;
 
+  adb_datum_t query = {3, 2, "testquery", 
+                       (double [6]) {0, 0.5, 0, 0.5, 0.5, 0},
+                       (double [3]) {-0.5, -1, -1}};
+  adb_query_id_t qid = {0};
+  qid.datum = &query;
+  qid.sequence_length = 1;
+  qid.sequence_start = 0;
+  adb_query_parameters_t parms =
+    {ADB_ACCUMULATION_PER_TRACK, ADB_DISTANCE_EUCLIDEAN_NORMED, 10, 10};
+  adb_query_refine_t refine = {0};
+  refine.hopsize = 1;
 
-    /* remove old directory */
-    //if [ -f testdb ]; then rm -f testdb; fi
-    clean_remove_db(databasename);
+  adb_query_spec_t spec;
+  spec.qid = qid;
+  spec.params = parms;
+  spec.refine = refine;
 
-    /* create new db */
-    //${AUDIODB} -d testdb -N
-    mydbp=audiodb_create(databasename,0,0,0);
+  adb_query_results_t *results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 4) return 1;
+  result_present_or_fail(results, "testfeature", 0, 0, 0);
+  result_present_or_fail(results, "testfeature", 2, 0, 1);
+  result_present_or_fail(results, "testfeature", 2, 0, 2);
+  result_present_or_fail(results, "testfeature", 0, 0, 3);
+  audiodb_query_free_results(adb, &spec, results);
 
-//intstring 2 > testfeature
-//floatstring 0 1 >> testfeature
-//floatstring 1 0 >> testfeature
-//floatstring 1 0 >> testfeature
-//floatstring 0 1 >> testfeature
-    ivals[0]=2;
-    dvals[0]=0; dvals[1]=1; dvals[2]=1; dvals[3]=0;
-    dvals[4]=1; dvals[5]=0; dvals[6]=0; dvals[7]=1;
-    maketestfile("testfeature",ivals,dvals,8);
+  spec.qid.sequence_start = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 4) return 1;
+  result_present_or_fail(results, "testfeature", 0, 1, 0);
+  result_present_or_fail(results, "testfeature", 2, 1, 1);
+  result_present_or_fail(results, "testfeature", 2, 1, 2);
+  result_present_or_fail(results, "testfeature", 0, 1, 3);
+  audiodb_query_free_results(adb, &spec, results);
 
-//intstring 1 > testpower
-//floatstring -0.5 >> testpower
-//floatstring -1 >> testpower
-//floatstring -1 >> testpower
-//floatstring -0.5 >> testpower
-    ivals[0]=1;
-    dvals[0]=-0.5; dvals[1]=-1; dvals[2]=-1; dvals[3]=-0.5;
-    maketestfile("testpower",ivals,dvals,4);
+  spec.qid.sequence_start = 2;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 4) return 1;
+  result_present_or_fail(results, "testfeature", 2, 2, 0);
+  result_present_or_fail(results, "testfeature", 0, 2, 1);
+  result_present_or_fail(results, "testfeature", 0, 2, 2);
+  result_present_or_fail(results, "testfeature", 2, 2, 3);
+  audiodb_query_free_results(adb, &spec, results);
 
-//expect_clean_error_exit ${AUDIODB} -d testdb -I -f testfeature -w testpower
-    myinsert.features="testfeature";
-    myinsert.power="testpower";
-    if (!audiodb_insert(mydbp,&myinsert)){ returnval=-1; } 
+  spec.qid.sequence_length = 2;
+  spec.qid.sequence_start = 0;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 3) return 1;
+  result_present_or_fail(results, "testfeature", 1, 0, 0);
+  result_present_or_fail(results, "testfeature", 2, 0, 1);
+  result_present_or_fail(results, "testfeature", 1, 0, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -P
-    if(audiodb_power(mydbp)){ returnval=-1; };
+  spec.qid.sequence_start = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 3) return 1;
+  result_present_or_fail(results, "testfeature", 0, 1, 0);
+  result_present_or_fail(results, "testfeature", 1, 1, 1);
+  result_present_or_fail(results, "testfeature", 2, 1, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
-//expect_clean_error_exit ${AUDIODB} -d testdb -I -f testfeature
-    myinsert.features="testfeature";
-    myinsert.power=NULL;
-    if (!audiodb_insert(mydbp,&myinsert)){ returnval=-1; } 
+  spec.refine.flags = ADB_REFINE_ABSOLUTE_THRESHOLD;
+  spec.refine.absolute_threshold = -1.4;
 
+  spec.qid.sequence_length = 2;
+  spec.qid.sequence_start = 0;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 3) return 1;
+  result_present_or_fail(results, "testfeature", 1, 0, 0);
+  result_present_or_fail(results, "testfeature", 2, 0, 1);
+  result_present_or_fail(results, "testfeature", 1, 0, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -I -f testfeature -w testpower
-    myinsert.features="testfeature";
-    myinsert.power="testpower";
-    if (audiodb_insert(mydbp,&myinsert)){ returnval=-1; } 
+  spec.qid.sequence_start = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 3) return 1;
+  result_present_or_fail(results, "testfeature", 0, 1, 0);
+  result_present_or_fail(results, "testfeature", 1, 1, 1);
+  result_present_or_fail(results, "testfeature", 2, 1, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
+  spec.refine.absolute_threshold = -0.8;
+  spec.qid.sequence_start = 0;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 2) return 1;
+  result_present_or_fail(results, "testfeature", 1, 0, 0);
+  result_present_or_fail(results, "testfeature", 1, 0, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
-//# sequence queries require L2NORM
-//${AUDIODB} -d testdb -L
-    if(audiodb_l2norm(mydbp)){ returnval=-1; };
+  spec.qid.sequence_start = 1;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 0) return 1;
+  audiodb_query_free_results(adb, &spec, results);
 
-//echo "query points (0.0,0.5),(0.0,0.5),(0.5,0.0)"
-//intstring 2 > testquery
-//floatstring 0 0.5 >> testquery
-//floatstring 0 0.5 >> testquery
-//floatstring 0.5 0 >> testquery
-    ivals[0]=2;
-    dvals[0]=0; dvals[1]=0.5; dvals[2]=0; dvals[3]=0.5; dvals[4]=0.5; dvals[5]=0;
-    maketestfile("testquery",ivals,dvals,6);
+  spec.refine.absolute_threshold = 0;
+  spec.refine.flags = ADB_REFINE_RELATIVE_THRESHOLD;
+  spec.refine.relative_threshold = 0.1;
+  spec.qid.sequence_start = 0;
+  results = audiodb_query_spec(adb, &spec);
+  if(!results || results->nresults != 2) return 1;
+  result_present_or_fail(results, "testfeature", 1, 0, 0);
+  result_present_or_fail(results, "testfeature", 1, 0, 2);
+  audiodb_query_free_results(adb, &spec, results);
 
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery > testoutput
-//audioDB -Q sequence -d testdb -f testquery -l 1
-//echo testfeature 1 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="1";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
+  audiodb_close(adb);
 
-    dump_query(&myadbquery,&myadbqueryresult);
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,0,0)) {returnval = -1;};
-
-
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -p 0 > testoutput
-//echo testfeature 1 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="1";
-    myadbquery.qpoint="0";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,0,0)) {returnval = -1;};
-
-    printf("returnval:%d\n",returnval);
-
-//${AUDIODB} -d testdb -Q sequence -l 1 -f testquery -p 1 > testoutput
-//echo testfeature 1 1 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="1";
-    myadbquery.qpoint="1";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,1,0)) {returnval = -1;};
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -p 0 > testoutput
-//echo testfeature 1.33333 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="0";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1.33333,0,0)) {returnval = -1;};
-
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -p 1 > testoutput
-//echo testfeature 1 1 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="1";
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,1,0)) {returnval = -1;};
-
-
-//echo "query points (0.0,0.5)p=-0.5,(0.0,0.5)p=-1,(0.5,0.0)p=-1"
-//intstring 1 > testquerypower
-//floatstring -0.5 -1 -1 >> testquerypower
-    ivals[0]=1;
-    dvals[0]=-0.5; dvals[1]=-1; dvals[2]=-1; 
-    maketestfile("testquerypower",ivals,dvals,3);
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-1.4 -p 0 > testoutput
-//echo testfeature 1.33333 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint=NULL;
-    myadbquery.absolute_threshold=-1.4;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1.33333,0,0)) {returnval = -1;};
-
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-1.4 -p 1 > testoutput
-//echo testfeature 1 1 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="1";
-    myadbquery.absolute_threshold=-1.4;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,1,0)) {returnval = -1;};
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-0.8 -p 0 > testoutput
-//echo testfeature 1 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="0";
-    myadbquery.absolute_threshold=-0.8;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,0,0)) {returnval = -1;};
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --absolute-threshold=-0.8 -p 1 > testoutput
-//cat /dev/null > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="1";
-    myadbquery.absolute_threshold=-0.8;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 0) {returnval = -1;};
-
-
-
-//${AUDIODB} -d testdb -Q sequence -l 2 -f testquery -w testquerypower --relative-threshold=0.1 -p 0 > testoutput
-//echo testfeature 1 0 0 > test-expected-output
-//cmp testoutput test-expected-output
-    myadbquery.querytype="sequence";
-    myadbquery.feature="testquery";
-    myadbquery.power="testquerypower";
-    myadbquery.sequencelength="2";
-    myadbquery.qpoint="0";
-    myadbquery.absolute_threshold=0.0;
-    myadbquery.relative_threshold=0.1;
-    audiodb_query(mydbp,&myadbquery,&myadbqueryresult);
-    size=myadbqueryresult.sizeRlist;
-
-    /* check the test values */
-    if (size != 1) {returnval = -1;};
-    if (testoneresult(&myadbqueryresult,0,"testfeature",1,0,0)) {returnval = -1;};
-
-
-
-////    returnval=-1;
-    printf("returnval:%d\n",returnval);
-      
-    return(returnval);
+  return 104;
 }
-
