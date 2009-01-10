@@ -15,7 +15,7 @@ dbName = 'tutorial.adb'
 # From: http://www.informit.com/articles/article.aspx?p=686162&seqNum=2
 #serverHost = 'research-hm3.corp.sk1.yahoo.com'
 serverHost = 'localhost'
-serverPort = 14476
+serverPort = 14475
 
 # Start the server on serverHost with
 #	./audioDB -s 14475
