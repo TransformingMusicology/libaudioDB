@@ -925,7 +925,21 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
 
   adb_query_results_t *rs = audiodb_query_spec(adb, &qspec);
 
-  // FIXME: free bits of datum if !query_from_key
+  // FIXME: we don't yet free everything up if there are error
+  // conditions during the construction of the query spec (including
+  // the datum itself).
+  if(datum.data) {
+    free(datum.data);
+    datum.data = NULL;
+  }
+  if(datum.power) {
+    free(datum.data);
+    datum.data = NULL;
+  }
+  if(datum.times) {
+    free(datum.data);
+    datum.data = NULL;
+  }
 
   if(rs == NULL) {
     error("audiodb_query_spec failed");
