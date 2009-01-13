@@ -19,7 +19,7 @@ fi
 for file in ${pattern}; do
   if [ -d ${file} ]; then
     if [ -f ${file}/run-test.sh ]; then
-      echo -n Running test ${file}
+      echo -n Running command-line test ${file}
       if [ -f ${file}/short-description ]; then
         awk '{ printf(" (%s)",$0) }' < ${file}/short-description
       fi

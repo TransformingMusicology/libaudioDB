@@ -10,7 +10,7 @@ fi
 for file in ${pattern}; do
   if [ -d ${file} ]; then
     if [ /bin/true ]; then
-      echo -n Running test ${file}
+      echo -n Running library test ${file}
       if [ -f ${file}/short-description ]; then
         awk '{ printf(" (%s)",$0) }' < ${file}/short-description
       fi
