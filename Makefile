@@ -45,10 +45,10 @@ HELP.txt: $(EXECUTABLE)
 cmdline.c cmdline.h: gengetopt.in
 	$(GENGETOPT) -e <gengetopt.in
 
-soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
+soapServer.cpp soapClient.cpp soapC.cpp soapH.h adb.nsmap: audioDBws.h
 	$(SOAPCPP2) audioDBws.h
 
-$(LIBOBJS): %.o: %.cpp audioDB.h audioDB_API.h audioDB-internals.h accumulator.h accumulators.h
+$(LIBOBJS): %.o: %.cpp audioDB.h audioDB_API.h audioDB-internals.h accumulator.h accumulators.h cmdline.h soapH.h
 	g++ -c $(CFLAGS) $(GSL_INCLUDE) -Wall $<
 
 %.o: %.cpp audioDB.h audioDB_API.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
