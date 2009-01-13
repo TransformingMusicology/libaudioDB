@@ -48,6 +48,9 @@ cmdline.c cmdline.h: gengetopt.in
 soapServer.cpp soapClient.cpp soapC.cpp adb.nsmap: audioDBws.h
 	$(SOAPCPP2) audioDBws.h
 
+$(LIBOBJS): %.o: %.cpp audioDB.h audioDB_API.h audioDB-internals.h accumulator.h accumulators.h
+	g++ -c $(CFLAGS) $(GSL_INCLUDE) -Wall $<
+
 %.o: %.cpp audioDB.h audioDB_API.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
 	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) $(GSL_INCLUDE) -Wall  $<
 
@@ -83,6 +86,7 @@ distclean: clean
 
 test: $(EXECUTABLE)
 	-sh -c "cd tests && sh ./run-tests.sh"
+	-sh -c "cd libtests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
 	gcc -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
