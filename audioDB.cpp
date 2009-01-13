@@ -151,8 +151,6 @@ void audioDB::cleanup() {
     munmap(powerFileNameTable, fileTableLength);
   if(reporter)
     delete reporter;
-  if(allowed_keys)
-    delete allowed_keys;
   if(rng)
     gsl_rng_free(rng);
   if(infid>0)

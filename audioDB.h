@@ -292,7 +292,6 @@ class audioDB{
   double relative_threshold;
   
   ReporterBase* reporter;  // track/point reporter
-  set<Uns32T> * allowed_keys;    // search restrict list by key
 
   // LISZT parameters
   unsigned lisztOffset;
@@ -354,8 +353,6 @@ class audioDB{
   Uns32T index_insert_shingles(vector<vector<float> >*, Uns32T trackID, double* spp);
   void insertPowerData(unsigned n, int powerfd, double *powerdata);
   void init_track_aux_data(Uns32T trackID, double* fvp, double** sNormpp,double** snPtrp, double** sPowerp, double** spPtrp);
-  void initialize_allowed_keys(std::ifstream*); // implementation of restrict lists using STL "set" class
-  int is_in_allowed_keys(Uns32T trackID); // test method for allowed_keys used during search
   
   // Web Services
   void startServer();
@@ -431,7 +428,6 @@ class audioDB{
     use_relative_threshold(false),		\
     relative_threshold(0.0),			\
     reporter(0),                                \
-    allowed_keys(0),                            \
     lisztOffset(0),                             \
     lisztLength(0),                             \
     lsh(0),					\
