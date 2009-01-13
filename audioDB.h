@@ -310,7 +310,7 @@ class audioDB{
 
  public:
   audioDB(const unsigned argc, const char *argv[]);
-  audioDB(const unsigned argc, const char *argv[], adb__queryResponse *adbQueryResponse);
+  audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__queryResponse *adbQueryResponse);
   audioDB(const unsigned argc, const char *argv[], adb__statusResponse *adbStatusResponse);
   audioDB(const unsigned argc, const char *argv[], adb__lisztResponse *adbLisztResponse);
 
@@ -322,7 +322,7 @@ class audioDB{
   void create(const char* dbName);
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
-  void query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse=0);
+  void query(const char* dbName, const char* inFile, struct soap *soap=0, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
 
   unsigned random_track(unsigned *propTable, unsigned total);

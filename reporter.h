@@ -46,7 +46,7 @@ public:
   // reporter classes for WS and for stdout, rather than passing this
   // adbQueryResponse thing everywhere; the adb argument is there
   // solely for converting trackIDs into names.  -- CSR, 2007-12-10.
-  virtual void report(adb_t *adb, void* adbQueryResponse) = 0;
+  virtual void report(adb_t *adb, struct soap *soap, void* adbQueryResponse) = 0;
 };
 
 template <class T> class pointQueryReporter : public Reporter {
@@ -54,7 +54,7 @@ public:
   pointQueryReporter(unsigned int pointNN);
   ~pointQueryReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, void* adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void* adbQueryResponse);
 private:
   unsigned int pointNN;
   std::priority_queue< NNresult, std::vector< NNresult >, T> *queue;
@@ -83,7 +83,7 @@ template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, u
   }
 }
 
-template <class T> void pointQueryReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
+template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   NNresult r;
   std::vector<NNresult> v;
   unsigned int size = queue->size();
@@ -109,14 +109,14 @@ template <class T> void pointQueryReporter<T>::report(adb_t *adb, void *adbQuery
     response->result.__sizeDist=size;
     response->result.__sizeQpos=size;
     response->result.__sizeSpos=size;
-    response->result.Rlist= new char*[size];
-    response->result.Dist = new double[size];
-    response->result.Qpos = new unsigned int[size];
-    response->result.Spos = new unsigned int[size];
+    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
+    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
+    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
+    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
       response->result.Dist[k] = r.dist;
       response->result.Qpos[k] = r.qpos;
       response->result.Spos[k] = r.spos;
@@ -133,7 +133,7 @@ template <class T> class trackAveragingReporter : public Reporter {
   trackAveragingReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackAveragingReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -164,7 +164,7 @@ template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackI
   }
 }
 
-template <class T> void trackAveragingReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
+template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
@@ -217,14 +217,14 @@ template <class T> void trackAveragingReporter<T>::report(adb_t *adb, void *adbQ
     response->result.__sizeDist=size;
     response->result.__sizeQpos=size;
     response->result.__sizeSpos=size;
-    response->result.Rlist= new char*[size];
-    response->result.Dist = new double[size];
-    response->result.Qpos = new unsigned int[size];
-    response->result.Spos = new unsigned int[size];
+    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
+    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
+    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
+    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
       response->result.Dist[k] = r.dist;
       response->result.Qpos[k] = r.qpos;
       response->result.Spos[k] = r.spos;
@@ -245,13 +245,13 @@ template <class T> class trackSequenceQueryNNReporter : public trackAveragingRep
   using trackAveragingReporter<T>::pointNN;
  public:
   trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
-  void report(adb_t *adb, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
 };
 
 template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles)
 :trackAveragingReporter<T>(pointNN, trackNN, numFiles){}
 
-template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, void *adbQueryResponse) {
+template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues 
     = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
@@ -322,10 +322,10 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, void
     response->result.__sizeDist=size*pointNN;
     response->result.__sizeQpos=size*pointNN;
     response->result.__sizeSpos=size*pointNN;
-    response->result.Rlist= new char*[size*pointNN];
-    response->result.Dist = new double[size*pointNN];
-    response->result.Qpos = new unsigned int[size*pointNN];
-    response->result.Spos = new unsigned int[size*pointNN];
+    response->result.Rlist= (char **) soap_malloc(soap, size * pointNN * sizeof(char *));
+    response->result.Dist = (double *) soap_malloc(soap, size * pointNN * sizeof(double));
+    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
+    response->result.Spos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
     unsigned int k = 0;
     // Loop over returned tracks
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
@@ -347,7 +347,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, void
 	  rk.spos = 0xFFFFFFFF;
 	}
 	  
-	response->result.Rlist[k] = new char[O2_MAXFILESTR];
+	response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
 	response->result.Dist[k] = rk.dist;
 	response->result.Qpos[k] = rk.qpos;
 	response->result.Spos[k] = rk.spos;
@@ -415,7 +415,7 @@ public:
   trackSequenceQueryRadReporter(unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
  protected:
   unsigned int trackNN;
   unsigned int numFiles;
@@ -462,7 +462,7 @@ void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int
   }
 }
 
-void trackSequenceQueryRadReporter::report(adb_t *adb, void *adbQueryResponse) {
+void trackSequenceQueryRadReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -503,14 +503,14 @@ void trackSequenceQueryRadReporter::report(adb_t *adb, void *adbQueryResponse) {
     response->result.__sizeDist=size;
     response->result.__sizeQpos=size;
     response->result.__sizeSpos=size;
-    response->result.Rlist= new char*[size];
-    response->result.Dist = new double[size];
-    response->result.Qpos = new unsigned int[size];
-    response->result.Spos = new unsigned int[size];
+    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
+    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
+    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
+    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
     unsigned int k = 0;
     for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
       r = *rit;
-      response->result.Rlist[k] = new char[O2_MAXFILESTR];
+      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
       response->result.Dist[k] = 0;
       response->result.Qpos[k] = 0;
       response->result.Spos[k] = r.count;
@@ -531,7 +531,7 @@ public:
   trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -594,7 +594,7 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
   }
 }
 
-void trackSequenceQueryRadNNReporter::report(adb_t *adb, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -636,7 +636,7 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, void *adbQueryResponse)
       }	
     }
     // Report
-    rep->report(adb, adbQueryResponse);
+    rep->report(adb, soap, adbQueryResponse);
     // Exit
     delete[] point_queues;
     return;
@@ -674,10 +674,10 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, void *adbQueryResponse)
     response->result.__sizeDist=size*pointNN;
     response->result.__sizeQpos=size*pointNN;
     response->result.__sizeSpos=size*pointNN;
-    response->result.Rlist= new char*[size*pointNN];
-    response->result.Dist = new double[size*pointNN];
-    response->result.Qpos = new unsigned int[size*pointNN];
-    response->result.Spos = new unsigned int[size*pointNN];
+    response->result.Rlist= (char **) soap_malloc(soap, size * pointNN * sizeof(char *));
+    response->result.Dist = (double *) soap_malloc(soap, size * pointNN * sizeof(double));
+    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
+    response->result.Spos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
     unsigned int k = 0;
     // Loop over returned tracks
     for(rit = v.rbegin(); rit < v.rend(); rit++) {
@@ -699,7 +699,7 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, void *adbQueryResponse)
 	  rk.spos = 0xFFFFFFFF;
 	}
 	  
-	response->result.Rlist[k] = new char[O2_MAXFILESTR];
+	response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
 	response->result.Dist[k] = rk.dist;
 	response->result.Qpos[k] = rk.qpos;
 	response->result.Spos[k] = rk.spos;
@@ -730,7 +730,7 @@ public:
   trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporterOneToOne();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -778,7 +778,7 @@ void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, un
 
 }
 
-void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
   if(adbQueryResponse==0) {
     std::vector< NNresult >::iterator vit;
     NNresult rk;

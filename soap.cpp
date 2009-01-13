@@ -294,7 +294,7 @@ int adb__query(struct soap* soap, xsd__string dbName,
   argv[argv_counter] = NULL;
 
   try {
-    audioDB(argc, argv, &adbQueryResponse);
+    audioDB(argc, argv, soap, &adbQueryResponse);
     delete [] argv;
     return SOAP_OK;
   } catch (char *err) {
@@ -361,7 +361,7 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   
  
   try {
-    audioDB(argc, argv, &adbQueryResponse);
+    audioDB(argc, argv, soap, &adbQueryResponse);
     return SOAP_OK;
   } catch (char *err) {
     soap_receiver_fault(soap, err, "");

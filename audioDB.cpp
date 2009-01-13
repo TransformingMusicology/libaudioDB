@@ -83,7 +83,7 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
     error("Unrecognized command",command);
 }
 
-audioDB::audioDB(const unsigned argc, const char *argv[], adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     isServer = 1; // Set to make errors report over SOAP
@@ -92,7 +92,7 @@ audioDB::audioDB(const unsigned argc, const char *argv[], adb__queryResponse *ad
     if(dbName && adb_root)
       prefix_name((char** const)&dbName, adb_root);
     assert(O2_ACTION(COM_QUERY));
-    query(dbName, inFile, adbQueryResponse);
+    query(dbName, inFile, soap, adbQueryResponse);
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -757,7 +757,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   status(dbName);
 }
 
-void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *adbQueryResponse) {
+void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, adb__queryResponse *adbQueryResponse) {
 
   if(!adb) {
     if(!(adb = audiodb_open(dbName, O_RDWR))) {
@@ -951,7 +951,7 @@ void audioDB::query(const char* dbName, const char* inFile, adb__queryResponse *
   }
   audiodb_query_free_results(adb, &qspec, rs);
 
-  reporter->report(adb, adbQueryResponse);
+  reporter->report(adb, soap, adbQueryResponse);
 }
 
 // This entry point is visited once per instance
