@@ -8,9 +8,8 @@ GSOAP_INCLUDE=
 
 SHARED_LIB_FLAGS=-shared -Wl,-soname,
 
-LIBOBJS=query.o index.o insert.o create.o common.o open.o close.o status.o dump.o power.o l2norm.o lshlib.o lock.o pointpair.o
-OBJS=$(LIBOBJS) soap.o liszt.o sample.o cmdline.o audioDB.o common.o
-
+LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o lshlib.o index-utils.o query-indexed.o
+OBJS=$(LIBOBJS) index.o soap.o liszt.o sample.o cmdline.o audioDB.o common.o
 
 EXECUTABLE=audioDB
 
@@ -48,7 +47,7 @@ cmdline.c cmdline.h: gengetopt.in
 soapServer.cpp soapClient.cpp soapC.cpp soapH.h adb.nsmap: audioDBws.h
 	$(SOAPCPP2) audioDBws.h
 
-$(LIBOBJS): %.o: %.cpp audioDB.h audioDB_API.h audioDB-internals.h accumulator.h accumulators.h cmdline.h soapH.h
+$(LIBOBJS): %.o: %.cpp audioDB_API.h audioDB-internals.h accumulator.h accumulators.h
 	g++ -c $(CFLAGS) $(GSL_INCLUDE) -Wall $<
 
 %.o: %.cpp audioDB.h audioDB_API.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
@@ -85,8 +84,8 @@ distclean: clean
 
 
 test: $(EXECUTABLE)
-	-sh -c "cd tests && sh ./run-tests.sh"
-	-sh -c "cd libtests && sh ./run-tests.sh"
+	sh -c "cd libtests && sh ./run-tests.sh"
+	sh -c "cd tests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
 	gcc -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<

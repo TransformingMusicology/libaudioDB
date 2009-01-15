@@ -1,8 +1,4 @@
 #include "audioDB.h"
-extern "C" {
-#include "audioDB_API.h"
-#include "audioDB-internals.h"
-}
 
 #if defined(O2_DEBUG)
 void sigterm_action(int signal, siginfo_t *info, void *context) {

@@ -1,8 +1,4 @@
 #include "audioDB.h"
-extern "C" {
-#include "audioDB_API.h"
-#include "audioDB-internals.h"
-}
 #include "reporter.h"
 
 char* SERVER_ADB_ROOT;

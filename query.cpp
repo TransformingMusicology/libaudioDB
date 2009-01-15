@@ -1,4 +1,6 @@
-#include "audioDB.h"
+extern "C" {
+#include "audioDB_API.h"
+}
 #include "audioDB-internals.h"
 #include "accumulators.h"
 
@@ -198,21 +200,21 @@ int audiodb_read_data(adb_t *adb, int trkfid, int track, double **data_buffer_p,
 
 int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
   off_t track_offset = (*adb->track_offsets)[track_id];
-  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+  if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     /* create a reference/insert, then use adb_insert_create_datum() */
     adb_reference_t reference = {0};
-    char features[MAXSTR], power[MAXSTR], times[MAXSTR];
-    lseek(adb->fd, adb->header->dataOffset + track_id * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
-    read_or_goto_error(adb->fd, features, MAXSTR);
+    char features[ADB_MAXSTR], power[ADB_MAXSTR], times[ADB_MAXSTR];
+    lseek(adb->fd, adb->header->dataOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+    read_or_goto_error(adb->fd, features, ADB_MAXSTR);
     reference.features = features;
-    if(adb->header->flags & O2_FLAG_POWER) {
-      lseek(adb->fd, adb->header->powerTableOffset + track_id * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
-      read_or_goto_error(adb->fd, power, MAXSTR);
+    if(adb->header->flags & ADB_HEADER_FLAG_POWER) {
+      lseek(adb->fd, adb->header->powerTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      read_or_goto_error(adb->fd, power, ADB_MAXSTR);
       reference.power = power;
     }
-    if(adb->header->flags & O2_FLAG_TIMES) {
-      lseek(adb->fd, adb->header->timesTableOffset + track_id * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
-      read_or_goto_error(adb->fd, times, MAXSTR);
+    if(adb->header->flags & ADB_HEADER_FLAG_TIMES) {
+      lseek(adb->fd, adb->header->timesTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      read_or_goto_error(adb->fd, times, ADB_MAXSTR);
       reference.times = times;
     }
     return audiodb_insert_create_datum(&reference, d);
@@ -225,12 +227,12 @@ int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
     d->data = (double *) malloc(d->nvectors * d->dim * sizeof(double));
     lseek(adb->fd, adb->header->dataOffset + track_offset, SEEK_SET);
     read_or_goto_error(adb->fd, d->data, d->nvectors * d->dim * sizeof(double));
-    if(adb->header->flags & O2_FLAG_POWER) {
+    if(adb->header->flags & ADB_HEADER_FLAG_POWER) {
       d->power = (double *) malloc(d->nvectors * sizeof(double));
       lseek(adb->fd, adb->header->powerTableOffset + track_offset / d->dim, SEEK_SET);
       read_or_goto_error(adb->fd, d->power, d->nvectors * sizeof(double));
     }
-    if(adb->header->flags & O2_FLAG_TIMES) {
+    if(adb->header->flags & ADB_HEADER_FLAG_TIMES) {
       d->times = (double *) malloc(2 * d->nvectors * sizeof(double));
       lseek(adb->fd, adb->header->timesTableOffset + track_offset / d->dim, SEEK_SET);
       read_or_goto_error(adb->fd, d->times, 2 * d->nvectors * sizeof(double));
@@ -354,7 +356,7 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
   read_or_goto_error(adb->fd, dbpointers->l2norm_data, nvectors * sizeof(double));
 
   if (using_power) {
-    if (!(adb->header->flags & O2_FLAG_POWER)) {
+    if (!(adb->header->flags & ADB_HEADER_FLAG_POWER)) {
       goto error;
     }
     dbpointers->power_data = new double[nvectors];
@@ -380,7 +382,7 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
   }
 
   if (using_times) {
-    if(!(adb->header->flags & O2_FLAG_TIMES)) {
+    if(!(adb->header->flags & ADB_HEADER_FLAG_TIMES)) {
       goto error;
     }
 
@@ -450,10 +452,10 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   while(npairs--) {
     PointPair pp = qstate->exact_evaluation_queue->top();
     if(currentTrack != pp.trackID) {
-      SAFE_DELETE_ARRAY(dbdata);
-      SAFE_DELETE_ARRAY(dbpointers.l2norm_data);
-      SAFE_DELETE_ARRAY(dbpointers.power_data);
-      SAFE_DELETE_ARRAY(dbpointers.mean_duration);
+      maybe_delete_array(dbdata);
+      maybe_delete_array(dbpointers.l2norm_data);
+      maybe_delete_array(dbpointers.power_data);
+      maybe_delete_array(dbpointers.mean_duration);
       currentTrack = pp.trackID;
       adb_datum_t d = {0};
       if(audiodb_track_id_datum(adb, pp.trackID, &d)) {
@@ -485,7 +487,7 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
         break;
       }
       if((!(spec->refine.flags & ADB_REFINE_RADIUS)) || 
-         dist <= (spec->refine.radius+O2_DISTANCE_TOLERANCE)) {
+         dist <= (spec->refine.radius + ADB_DISTANCE_TOLERANCE)) {
         adb_result_t r;
         r.key = (*adb->keys)[pp.trackID].c_str();
         r.dist = dist;
@@ -497,12 +499,11 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
     qstate->exact_evaluation_queue->pop();
   }
 
-  
   // Cleanup
-  SAFE_DELETE_ARRAY(dbdata);
-  SAFE_DELETE_ARRAY(dbpointers.l2norm_data);
-  SAFE_DELETE_ARRAY(dbpointers.power_data);
-  SAFE_DELETE_ARRAY(dbpointers.mean_duration);
+  maybe_delete_array(dbdata);
+  maybe_delete_array(dbpointers.l2norm_data);
+  maybe_delete_array(dbpointers.power_data);
+  maybe_delete_array(dbpointers.mean_duration);
   delete qstate->exact_evaluation_queue;
   return 0;
 }
@@ -514,7 +515,7 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
 
   bool power_refine = spec->refine.flags & (ADB_REFINE_ABSOLUTE_THRESHOLD|ADB_REFINE_RELATIVE_THRESHOLD);
 
-  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+  if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     /* FIXME: actually it would be nice to support this mode of
      * operation, but for now... */
     return 1;
@@ -590,7 +591,7 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
 	    if ((!power_refine) || audiodb_powers_acceptable(&spec->refine, qpointers.power[j], dbpointers.power[trackIndexOffset + k])) {
               // radius test
               if((!(spec->refine.flags & ADB_REFINE_RADIUS)) || 
-                 thisDist <= (spec->refine.radius+O2_DISTANCE_TOLERANCE)) {
+                 thisDist <= (spec->refine.radius + ADB_DISTANCE_TOLERANCE)) {
                 adb_result_t r;
                 r.key = (*adb->keys)[track].c_str();
                 r.dist = thisDist;

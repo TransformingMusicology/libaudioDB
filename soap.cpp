@@ -1,5 +1,4 @@
 #include "audioDB.h"
-#include "audioDB-internals.h"
 #include "adb.nsmap"
 
 /* Command-line client definitions */

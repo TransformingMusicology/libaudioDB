@@ -1,8 +1,7 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 int audiodb_power(adb_t *adb) {
   if(!(adb->flags & O_RDWR)) {
@@ -12,6 +11,6 @@ int audiodb_power(adb_t *adb) {
     return 1;
   }
 
-  adb->header->flags |= O2_FLAG_POWER;
+  adb->header->flags |= ADB_HEADER_FLAG_POWER;
   return audiodb_sync_header(adb);
 }

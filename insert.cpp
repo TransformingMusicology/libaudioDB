@@ -1,4 +1,3 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
 }
@@ -6,7 +5,7 @@ extern "C" {
 
 static bool audiodb_enough_data_space_free(adb_t *adb, off_t size) {
   adb_header_t *header = adb->header;
-  if(header->flags & O2_FLAG_LARGE_ADB) {
+  if(header->flags & ADB_HEADER_FLAG_REFERENCES) {
     return true;
   } else {
     /* FIXME: timesTableOffset isn't necessarily the next biggest
@@ -23,11 +22,11 @@ static bool audiodb_enough_per_file_space_free(adb_t *adb) {
   adb_header_t *header = adb->header;
   off_t file_table_length = header->trackTableOffset - header->fileTableOffset;
   off_t track_table_length = header->dataOffset - header->trackTableOffset;
-  int fmaxfiles = file_table_length / O2_FILETABLE_ENTRY_SIZE;
-  int tmaxfiles = track_table_length / O2_TRACKTABLE_ENTRY_SIZE;
+  int fmaxfiles = file_table_length / ADB_FILETABLE_ENTRY_SIZE;
+  int tmaxfiles = track_table_length / ADB_TRACKTABLE_ENTRY_SIZE;
   /* maxfiles is the _minimum_ of the two.  Do not be confused... */
   int maxfiles = fmaxfiles > tmaxfiles ? tmaxfiles : fmaxfiles;
-  if(header->flags & O2_FLAG_LARGE_ADB) {
+  if(header->flags & ADB_HEADER_FLAG_REFERENCES) {
     /* by default, these tables are created with the same size as the
      * fileTable (which should be called key_table); relying on that
      * always being the case, though, smacks of optimism, so instead
@@ -35,9 +34,9 @@ static bool audiodb_enough_per_file_space_free(adb_t *adb) {
     off_t data_table_length = header->timesTableOffset - header->dataOffset;
     off_t times_table_length = header->powerTableOffset - header->timesTableOffset;
     off_t power_table_length = header->dbSize - header->powerTableOffset;
-    int dmaxfiles = data_table_length / O2_FILETABLE_ENTRY_SIZE;
-    int timaxfiles = times_table_length / O2_FILETABLE_ENTRY_SIZE;
-    int pmaxfiles = power_table_length / O2_FILETABLE_ENTRY_SIZE;
+    int dmaxfiles = data_table_length / ADB_FILETABLE_ENTRY_SIZE;
+    int timaxfiles = times_table_length / ADB_FILETABLE_ENTRY_SIZE;
+    int pmaxfiles = power_table_length / ADB_FILETABLE_ENTRY_SIZE;
     /* ... even though it means a certain amount of tedium. */
     maxfiles = maxfiles > dmaxfiles ? dmaxfiles : maxfiles;
     maxfiles = maxfiles > timaxfiles ? timaxfiles : maxfiles;
@@ -58,12 +57,12 @@ static bool audiodb_enough_per_file_space_free(adb_t *adb) {
  *     header dimension is zero, in which case write datum->dim to
  *     adb->header->dim).
  *  4. check for presence of datum->key in adb->keymap;
- *  5. check for consistency between power and O2_FLAG_POWER, and 
- *     times and O2_FLAG_TIMES;
+ *  5. check for consistency between power and ADB_HEADER_FLAG_POWER,
+ *     and times and ADB_HEADER_FLAG_TIMES;
  *  6. write in data, power, times as appropriate; add to track
  *     and key tables too;
- *  7. if O2_FLAG_L2NORM and !O2_FLAG_LARGE_ADB, compute norms and fill
- *     in table;
+ *  7. if ADB_HEADER_FLAG_L2NORM and !ADB_HEADER_FLAG_REFERENCES,
+ *     compute norms and fill in table;
  *  8. update adb->keys, adb->keymap, adb->track_lengths,
  *     adb->track_offsets and adb->header;
  *  9. sync adb->header with disk.
@@ -112,20 +111,20 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
        of audioDB::batchinsert. */
     return 2;
   }
-  /* 5. check for consistency between power and O2_FLAG_POWER, and
-   *    times and O2_FLAG_TIMES; 
+  /* 5. check for consistency between power and ADB_HEADER_FLAG_POWER,
+   *    and times and ADB_HEADER_FLAG_TIMES;
    */
-  if((datum->power && !(adb->header->flags & O2_FLAG_POWER)) ||
-     ((adb->header->flags & O2_FLAG_POWER) && !datum->power)) {
+  if((datum->power && !(adb->header->flags & ADB_HEADER_FLAG_POWER)) ||
+     ((adb->header->flags & ADB_HEADER_FLAG_POWER) && !datum->power)) {
     return 1;
   }
-  if(datum->times && !(adb->header->flags & O2_FLAG_TIMES)) {
+  if(datum->times && !(adb->header->flags & ADB_HEADER_FLAG_TIMES)) {
     if(adb->header->numFiles == 0) {
-      adb->header->flags |= O2_FLAG_TIMES;
+      adb->header->flags |= ADB_HEADER_FLAG_TIMES;
     } else {
       return 1;
     }
-  } else if ((adb->header->flags & O2_FLAG_TIMES) && !datum->times) {
+  } else if ((adb->header->flags & ADB_HEADER_FLAG_TIMES) && !datum->times) {
     return 1;
   }
   /* 6. write in data, power, times as appropriate; add to track
@@ -135,25 +134,25 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
   nfiles = adb->header->numFiles;
 
   /* FIXME: checking for all these lseek()s */
-  lseek(adb->fd, adb->header->fileTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+  lseek(adb->fd, adb->header->fileTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
   write_or_goto_error(adb->fd, datum->key, strlen(datum->key)+1);
-  lseek(adb->fd, adb->header->trackTableOffset + nfiles * O2_TRACKTABLE_ENTRY_SIZE, SEEK_SET);
-  write_or_goto_error(adb->fd, &datum->nvectors, O2_TRACKTABLE_ENTRY_SIZE);
-  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+  lseek(adb->fd, adb->header->trackTableOffset + nfiles * ADB_TRACKTABLE_ENTRY_SIZE, SEEK_SET);
+  write_or_goto_error(adb->fd, &datum->nvectors, ADB_TRACKTABLE_ENTRY_SIZE);
+  if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     char cwd[PATH_MAX];
     char slash = '/';
 
     if(!getcwd(cwd, PATH_MAX)) {
       goto error;
     }
-    lseek(adb->fd, adb->header->dataOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+    lseek(adb->fd, adb->header->dataOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
     if(*((char *) datum->data) != '/') {
       write_or_goto_error(adb->fd, cwd, strlen(cwd));
       write_or_goto_error(adb->fd, &slash, 1);
     }
     write_or_goto_error(adb->fd, datum->data, strlen((const char *) datum->data)+1);
     if(datum->power) {
-      lseek(adb->fd, adb->header->powerTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek(adb->fd, adb->header->powerTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
       if(*((char *) datum->power) != '/') {
         write_or_goto_error(adb->fd, cwd, strlen(cwd));
         write_or_goto_error(adb->fd, &slash, 1);
@@ -161,7 +160,7 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
       write_or_goto_error(adb->fd, datum->power, strlen((const char *) datum->power)+1);
     }
     if(datum->times) {
-      lseek(adb->fd, adb->header->timesTableOffset + nfiles * O2_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek(adb->fd, adb->header->timesTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
       if(*((char *) datum->times) != '/') {
         write_or_goto_error(adb->fd, cwd, strlen(cwd));
         write_or_goto_error(adb->fd, &slash, 1);
@@ -181,11 +180,11 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
     }
   }
 
-  /* 7. if O2_FLAG_L2NORM and !O2_FLAG_LARGE_ADB, compute norms and fill
-   *    in table;
+  /* 7. if ADB_HEADER_FLAG_L2NORM and !ADB_HEADER_FLAG_REFERENCES,
+   *    compute norms and fill in table;
    */
-  if((adb->header->flags & O2_FLAG_L2NORM) &&
-     !(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+  if((adb->header->flags & ADB_HEADER_FLAG_L2NORM) &&
+     !(adb->header->flags & ADB_HEADER_FLAG_REFERENCES)) {
     l2norm_buffer = (double *) malloc(datum->nvectors * sizeof(double));
     
     audiodb_l2norm_buffer((double *) datum->data, datum->dim, datum->nvectors, l2norm_buffer);
@@ -216,7 +215,7 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
 }
 
 int audiodb_insert_datum(adb_t *adb, const adb_datum_t *datum) {
-  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+  if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     return 1;
   } else {
     adb_datum_internal_t d;
@@ -231,7 +230,7 @@ int audiodb_insert_datum(adb_t *adb, const adb_datum_t *datum) {
 }
 
 int audiodb_insert_reference(adb_t *adb, const adb_reference_t *reference) {
-  if(!(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+  if(!(adb->header->flags & ADB_HEADER_FLAG_REFERENCES)) {
     return 1;
   } else {
     adb_datum_internal_t d;
@@ -404,7 +403,7 @@ int audiodb_insert_create_datum(adb_insert_t *insert, adb_datum_t *datum) {
 }
 
 int audiodb_insert(adb_t *adb, adb_insert_t *insert) {
-  if(adb->header->flags & O2_FLAG_LARGE_ADB) {
+  if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     adb_reference_t *reference = insert;
     int err;
     err = audiodb_insert_reference(adb, reference);

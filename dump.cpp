@@ -1,8 +1,7 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 int audiodb_dump(adb_t *adb, const char *output) {
   char *fileTable = 0; /* key_table */
@@ -36,16 +35,16 @@ int audiodb_dump(adb_t *adb, const char *output) {
   unsigned nfiles = adb->header->numFiles;
 
   if(adb->header->length > 0) {
-    fileTableLength = ALIGN_PAGE_UP(nfiles * O2_FILETABLE_ENTRY_SIZE);
-    if(!(adb->header->flags & O2_FLAG_LARGE_ADB)) {
+    fileTableLength = align_page_up(nfiles * ADB_FILETABLE_ENTRY_SIZE);
+    if(!(adb->header->flags & ADB_HEADER_FLAG_REFERENCES)) {
       off_t length = adb->header->length;
       unsigned dim = adb->header->dim;
-      timesTableLength = ALIGN_PAGE_UP(2*length/dim);
-      powerTableLength = ALIGN_PAGE_UP(length/dim);
+      timesTableLength = align_page_up(2*length/dim);
+      powerTableLength = align_page_up(length/dim);
     }
 
     mmap_or_goto_error(char *, fileTable, adb->header->fileTableOffset, fileTableLength);
-    if (adb->header->flags & O2_FLAG_LARGE_ADB) {
+    if (adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
       mmap_or_goto_error(char *, featureFileNameTable, adb->header->dataOffset, fileTableLength);
       mmap_or_goto_error(char *, powerFileNameTable, adb->header->powerTableOffset, fileTableLength);
       mmap_or_goto_error(char *, timesFileNameTable, adb->header->timesTableOffset, fileTableLength);
@@ -74,14 +73,14 @@ int audiodb_dump(adb_t *adb, const char *output) {
     goto error;
   }
 
-  times = adb->header->flags & O2_FLAG_TIMES;
+  times = adb->header->flags & ADB_HEADER_FLAG_TIMES;
   if (times) {
     if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
       goto error;
     }
   }
 
-  power = adb->header->flags & O2_FLAG_POWER;
+  power = adb->header->flags & ADB_HEADER_FLAG_POWER;
   if (power) {
     if ((pLfd = open("powerList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
       goto error;
@@ -105,22 +104,22 @@ int audiodb_dump(adb_t *adb, const char *output) {
   lseek(adb->fd, adb->header->dataOffset, SEEK_SET);
 
   for(unsigned k = 0; k < nfiles; k++) {
-    fprintf(kLFile, "%s\n", fileTable + k*O2_FILETABLE_ENTRY_SIZE);
-    if(adb->header->flags & O2_FLAG_LARGE_ADB) {
-      char *featureFileName = featureFileNameTable+k*O2_FILETABLE_ENTRY_SIZE;
+    fprintf(kLFile, "%s\n", fileTable + k*ADB_FILETABLE_ENTRY_SIZE);
+    if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
+      char *featureFileName = featureFileNameTable+k*ADB_FILETABLE_ENTRY_SIZE;
       if(*featureFileName != '/') {
         goto error;
       }
       fprintf(fLFile, "%s\n", featureFileName);
       if(times) {
-	char *timesFileName = timesFileNameTable + k*O2_FILETABLE_ENTRY_SIZE;
+	char *timesFileName = timesFileNameTable + k*ADB_FILETABLE_ENTRY_SIZE;
 	if(*timesFileName != '/') {
           goto error;
 	}
 	fprintf(tLFile, "%s\n", timesFileName);
       }
       if(power) {
-	char *powerFileName = powerFileNameTable + k*O2_FILETABLE_ENTRY_SIZE;
+	char *powerFileName = powerFileNameTable + k*ADB_FILETABLE_ENTRY_SIZE;
 	if(*powerFileName != '/') {
           goto error;
 	}
@@ -189,7 +188,7 @@ int audiodb_dump(adb_t *adb, const char *output) {
       } 
       
       pos += (*adb->track_lengths)[k];
-      std::cout << fileTable+k*O2_FILETABLE_ENTRY_SIZE << " " << (*adb->track_lengths)[k] << std::endl;
+      std::cout << fileTable+k*ADB_FILETABLE_ENTRY_SIZE << " " << (*adb->track_lengths)[k] << std::endl;
     }
   }
 
@@ -205,9 +204,9 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
           (int) ((adb->header->timesTableOffset - adb->header->dataOffset) / (1024*1024)),
           // fileTable entries (char[256]) are bigger than trackTable
           // (int), so the granularity of page aligning is finer.
-          (int) ((adb->header->trackTableOffset - adb->header->fileTableOffset) / O2_FILETABLE_ENTRY_SIZE),
+          (int) ((adb->header->trackTableOffset - adb->header->fileTableOffset) / ADB_FILETABLE_ENTRY_SIZE),
           (int) ceil(((double) (adb->header->timesTableOffset - adb->header->dataOffset)) / ((double) (adb->header->dbSize - adb->header->l2normTableOffset))));
-  if(adb->header->flags & O2_FLAG_L2NORM) {
+  if(adb->header->flags & ADB_HEADER_FLAG_L2NORM) {
     fprintf(scriptFile, "\"${AUDIODB}\" -d \"$1\" -L\n");
   }
   if(power) {

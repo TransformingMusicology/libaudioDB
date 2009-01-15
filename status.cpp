@@ -1,8 +1,7 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 int audiodb_status(adb_t *adb, adb_status_t *status) {
   /* FIXME: it would be nice to be able to test for "is this database

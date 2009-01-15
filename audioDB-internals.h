@@ -1,4 +1,11 @@
+#include <set>
+#include <queue>
+#include <map>
+#include <string>
+
+#include "pointpair.h"
 #include "accumulator.h"
+#include "lshlib.h"
 
 /* this struct is for writing polymorphic routines as puns.  When
  * inserting, we might have a "datum" (with actual numerical data) or
@@ -47,6 +54,32 @@ typedef struct adb_qstate_internal {
   std::priority_queue<PointPair> *exact_evaluation_queue;
   LSH *lsh;
 } adb_qstate_internal_t;
+
+/* this struct is the in-memory representation of the binary
+ * information stored at the head of each adb file */
+typedef struct adbheader {
+  uint32_t magic;
+  uint32_t version;
+  uint32_t numFiles;
+  uint32_t dim;
+  uint32_t flags;
+  uint32_t headerSize;
+  off_t length;
+  off_t fileTableOffset;
+  off_t trackTableOffset;
+  off_t dataOffset;
+  off_t l2normTableOffset;
+  off_t timesTableOffset;
+  off_t powerTableOffset;
+  off_t dbSize;
+} adb_header_t;
+
+#define ADB_HEADER_SIZE (sizeof(struct adbheader))
+
+#define ADB_HEADER_FLAG_L2NORM		(0x1U)
+#define ADB_HEADER_FLAG_POWER		(0x4U)
+#define ADB_HEADER_FLAG_TIMES		(0x20U)
+#define ADB_HEADER_FLAG_REFERENCES	(0x40U)
 
 /* the transparent version of the opaque (forward-declared) adb_t. */
 struct adb {
@@ -111,6 +144,13 @@ typedef struct {
     } \
   }
 
+#define maybe_delete_array(pointer) \
+  { if(pointer) { \
+      delete [] pointer; \
+      pointer = NULL; \
+    } \
+  }
+
 #define write_or_goto_error(fd, buffer, size) \
   { ssize_t tmp = size; \
     if(write(fd, buffer, size) != tmp) { \
@@ -134,7 +174,7 @@ static inline int audiodb_sync_header(adb_t *adb) {
   if(lseek(adb->fd, (off_t) 0, SEEK_SET) == (off_t) -1) {
     goto error;
   }
-  if(write(adb->fd, adb->header, O2_HEADERSIZE) != O2_HEADERSIZE) {
+  if(write(adb->fd, adb->header, ADB_HEADER_SIZE) != ADB_HEADER_SIZE) {
     goto error;
   }
 
@@ -242,9 +282,14 @@ static inline uint32_t audiodb_index_from_trackinfo(uint32_t track_id, uint32_t 
   return ((track_id << n_point_bits) | track_pos);
 }
 
+#define ADB_FIXME_DEFAULT_LSH_N_POINT_BITS 14
+#ifndef ADB_FIXME_LSH_N_POINT_BITS
+#define ADB_FIXME_LSH_N_POINT_BITS ADB_FIXME_DEFAULT_LSH_N_POINT_BITS
+#endif
+
 static inline uint32_t audiodb_lsh_n_point_bits(adb_t *adb) {
   uint32_t nbits = adb->header->flags >> 28;
-  return (nbits ? nbits : O2_DEFAULT_LSH_N_POINT_BITS);
+  return (nbits ? nbits : ADB_FIXME_LSH_N_POINT_BITS);
 }
 
 int audiodb_read_data(adb_t *, int, int, double **, size_t *);
@@ -258,3 +303,33 @@ int audiodb_query_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t 
 char *audiodb_index_get_name(const char *, double, uint32_t);
 bool audiodb_index_exists(const char *, double, uint32_t);
 int audiodb_index_query_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t *);
+LSH *audiodb_index_allocate(adb_t *, char *, bool);
+vector<vector<float> > *audiodb_index_initialize_shingles(uint32_t, uint32_t, uint32_t);
+void audiodb_index_delete_shingles(vector<vector<float> > *);
+void audiodb_index_make_shingle(vector<vector<float> > *, uint32_t, double *, uint32_t, uint32_t);
+int audiodb_index_norm_shingles(vector<vector<float> > *, double *, double *, uint32_t, uint32_t, double, bool, bool, float);
+
+#define ADB_MAXSTR (512U)
+#define ADB_FILETABLE_ENTRY_SIZE (256U)
+#define ADB_TRACKTABLE_ENTRY_SIZE (sizeof(uint32_t))
+#define ADB_DISTANCE_TOLERANCE (1e-6)
+
+#define ADB_DEFAULT_DATASIZE (1355U) /* in MB */
+#define ADB_DEFAULT_NTRACKS (20000U)
+#define ADB_DEFAULT_DATADIM (9U)
+
+#define ADB_FIXME_LARGE_ADB_SIZE (ADB_DEFAULT_DATASIZE+1)
+#define ADB_FIXME_LARGE_ADB_NTRACKS (ADB_DEFAULT_NTRACKS+1)
+
+#define ADB_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
+#define ADB_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
+#define ADB_FORMAT_VERSION (4U)
+
+#define ADB_LSH_MAXTRACKLEN (1 << ADB_FIXME_LSH_N_POINT_BITS)
+
+#define align_up(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
+#define align_down(x,w) ((x) & ~((1<<w)-1))
+
+#define align_page_up(x) (((x) + (getpagesize()-1)) & ~(getpagesize()-1))
+#define align_page_down(x) ((x) & ~(getpagesize()-1))
+

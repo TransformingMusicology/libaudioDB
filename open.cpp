@@ -1,22 +1,21 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 static bool audiodb_check_header(adb_header_t *header) {
   /* FIXME: use syslog() or write to stderr or something to give the
      poor user some diagnostics. */
-  if(header->magic == O2_OLD_MAGIC) {
+  if(header->magic == ADB_OLD_MAGIC) {
     return false;
   }
-  if(header->magic != O2_MAGIC) {
+  if(header->magic != ADB_MAGIC) {
     return false;
   }
-  if(header->version != O2_FORMAT_VERSION) {
+  if(header->version != ADB_FORMAT_VERSION) {
     return false;
   }
-  if(header->headerSize != O2_HEADERSIZE) {
+  if(header->headerSize != ADB_HEADER_SIZE) {
     return false;
   }
   return true;
@@ -28,11 +27,11 @@ static int audiodb_collect_keys(adb_t *adb) {
 
   if(adb->header->length > 0) {
     unsigned nfiles = adb->header->numFiles;
-    key_table_length = ALIGN_PAGE_UP(nfiles * O2_FILETABLE_ENTRY_SIZE);
+    key_table_length = align_page_up(nfiles * ADB_FILETABLE_ENTRY_SIZE);
     mmap_or_goto_error(char *, key_table, adb->header->fileTableOffset, key_table_length);
     for (unsigned int k = 0; k < nfiles; k++) {
-      adb->keys->push_back(key_table + k*O2_FILETABLE_ENTRY_SIZE);
-      (*adb->keymap)[(key_table + k*O2_FILETABLE_ENTRY_SIZE)] = k;
+      adb->keys->push_back(key_table + k*ADB_FILETABLE_ENTRY_SIZE);
+      (*adb->keymap)[(key_table + k*ADB_FILETABLE_ENTRY_SIZE)] = k;
     }
     munmap(key_table, key_table_length);
   }
@@ -49,7 +48,7 @@ static int audiodb_collect_track_lengths(adb_t *adb) {
   size_t track_table_length = 0;
   if(adb->header->length > 0) {
     unsigned nfiles = adb->header->numFiles;
-    track_table_length = ALIGN_PAGE_UP(nfiles * O2_TRACKTABLE_ENTRY_SIZE);
+    track_table_length = align_page_up(nfiles * ADB_TRACKTABLE_ENTRY_SIZE);
     mmap_or_goto_error(uint32_t *, track_table, adb->header->trackTableOffset, track_table_length);
     off_t offset = 0;
     for (unsigned int k = 0; k < nfiles; k++) {
@@ -97,7 +96,7 @@ adb_t *audiodb_open(const char *path, int flags) {
   if(!(adb->header)) {
     goto error;
   }
-  if(read(fd, (char *) adb->header, O2_HEADERSIZE) != O2_HEADERSIZE) {
+  if(read(fd, (char *) adb->header, ADB_HEADER_SIZE) != ADB_HEADER_SIZE) {
     goto error;
   }
   if(!audiodb_check_header(adb->header)) {

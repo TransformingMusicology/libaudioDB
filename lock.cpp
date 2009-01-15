@@ -1,4 +1,7 @@
-#include "audioDB.h"
+extern "C" {
+#include "audioDB_API.h"
+}
+#include "audioDB-internals.h"
 
 int acquire_lock(int fd, bool exclusive) {
   struct flock lock;

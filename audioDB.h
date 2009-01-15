@@ -24,6 +24,7 @@
 extern "C" {
 #include "audioDB_API.h"
 }
+#include "audioDB-internals.h"
 #include "ReporterBase.h"
 #include "accumulator.h"
 #include "lshlib.h"
@@ -32,17 +33,7 @@ extern "C" {
 #include "soapH.h"
 #include "cmdline.h"
 
-// should probably be rewritten
-class PointPair{
- public:
-  Uns32T trackID;
-  Uns32T qpos;
-  Uns32T spos;
-  PointPair(Uns32T a, Uns32T b, Uns32T c);
-};
-bool operator<(const PointPair& a, const PointPair& b);
-
-#define MAXSTR 512
+#define MAXSTR ADB_MAXSTR
 
 // Databse PRIMARY commands
 #define COM_CREATE "--NEW"
@@ -79,54 +70,41 @@ bool operator<(const PointPair& a, const PointPair& b);
 #define COM_LSH_EXACT "--lsh_exact"
 #define COM_NO_UNIT_NORMING "--no_unit_norming"
 
-#define O2_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
-#define O2_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
-#define O2_FORMAT_VERSION (4U)
-
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
 
 //#define O2_DEFAULTDBSIZE (4000000000) // 4GB table size
 #define O2_DEFAULTDBSIZE (2000000000) // 2GB table size
 
-// Bit masks for packing (trackID,pointID) into 32-bit unsigned int
-// This can be controlled at compile time
-#define O2_DEFAULT_LSH_N_POINT_BITS 14
-
-// Override the default point bit width for large database support
-#ifndef LSH_N_POINT_BITS
-#define LSH_N_POINT_BITS O2_DEFAULT_LSH_N_POINT_BITS
-#endif
-
-// LIMIT PARAMETERS
-#define O2_DEFAULT_DATASIZE (1355U) // in MB
+#define O2_DEFAULT_DATASIZE (1355U) /* in MB */
 #define O2_DEFAULT_NTRACKS (20000U)
 #define O2_DEFAULT_DATADIM (9U)
+
+// LIMIT PARAMETERS
 #define O2_REALTYPE (double)
 #define O2_MAXFILES (1000000U)
-#define O2_MAXFILESTR (256U)
-#define O2_FILETABLE_ENTRY_SIZE (O2_MAXFILESTR)
-#define O2_TRACKTABLE_ENTRY_SIZE (sizeof(unsigned))
+#define O2_MAXFILESTR ADB_FILETABLE_ENTRY_SIZE
+#define O2_FILETABLE_ENTRY_SIZE ADB_FILETABLE_ENTRY_SIZE
+#define O2_TRACKTABLE_ENTRY_SIZE ADB_TRACKTABLE_ENTRY_SIZE
 #define O2_HEADERSIZE (sizeof(dbTableHeaderT))
 #define O2_MEANNUMVECTORS (1000U)
 #define O2_MAXDIM (20000U)
 #define O2_MAXNN (1000000U)
 #define O2_MAXSEQLEN (8000U)            // maximum feature vectors in a sequence
 #define O2_MAXTRACKS (1000000U)           // maximum number of tracks
-#define O2_MAXTRACKLEN (1<<LSH_N_POINT_BITS) // maximum shingles in a track
+#define O2_MAXTRACKLEN ADB_LSH_MAXTRACKLEN
 #define O2_MAXDOTPRODUCTMEMORY (sizeof(O2_REALTYPE)*O2_MAXSEQLEN*O2_MAXSEQLEN) // 512MB
-#define O2_DISTANCE_TOLERANCE (1e-6)
 #define O2_SERIAL_MAX_TRACKBATCH (1000000)
 #define O2_LARGE_ADB_SIZE (O2_DEFAULT_DATASIZE+1) // datasize at which features are kept externally (in Mbytes)
 #define O2_LARGE_ADB_NTRACKS (O2_DEFAULT_NTRACKS+1) // ntracks at which features are kept externally
 #define O2_MAX_VECTORS ( O2_MEANNUMVECTORS * O2_MAXTRACKS )
 
 // Flags
-#define O2_FLAG_L2NORM (0x1U)
+#define O2_FLAG_L2NORM ADB_HEADER_FLAG_L2NORM
 #define O2_FLAG_MINMAX (0x2U)
-#define O2_FLAG_POWER (0x4U)
-#define O2_FLAG_TIMES (0x20U)
-#define O2_FLAG_LARGE_ADB (0x40U)
+#define O2_FLAG_POWER ADB_HEADER_FLAG_POWER
+#define O2_FLAG_TIMES ADB_HEADER_FLAG_TIMES
+#define O2_FLAG_LARGE_ADB ADB_HEADER_FLAG_REFERENCES
 #define DISPLAY_FLAG(x) (x?"on":"off")
 
 // Query types
@@ -195,23 +173,6 @@ bool operator<(const PointPair& a, const PointPair& b);
 extern char* SERVER_ADB_ROOT;
 extern char* SERVER_ADB_FEATURE_ROOT;
 
-typedef struct dbTableHeader {
-  uint32_t magic;
-  uint32_t version;
-  uint32_t numFiles;
-  uint32_t dim;
-  uint32_t flags;
-  uint32_t headerSize;
-  off_t length;
-  off_t fileTableOffset;
-  off_t trackTableOffset;
-  off_t dataOffset;
-  off_t l2normTableOffset;
-  off_t timesTableOffset;
-  off_t powerTableOffset;
-  off_t dbSize;
-} dbTableHeaderT, *dbTableHeaderPtr;
-
 class audioDB{  
  private:
   gengetopt_args_info args_info;
@@ -237,7 +198,7 @@ class audioDB{
   bool forWrite;
   int infid;
   struct stat statbuf;  
-  dbTableHeaderPtr dbH;
+  struct adbheader *dbH;
   struct adb *adb;
 
   gsl_rng *rng;

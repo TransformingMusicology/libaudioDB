@@ -9,7 +9,6 @@
  * Ian Knopke mas01ik@gold.ac.uk, ian.knopke@gmail.com */
 
 /* Temporary workarounds */
-typedef struct dbTableHeader adb_header_t;
 int acquire_lock(int, bool);
 int divest_lock(int);
 

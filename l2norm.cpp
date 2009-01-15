@@ -1,13 +1,12 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 static int audiodb_l2norm_existing(adb_t *adb) {
   double *data_buffer, *l2norm_buffer;
   adb_header_t *header = adb->header;
-  size_t data_buffer_size = ALIGN_PAGE_UP(header->length);
+  size_t data_buffer_size = align_page_up(header->length);
   size_t nvectors = header->length / (sizeof(double) * header->dim);
   /* FIXME: this map of the vector data will lose if we ever turn the
    * l2norm flag on when we have already inserted a large number of
@@ -42,17 +41,17 @@ int audiodb_l2norm(adb_t *adb) {
   if(!(adb->flags & O_RDWR)) {
     return 1;
   }
-  if(header->flags & O2_FLAG_L2NORM) {
+  if(header->flags & ADB_HEADER_FLAG_L2NORM) {
     /* non-error code for forthcoming backwards-compatibility
      * reasons */
     return 0;
   }
-  if((!(header->flags & O2_FLAG_LARGE_ADB)) && (header->length > 0)) {
+  if((!(header->flags & ADB_HEADER_FLAG_REFERENCES)) && (header->length > 0)) {
     if(audiodb_l2norm_existing(adb)) {
       goto error;
     }
   }
-  adb->header->flags |= O2_FLAG_L2NORM;
+  adb->header->flags |= ADB_HEADER_FLAG_L2NORM;
   return audiodb_sync_header(adb);
 
  error:

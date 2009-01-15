@@ -1,8 +1,7 @@
-#include "audioDB.h"
 extern "C" {
 #include "audioDB_API.h"
-#include "audioDB-internals.h"
 }
+#include "audioDB-internals.h"
 
 void audiodb_close(adb_t *adb) {
   free(adb->path);
