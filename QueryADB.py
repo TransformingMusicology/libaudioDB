@@ -286,7 +286,7 @@ def RunQuery(argv):
 		pointNN = '20'
 		trackNN = '5'
 		seqLen = argv[5]
-		queryRadius = '0.2'
+		queryRadius = '0.1'
 	else:
 		featureFile = 'foo.chr12'
 		powerFile = 'foo.power'
@@ -295,7 +295,7 @@ def RunQuery(argv):
 		pointNN = '3'
 		trackNN = '5'
 		seqLen = '10'
-		queryRadius = '0.2'
+		queryRadius = '0.1'
 
 	message = FEATURE_QUERY_TEMPLATE
 	message = FEATURE_QUERY_TEMPLATE%(dbName, featureFile, "", "", powerFile, qType, qPos, pointNN, trackNN, seqLen, queryRadius, '0.0', '0.0', '0', '1','0')

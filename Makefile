@@ -17,7 +17,10 @@ SOVERSION=0
 MINORVERSION=0
 LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
 
-override CFLAGS+=-O3 -g -fPIC
+override CFLAGS+=-O3 -g -fPIC 
+
+# set to DUMP hashtables on QUERY load
+#override CFLAGS+=-DLSH_DUMP_CORE_TABLES
 
 ifeq ($(shell uname),Linux)
 override CFLAGS+=-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64

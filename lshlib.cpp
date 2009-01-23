@@ -1358,12 +1358,7 @@ void G::unserialize_lsh_hashtables_format2(FILE* dbFile, bool forMerge){
 	  token = unserialize_hashtable_row_to_array(dbFile, h[x]+y, numElements);
 #else
 	token = unserialize_hashtable_row_format2(dbFile, h[x]+y);	
-#endif
-	
-#ifdef LSH_DUMP_CORE_TABLES
-	printf("C[%d,%d]", x, y);
-	dump_hashtable_row(h[x][y]);
-#endif
+#endif	
 	// Check that token is valid
 	if( !(token==O2_SERIAL_TOKEN_T1 || token==O2_SERIAL_TOKEN_ENDTABLE) ){
 	  fclose(dbFile);
@@ -1379,6 +1374,9 @@ void G::unserialize_lsh_hashtables_format2(FILE* dbFile, bool forMerge){
 	  H::t1 = token;
       }
   }
+#ifdef LSH_DUMP_CORE_TABLES
+  dump_hashtables();
+#endif
 }
  
 Uns32T G::unserialize_hashtable_row_format2(FILE* dbFile, bucket** b, Uns32T token){
@@ -1574,6 +1572,49 @@ void G::retrieve_from_core_hashtable_array(Uns32T* p, Uns32T qpos){
 	p = p + skip;
   }while( *p != LSH_CORE_ARRAY_END_ROW_TOKEN );
 }
+
+void G::dump_hashtables(){
+  for(Uns32T x = 0; x < H::L ; x++)
+    for(Uns32T y = 0; y < H::N ; y++){
+      bucket* bPtr = h[x][y];
+      if(bPtr){
+      printf("C[%d,%d]", x, y);
+#ifdef LSH_LIST_HEAD_COUNTERS
+	printf("[numBuckets=%d]",bPtr->snext.numBuckets);
+      if(bPtr->t2&LSH_CORE_ARRAY_BIT) {
+	dump_core_hashtable_array((Uns32T*)(bPtr->next));
+      } 
+      else {
+	dump_hashtable_row(bPtr->next);
+      }
+#else
+      dump_hashtable_row(bPtr);
+#endif
+  printf("\n");
+  fflush(stdout);
+      }
+    }
+}
+
+ void G::dump_core_hashtable_array(Uns32T* p){
+   Uns32T skip;
+   Uns32T t2;
+   Uns32T p1;
+   Uns32T p2;
+  CR_ASSERT(p);
+  do{
+    t2 = *p++;
+    p1 = *p++;
+    p2 = *p++;
+    skip = (( p1 & SKIP_BITS ) >> SKIP_BITS_RIGHT_SHIFT_LSB) + (( p2 & SKIP_BITS ) >> SKIP_BITS_RIGHT_SHIFT_MSB);
+    printf("(%0x, %0x)", t2, p1 ^ (p1 & SKIP_BITS));
+    if(skip--){
+      printf("(%0x, %0x)", t2, p2 ^ (p2 & SKIP_BITS));
+      while(skip-- )
+	printf("(%0x, %0x)", t2, *p++);
+    }
+  }while( *p != LSH_CORE_ARRAY_END_ROW_TOKEN );
+ }
  
 void G::dump_hashtable_row(bucket* p){
   while(p && p->t2!=IFLAG){

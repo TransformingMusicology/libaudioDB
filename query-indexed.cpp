@@ -31,6 +31,9 @@ int audiodb_index_init_query(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   if((!corep) && (qstate->lsh->get_lshHeader()->flags & O2_SERIAL_FILEFORMAT2)) {
     delete qstate->lsh;
     qstate->lsh = audiodb_index_allocate(adb, indexName, true);
+#ifdef LSH_DUMP_CORE_TABLES
+    qstate->lsh->dump_hashtables();
+#endif
   }
 
   delete[] indexName;

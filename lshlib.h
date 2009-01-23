@@ -325,6 +325,7 @@ class G: public H{
   void bucket_chain_point(bucket* p, Uns32T qpos);
   void sbucket_chain_point(sbucket* p, Uns32T qpos);  
   void dump_hashtable_row(bucket* p);
+  void dump_core_hashtable_array(Uns32T* p);
 
   // Serial (Format 1) Retrieval/Inspection Functions
   void serial_bucket_chain_point(SerialElementT* pe, Uns32T qpos);
@@ -361,6 +362,8 @@ class G: public H{
   void serial_dump_tables(char* filename);
   float get_mean_collision_rate(){ return (float) pointCount / bucketCount ; }
   char* get_indexName(){return indexName;}
+  void dump_hashtables();
+
 };
 
 typedef class G LSH;
