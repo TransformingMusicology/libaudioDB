@@ -1,19 +1,5 @@
 #include "lshlib.h"
 
-//#define LSH_DUMP_CORE_TABLES
-//#define USE_U_FUNCTIONS
-
-// Use backward-compatible CORE ARRAY lsh index
-#define LSH_CORE_ARRAY  // Set to use arrays for hashtables rather than linked-lists
-#define LSH_LIST_HEAD_COUNTERS // Enable counters in hashtable list heads
-
-// Critical path logic
-#if defined LSH_CORE_ARRAY && !defined LSH_LIST_HEAD_COUNTERS
-#define LSH_LIST_HEAD_COUNTERS
-#endif
-
-#define LSH_CORE_ARRAY_BIT (0x80000000) //  LSH_CORE_ARRAY test bit for list head
-
 
 void err(char*s){cout << s << endl;exit(2);}
 
@@ -162,10 +148,6 @@ void H::initialize_partial_functions(){
   H::uu = vector<vector<Uns32T> >(H::m);
   for( Uns32T aa=0 ; aa < H::m ; aa++ )
     H::uu[aa] = vector<Uns32T>( H::k/2 );
-#else
-  H::uu = vector<vector<Uns32T> >(H::L);
-  for( Uns32T aa=0 ; aa < H::L ; aa++ )
-    H::uu[aa] = vector<Uns32T>( H::k );
 #endif
 }
 
@@ -309,8 +291,8 @@ void H::compute_hash_functions(vector<float>& v){ // v \in R^d
     }
 #else
   for( aa=0; aa < H::L ; aa++ ){
-    ui = H::uu[aa].begin();
-    for( kk = 0 ; kk < H::k ; kk++ ){
+    pg= *( H::g + aa ); // L \times functions g_j(v) \in Z^k      
+    for( kk = 0 ; kk != H::k ; kk++ ){
       pb = *( H::b + aa ) + kk;
       pA = * ( * ( H::A + aa ) + kk );
       dd = H::d;
@@ -320,17 +302,8 @@ void H::compute_hash_functions(vector<float>& v){ // v \in R^d
 	tmp += *pA++ * *vi++;  // project
       tmp += *pb;              // translate
       tmp *= iw;               // scale      
-      *ui++ = (Uns32T) (floor(tmp));   // floor
+      *pg++ = (Uns32T) (floor(tmp));      // hash function g_j(v)=[x1 x2 ... xk]; xk \in Z
     }
-  }
-  // Compute hash functions
-  for( aa=0 ; aa < H::L ; aa++ ){
-    pg= *( H::g + aa ); // L \times functions g_j(v) \in Z^k      
-    // u_1 \in Z^{k \times d}
-    ui = H::uu[aa].begin();
-    kk=H::k;    
-    while( kk-- )
-      *pg++ = *ui++;      // hash function g_j(v)=[x1 x2 ... xk]; xk \in Z
   }
 #endif
 }

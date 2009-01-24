@@ -93,6 +93,20 @@ unsigned align_up(unsigned x, unsigned w);
 #define WRITE_UNS32(VAL, TOKENSTR) if( fwrite(VAL, sizeof(Uns32T), 1, dbFile) != 1 ){\
   fclose(dbFile);error("write error in serial_write_format2",TOKENSTR);}	
 
+//#define LSH_DUMP_CORE_TABLES  // set to dump hashtables on load
+//#define USE_U_FUNCTIONS       // set to use partial hashfunction re-use
+
+// Backward-compatible CORE ARRAY lsh index
+#define LSH_CORE_ARRAY  // Set to use arrays for hashtables rather than linked-lists
+#define LSH_LIST_HEAD_COUNTERS // Enable counters in hashtable list heads
+
+// Critical path logic
+#if defined LSH_CORE_ARRAY && !defined LSH_LIST_HEAD_COUNTERS
+#define LSH_LIST_HEAD_COUNTERS
+#endif
+
+#define LSH_CORE_ARRAY_BIT (0x80000000) //  LSH_CORE_ARRAY test bit for list head
+
 using namespace std;
 
 Uns32T get_page_logn();
@@ -206,8 +220,9 @@ class H{
   bucket*** h;      // The LSH hash tables
 
   bool use_u_functions; // flag to optimize computation of hashes
+#ifdef USE_U_FUNCTIONS
   vector<vector<Uns32T> > uu; // Storage for m patial hash evaluations ( g_j = [u_a,u_b] )
-
+#endif
   Uns32T maxp; // highest pointID stored in database
   Uns32T bucketCount;  // count of number of point buckets allocated
   Uns32T pointCount;    // count of number of points inserted
