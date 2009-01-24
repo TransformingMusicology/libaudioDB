@@ -756,7 +756,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
 void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, adb__queryResponse *adbQueryResponse) {
 
   if(!adb) {
-    if(!(adb = audiodb_open(dbName, O_RDWR))) {
+    if(!(adb = audiodb_open(dbName, O_RDONLY))) {
       error("failed to open database", dbName);
     }
   }
