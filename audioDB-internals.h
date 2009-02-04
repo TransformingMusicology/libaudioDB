@@ -271,15 +271,12 @@ static inline const char *audiodb_index_key(adb_t *adb, uint32_t index) {
   return (*adb->keys)[index].c_str();
 }
 
-static inline uint32_t audiodb_index_to_track_id(adb_t *adb, uint32_t lshid){
-  std::vector<off_t>::iterator it_b = (*adb->track_offsets).begin();
-  std::vector<off_t>::iterator it_e = (*adb->track_offsets).end();  
-  off_t test_id = lshid*adb->header->dim*sizeof(double);
-  std::vector<off_t>::iterator point_p = std::lower_bound(it_b, it_e, test_id);
-  if(*point_p == test_id)
-    return point_p - it_b; // lshid is first point in found track  
-  else    
-    return point_p - it_b - 1; // lshid is a point in the previous track  
+static inline uint32_t audiodb_index_to_track_id(adb_t *adb, uint32_t lshid) {
+  off_t offset = lshid * adb->header->dim * sizeof(double);
+  std::vector<off_t>::iterator b = (*adb->track_offsets).begin();
+  std::vector<off_t>::iterator e = (*adb->track_offsets).end();  
+  std::vector<off_t>::iterator p = std::upper_bound(b, e, offset);
+  return p - b - 1;
 }
 
 static inline uint32_t audiodb_index_to_track_pos(adb_t *adb, uint32_t track_id, uint32_t lshid) {
