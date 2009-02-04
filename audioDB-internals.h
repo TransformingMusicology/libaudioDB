@@ -2,6 +2,7 @@
 #include <queue>
 #include <map>
 #include <string>
+#include <algorithm>
 
 #include "pointpair.h"
 #include "accumulator.h"
