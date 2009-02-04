@@ -138,7 +138,7 @@ void H::initialize_lsh_functions(){
     }
   }
 
-  // Storage for whole or partial function evaluation depdenting on USE_U_FUNCTIONS
+  // Storage for whole or partial function evaluation depending on USE_U_FUNCTIONS
   H::initialize_partial_functions();
 }
 

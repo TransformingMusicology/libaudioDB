@@ -17,7 +17,10 @@ SOVERSION=0
 MINORVERSION=0
 LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
 
-override CFLAGS+=-O3 -g -fPIC 
+override CFLAGS+=-g -O3 -fPIC 
+
+# set to generate profile (gprof) and coverage (gcov) info
+#override CFLAGS+=-fprofile-arcs -ftest-coverage -pg
 
 # set to DUMP hashtables on QUERY load
 #override CFLAGS+=-DLSH_DUMP_CORE_TABLES

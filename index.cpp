@@ -128,7 +128,7 @@ void audioDB::index_index_db(const char* dbName){
     // Get the lsh header info and find how many tracks are inserted already
     lsh = new LSH(mergeIndexName, false); // lshInCore=false to avoid loading hashTables here
     assert(lsh);
-    Uns32T maxs = audiodb_index_to_track_id(lsh->get_maxp(), audiodb_lsh_n_point_bits(adb))+1;
+    Uns32T maxs = audiodb_index_to_track_id(adb, lsh->get_maxp())+1;
     delete lsh;
     lsh = 0;
 
@@ -295,19 +295,13 @@ void audioDB::index_insert_tracks(Uns32T start_track, Uns32T end_track,
 int audioDB::index_insert_track(Uns32T trackID, double** fvpp, double** snpp, double** sppp){
   // Loop over the current input track's vectors
   Uns32T numVecs = 0;
-  if (trackTable[trackID] > O2_MAXTRACKLEN) {
-    if (O2_MAXTRACKLEN < sequenceLength - 1) {
-      numVecs = 0;
-    } else {
-      numVecs = O2_MAXTRACKLEN - sequenceLength + 1;
-    }
+  
+  if (trackTable[trackID] < sequenceLength - 1) {
+    numVecs = 0;
   } else {
-    if (trackTable[trackID] < sequenceLength - 1) {
-      numVecs = 0;
-    } else {
-      numVecs = trackTable[trackID] - sequenceLength + 1;
-    }
+    numVecs = trackTable[trackID] - sequenceLength + 1;
   }
+
   
   Uns32T numVecsAboveThreshold = 0, collisionCount = 0; 
   if(numVecs){
@@ -351,7 +345,7 @@ Uns32T audioDB::index_insert_shingles(vector<vector<float> >* vv, Uns32T trackID
   cout << "[" << trackID << "]" << fileTable+trackID*O2_FILETABLE_ENTRY_SIZE;
   for( Uns32T pointID=0 ; pointID < (*vv).size(); pointID+=sequenceHop){
     if(!use_absolute_threshold || (use_absolute_threshold && (*spp >= absolute_threshold)))
-      collisionCount += lsh->insert_point((*vv)[pointID], audiodb_index_from_trackinfo(trackID, pointID, audiodb_lsh_n_point_bits(adb)));
+      collisionCount += lsh->insert_point((*vv)[pointID], audiodb_index_from_trackinfo(adb, trackID, pointID));
     spp+=sequenceHop;
     }
   return collisionCount;

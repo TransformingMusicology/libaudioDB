@@ -270,26 +270,25 @@ static inline const char *audiodb_index_key(adb_t *adb, uint32_t index) {
   return (*adb->keys)[index].c_str();
 }
 
-static inline uint32_t audiodb_index_to_track_id(uint32_t lshid, uint32_t n_point_bits) {
-  return (lshid >> n_point_bits);
+static inline uint32_t audiodb_index_to_track_id(adb_t *adb, uint32_t lshid){
+  std::vector<off_t>::iterator it_b = (*adb->track_offsets).begin();
+  std::vector<off_t>::iterator it_e = (*adb->track_offsets).end();  
+  off_t test_id = lshid*adb->header->dim*sizeof(double);
+  std::vector<off_t>::iterator point_p = std::lower_bound(it_b, it_e, test_id);
+  if(*point_p == test_id)
+    return point_p - it_b; // lshid is first point in found track  
+  else    
+    return point_p - it_b - 1; // lshid is a point in the previous track  
 }
 
-static inline uint32_t audiodb_index_to_track_pos(uint32_t lshid, uint32_t n_point_bits) {
-  return (lshid & ((1 << n_point_bits) - 1));
+static inline uint32_t audiodb_index_to_track_pos(adb_t *adb, uint32_t track_id, uint32_t lshid) {
+  uint32_t trackIndexOffset = (*adb->track_offsets)[track_id] / (adb->header->dim * sizeof(double));
+  return lshid - trackIndexOffset;
 }
 
-static inline uint32_t audiodb_index_from_trackinfo(uint32_t track_id, uint32_t track_pos, uint32_t n_point_bits) {
-  return ((track_id << n_point_bits) | track_pos);
-}
-
-#define ADB_FIXME_DEFAULT_LSH_N_POINT_BITS 14
-#ifndef ADB_FIXME_LSH_N_POINT_BITS
-#define ADB_FIXME_LSH_N_POINT_BITS ADB_FIXME_DEFAULT_LSH_N_POINT_BITS
-#endif
-
-static inline uint32_t audiodb_lsh_n_point_bits(adb_t *adb) {
-  uint32_t nbits = adb->header->flags >> 28;
-  return (nbits ? nbits : ADB_FIXME_LSH_N_POINT_BITS);
+static inline uint32_t audiodb_index_from_trackinfo(adb_t *adb, uint32_t track_id, uint32_t track_pos) {
+  uint32_t trackIndexOffset = (*adb->track_offsets)[track_id] / (adb->header->dim * sizeof(double));
+  return trackIndexOffset + track_pos;
 }
 
 int audiodb_read_data(adb_t *, int, int, double **, size_t *);
@@ -324,8 +323,6 @@ int audiodb_index_norm_shingles(vector<vector<float> > *, double *, double *, ui
 #define ADB_OLD_MAGIC ('O'|'2'<<8|'D'<<16|'B'<<24)
 #define ADB_MAGIC ('o'|'2'<<8|'d'<<16|'b'<<24)
 #define ADB_FORMAT_VERSION (4U)
-
-#define ADB_LSH_MAXTRACKLEN (1 << ADB_FIXME_LSH_N_POINT_BITS)
 
 #define align_up(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
 #define align_down(x,w) ((x) & ~((1<<w)-1))

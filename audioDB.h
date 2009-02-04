@@ -92,7 +92,7 @@ extern "C" {
 #define O2_MAXNN (1000000U)
 #define O2_MAXSEQLEN (8000U)            // maximum feature vectors in a sequence
 #define O2_MAXTRACKS (1000000U)           // maximum number of tracks
-#define O2_MAXTRACKLEN ADB_LSH_MAXTRACKLEN
+
 #define O2_MAXDOTPRODUCTMEMORY (sizeof(O2_REALTYPE)*O2_MAXSEQLEN*O2_MAXSEQLEN) // 512MB
 #define O2_SERIAL_MAX_TRACKBATCH (1000000)
 #define O2_LARGE_ADB_SIZE (O2_DEFAULT_DATASIZE+1) // datasize at which features are kept externally (in Mbytes)

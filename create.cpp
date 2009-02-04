@@ -73,15 +73,6 @@ adb_t *audiodb_create(const char *path, unsigned datasize, unsigned ntracks, uns
   databytes = ((off_t) datasize) * 1024 * 1024;
   auxbytes = databytes / datadim;
 
-  // For backward-compatibility, Record the point-encoding parameter for LSH indexing in the adb header
-  // If this value is 0 then it will be set to 14
-
-#if ADB_FIXME_LSH_N_POINT_BITS > 15
-#error "consistency check of ADB_FIXME_LSH_N_POINT_BITS failed (>31)"
-#endif
-
-  header->flags |= ADB_FIXME_LSH_N_POINT_BITS << 28;
-
   // If database will fit in a single file the vectors are copied into the AudioDB instance
   // Else all the vectors are left on the FileSystem and we use the dataOffset as storage
   // for the location of the features, powers and times files (assuming that arbitrary keys are used for the fileTable)

@@ -44,9 +44,8 @@ void audiodb_index_add_point_approximate(void *user_data, Uns32T pointID, Uns32T
   adb_qcallback_t *data = (adb_qcallback_t *) user_data;
   adb_t *adb = data->adb;
   adb_qstate_internal_t *qstate = data->qstate;
-  uint32_t nbits = audiodb_lsh_n_point_bits(adb);
-  uint32_t trackID = audiodb_index_to_track_id(pointID, nbits);
-  uint32_t spos = audiodb_index_to_track_pos(pointID, nbits);
+  uint32_t trackID = audiodb_index_to_track_id(adb, pointID);
+  uint32_t spos = audiodb_index_to_track_pos(adb, trackID, pointID);
   std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
   if(qstate->allowed_keys->find((*adb->keys)[trackID]) != keys_end) {
     adb_result_t r;
@@ -64,9 +63,8 @@ void audiodb_index_add_point_exact(void *user_data, Uns32T pointID, Uns32T qpos,
   adb_qcallback_t *data = (adb_qcallback_t *) user_data;
   adb_t *adb = data->adb;
   adb_qstate_internal_t *qstate = data->qstate;
-  uint32_t nbits = audiodb_lsh_n_point_bits(adb);
-  uint32_t trackID = audiodb_index_to_track_id(pointID, nbits);
-  uint32_t spos = audiodb_index_to_track_pos(pointID, nbits);
+  uint32_t trackID = audiodb_index_to_track_id(adb, pointID);
+  uint32_t spos = audiodb_index_to_track_pos(adb, trackID, pointID);
   std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
   if(qstate->allowed_keys->find((*adb->keys)[trackID]) != keys_end) {
     PointPair p(trackID, qpos, spos);
@@ -78,7 +76,9 @@ void audiodb_index_add_point_exact(void *user_data, Uns32T pointID, Uns32T qpos,
 // return 0: if index does not exist
 // return nqv: if index exists
 int audiodb_index_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_internal_t *qstate) {
-  
+  if(adb->header->flags>>28)
+    cerr << "WARNING: Database created using deprecated LSH_N_POINT_BITS coding: REBUILD INDEXES..." << endl;
+
   double *query = 0, *query_data = 0;
   adb_qpointers_internal_t qpointers = {0};
   
@@ -120,7 +120,7 @@ int audiodb_index_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
     return -1;
   }
 
-  uint32_t Nq = (qpointers.nvectors > ADB_LSH_MAXTRACKLEN ? ADB_LSH_MAXTRACKLEN : qpointers.nvectors) - sequence_length + 1;
+  uint32_t Nq = qpointers.nvectors - sequence_length + 1;
   std::vector<std::vector<float> > *vv = audiodb_index_initialize_shingles(Nq, adb->header->dim, sequence_length);
 
   // Construct shingles from query features  
