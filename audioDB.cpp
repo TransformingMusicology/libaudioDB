@@ -737,7 +737,7 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
     }
   } while(!filesIn->eof());
 
-  VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * dbH->dim * sizeof(double)));
+  VERB_LOG(0, "%s %s %u vectors %ju bytes.\n", COM_BATCHINSERT, dbName, totalVectors, (intmax_t) (totalVectors * adb->header->dim * sizeof(double)));
 
   delete [] thisPowerFileName;
   if(key && (key != inFile)) {
@@ -912,7 +912,7 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     if(!(qspec.refine.flags & ADB_REFINE_RADIUS)) {
       error("query-type not yet supported");
     } else {
-      reporter = new trackSequenceQueryRadNNReporterOneToOne(pointNN,trackNN, dbH->numFiles);
+      reporter = new trackSequenceQueryRadNNReporterOneToOne(pointNN,trackNN, adb->header->numFiles);
     }
     break;
   default:
