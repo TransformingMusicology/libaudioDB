@@ -1,0 +1,2 @@
+\draw[thick] (-2.5,-0.2) rectangle (2.5,0.2);
+\draw plot[domain=-2.4:2.4,samples=250] (\x, {0.15*sin(9.2*\x r)});
