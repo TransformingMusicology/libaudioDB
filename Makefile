@@ -89,7 +89,7 @@ distclean: clean
 	-rm -rf audioDB.dump
 
 
-test: $(EXECUTABLE)
+test: $(EXECUTABLE) $(LIBRARY)
 	sh -c "cd libtests && sh ./run-tests.sh"
 	sh -c "cd tests && sh ./run-tests.sh"
 
