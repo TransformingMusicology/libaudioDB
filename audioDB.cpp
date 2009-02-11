@@ -111,7 +111,7 @@ audioDB::audioDB(const unsigned argc, const char *argv[], adb__statusResponse *a
   }
 }
 
-audioDB::audioDB(const unsigned argc, const char *argv[], adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
+audioDB::audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
 {
   try {
     isServer = 1; // Set to make errors report over SOAP
@@ -120,7 +120,7 @@ audioDB::audioDB(const unsigned argc, const char *argv[], adb__lisztResponse *ad
     if(dbName && adb_root)
       prefix_name((char** const)&dbName, adb_root);
     assert(O2_ACTION(COM_LISZT));
-    liszt(dbName, lisztOffset, lisztLength, adbLisztResponse);
+    liszt(dbName, lisztOffset, lisztLength, soap, adbLisztResponse);
   } catch(char *err) {
     cleanup();
     throw(err);
@@ -948,6 +948,44 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
   audiodb_query_free_results(adb, &qspec, rs);
 
   reporter->report(adb, soap, adbQueryResponse);
+}
+
+void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, struct soap *soap, adb__lisztResponse* adbLisztResponse) {
+  if(!adb) {
+    if(!(adb = audiodb_open(dbName, O_RDONLY))) {
+      error("failed to open database", dbName);
+    }
+  }
+
+  adb_liszt_results_t *results = audiodb_liszt(adb);
+  if(!results) {
+    error("audiodb_liszt() failed");
+  }
+
+  if(offset > results->nresults) {
+    audiodb_liszt_free_results(adb, results);
+    error("listKeys offset out of range");
+  }
+
+  if(!adbLisztResponse){
+    for(uint32_t k = 0; k < numLines && offset + k < results->nresults; k++) {
+      uint32_t index = offset + k;
+      printf("[%d] %s (%d)\n", index, results->entries[index].key, results->entries[index].nvectors);
+    }
+  } else {
+    adbLisztResponse->result.Rkey = (char **) soap_malloc(soap, numLines * sizeof(char *));
+    adbLisztResponse->result.Rlen = (unsigned int *) soap_malloc(soap, numLines * sizeof(unsigned int));
+    uint32_t k;
+    for(k = 0; k < numLines && offset + k < results->nresults; k++) {
+      uint32_t index = offset + k;
+      adbLisztResponse->result.Rkey[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
+      snprintf(adbLisztResponse->result.Rkey[k], O2_MAXFILESTR, "%s", results->entries[index].key);
+      adbLisztResponse->result.Rlen[k] = results->entries[index].nvectors;
+    }
+    adbLisztResponse->result.__sizeRkey = k;
+    adbLisztResponse->result.__sizeRlen = k;
+  }
+  audiodb_liszt_free_results(adb, results);  
 }
 
 // This entry point is visited once per instance

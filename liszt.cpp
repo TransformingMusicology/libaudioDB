@@ -1,34 +1,25 @@
-#include "audioDB.h"
+extern "C" {
+#include "audioDB_API.h"
+}
+#include "audioDB-internals.h"
 
-void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, adb__lisztResponse* adbLisztResponse){
-  if(!dbH) {
-    initTables(dbName, 0);
+adb_liszt_results_t *audiodb_liszt(adb_t *adb) {
+  uint32_t nfiles = adb->header->numFiles;
+  adb_liszt_results_t *results;
+  results = (adb_liszt_results_t *) calloc(sizeof(adb_liszt_results_t),1);
+  results->nresults = nfiles;
+  if(nfiles > 0) {
+    results->entries = (adb_track_entry_t *) malloc(nfiles * sizeof(adb_track_entry_t));
   }
+  for(uint32_t k = 0; k < nfiles; k++) {
+    results->entries[k].nvectors = (*adb->track_lengths)[k];
+    results->entries[k].key = audiodb_index_key(adb, k);
+  }
+  return results;
+}
 
-  assert(trackTable && fileTable);
-
-  if(offset>dbH->numFiles){
-    char tmpStr[MAXSTR];
-    sprintf(tmpStr, "numFiles=%u, lisztOffset=%u", dbH->numFiles, offset);
-    error("listKeys offset out of range", tmpStr);
-  }
-
-  if(!adbLisztResponse){
-    for(Uns32T k=0; k<numLines && offset+k<dbH->numFiles; k++){
-      fprintf(stdout, "[%d] %s (%d)\n", offset+k, fileTable+(offset+k)*O2_FILETABLE_ENTRY_SIZE, trackTable[offset+k]);
-    }
-  }
-  else{
-    adbLisztResponse->result.Rkey = new char*[numLines];
-    adbLisztResponse->result.Rlen = new unsigned int[numLines];
-    Uns32T k = 0;
-    for( ; k<numLines && offset+k<dbH->numFiles; k++){    
-      adbLisztResponse->result.Rkey[k] = new char[MAXSTR];
-      snprintf(adbLisztResponse->result.Rkey[k], O2_MAXFILESTR, "%s", fileTable+(offset+k)*O2_FILETABLE_ENTRY_SIZE);
-      adbLisztResponse->result.Rlen[k] = trackTable[offset+k];
-    }
-    adbLisztResponse->result.__sizeRkey = k;
-    adbLisztResponse->result.__sizeRlen = k;
-  }
-  
+int audiodb_liszt_free_results(adb_t *adb, adb_liszt_results_t *results) {
+  free(results->entries);
+  free(results);
+  return 0;
 }

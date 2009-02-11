@@ -164,7 +164,7 @@ int adb__liszt(struct soap* soap, xsd__string dbName, xsd__int lisztOffset, xsd_
   const char *argv[] = {"./audioDB", COM_LISZT, "-d",dbName, "--lisztOffset", lisztOffsetStr, "--lisztLength", lisztLengthStr};
   const unsigned argc = 8;
   try{
-    audioDB(argc, argv, &adbLisztResponse);
+    audioDB(argc, argv, soap, &adbLisztResponse);
     return SOAP_OK;
   } catch(char *err) {
     soap_receiver_fault(soap, err, "");

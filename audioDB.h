@@ -273,7 +273,7 @@ class audioDB{
   audioDB(const unsigned argc, const char *argv[]);
   audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__queryResponse *adbQueryResponse);
   audioDB(const unsigned argc, const char *argv[], adb__statusResponse *adbStatusResponse);
-  audioDB(const unsigned argc, const char *argv[], adb__lisztResponse *adbLisztResponse);
+  audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__lisztResponse *adbLisztResponse);
 
   void cleanup();
   ~audioDB();
@@ -291,7 +291,7 @@ class audioDB{
   void l2norm(const char* dbName);
   void power_flag(const char *dbName);
   void dump(const char* dbName);
-  void liszt(const char* dbName, unsigned offset, unsigned numLines, adb__lisztResponse* adbLisztResponse=0);
+  void liszt(const char* dbName, unsigned offset, unsigned numLines, struct soap *soap=0, adb__lisztResponse* adbLisztResponse=0);
 
   // LSH indexing parameters and data structures
   LSH* lsh;

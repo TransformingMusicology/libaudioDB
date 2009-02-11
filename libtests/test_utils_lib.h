@@ -40,3 +40,16 @@ int result_position(adb_query_results_t *r, const char *key, float dist, uint32_
 
 #define result_present_or_fail(r, k, d, q, i) \
   if(result_position(r, k, d, q, i) < 0) return 1;
+
+int entry_position(adb_liszt_results_t *l, const char *key, uint32_t nvectors) {
+  for(uint32_t k = 0; k < l->nresults; k++) {
+    adb_track_entry_t entry = l->entries[k];
+    if((nvectors == entry.nvectors) && !strcmp(key, entry.key)) {
+      return k;
+    }
+  }
+  return -1;
+}
+
+#define entry_present_or_fail(l, k, n) \
+  if(entry_position(l, k, n) < 0) return 1;

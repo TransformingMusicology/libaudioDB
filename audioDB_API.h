@@ -163,6 +163,16 @@ typedef struct adbqueryspec {
   adb_query_refine_t refine;
 } adb_query_spec_t;
 
+typedef struct adbtrackentry {
+  uint32_t nvectors;
+  const char *key;
+} adb_track_entry_t;
+
+typedef struct adblisztresults {
+  uint32_t nresults;
+  adb_track_entry_t *entries;
+} adb_liszt_results_t;
+
 /*******************************************************************/
 /* Function prototypes for API */
 
@@ -197,5 +207,9 @@ int audiodb_status(adb_ptr mydb, adb_status_ptr status);
 
 /* varoius dump formats */
 int audiodb_dump(adb_ptr mydb, const char *outputdir);
+
+/* liszt */
+adb_liszt_results_t *audiodb_liszt(adb_t *);
+int audiodb_liszt_free_results(adb_t *, adb_liszt_results_t *);
 
 #endif
