@@ -20,7 +20,9 @@ void audioDB::ws_status(const char*dbName, char* hostport){
     std::cout << "nullCount = " << adbStatusResponse.result.nullCount << std::endl;
     std::cout << "flags = " << (adbStatusResponse.result.flags & 0x00FFFFFF) << std::endl;
   } else {
-    soap_print_fault(&soap,stderr);
+    char fault[MAXSTR];
+    soap_sprint_fault(&soap, fault, MAXSTR);
+    error(fault);
   }
   
   soap_destroy(&soap);
@@ -39,8 +41,13 @@ void audioDB::ws_liszt(const char* dbName, char* Hostport){
 		<< adbLisztResponse.result.Rlen[i] << ")" << std::endl;
     }
   } else {
-    soap_print_fault(&soap, stderr);
+    char fault[MAXSTR];
+    soap_sprint_fault(&soap, fault, MAXSTR);
+    error(fault);
   }
+  soap_destroy(&soap);
+  soap_end(&soap);
+  soap_done(&soap);
 }
 
 // WS_QUERY (CLIENT SIDE)
@@ -72,7 +79,9 @@ void audioDB::ws_query(const char*dbName, const char *featureFileName, const cha
       }
     }
   } else {
-    soap_print_fault(&soap,stderr);
+    char fault[MAXSTR];
+    soap_sprint_fault(&soap, fault, MAXSTR);
+    error(fault);
   }
 
   soap_destroy(&soap);
@@ -122,10 +131,12 @@ void audioDB::ws_query_by_key(const char*dbName, const char *trackKey, const cha
       for(int i=0; i<adbQueryResponse.result.__sizeRlist; i++)
 	std::cout << adbQueryResponse.result.Rlist[i] << " " << adbQueryResponse.result.Dist[i] 
 		  << " " << adbQueryResponse.result.Qpos[i] << " " << adbQueryResponse.result.Spos[i] << std::endl;
+    } else {
+      char fault[MAXSTR];
+      soap_sprint_fault(&soap, fault, MAXSTR);
+      error(fault);
     }
-    else
-      soap_print_fault(&soap,stderr);
-  }else
+  } else
     ;// FIX ME: WRITE NON-SEQUENCE QUERY BY KEY ?
   
   soap_destroy(&soap);

@@ -75,7 +75,13 @@ check_server() {
 }
 
 expect_client_failure() {
-  # FIXME: work out whether and how the client should report server
-  # errors.  At present, the client exits with a zero exit code.
+  trap - ERR
   "$@"
+  exit_code=$?
+  trap "exit 1" ERR
+  if [ $exit_code -eq 0 ]; then
+    exit 1
+  elif [ $exit_code -ge 126 ]; then
+    exit 1
+  fi
 }

@@ -49,9 +49,9 @@ cmp testoutput test-expected-output
 WSPORT=10039
 start_server ${AUDIODB} ${WSPORT}
 
-expect_clean_error_exit ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset -1
-#expect_clean_error_exit ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset 3 #NOT EXITING CLEANLY
-expect_clean_error_exit ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztLength -1
+expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset -1
+expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset 3
+expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztLength -1
 
 check_server $!
 
