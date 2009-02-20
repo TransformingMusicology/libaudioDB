@@ -271,8 +271,8 @@ static inline const char *audiodb_index_key(adb_t *adb, uint32_t index) {
   return (*adb->keys)[index].c_str();
 }
 
-static inline uint32_t audiodb_index_to_track_id(adb_t *adb, uint32_t lshid) {
-  off_t offset = lshid * adb->header->dim * sizeof(double);
+static inline uint32_t audiodb_index_to_track_id(adb_t *adb, uint32_t lshid){
+  off_t offset = (off_t)lshid*adb->header->dim*sizeof(double);
   std::vector<off_t>::iterator b = (*adb->track_offsets).begin();
   std::vector<off_t>::iterator e = (*adb->track_offsets).end();  
   std::vector<off_t>::iterator p = std::upper_bound(b, e, offset);
