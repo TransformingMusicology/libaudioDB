@@ -1,3 +1,6 @@
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <set>
 #include <queue>
 #include <map>
@@ -179,8 +182,11 @@ static inline int audiodb_sync_header(adb_t *adb) {
     goto error;
   }
 
-  /* can be fsync() if fdatasync() is racily exciting and new */
+#if defined(_POSIX_SYNCHRONIZED_IO) && (_POSIX_SYNCHRONIZED_IO > 0)
   fdatasync(adb->fd);
+#else
+  fsync(adb->fd);
+#endif
   if(lseek(adb->fd, pos, SEEK_SET) == (off_t) -1) {
     goto error;
   }
