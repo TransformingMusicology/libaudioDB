@@ -165,6 +165,12 @@ audioDB::~audioDB(){
 
 int audioDB::processArgs(const unsigned argc, const char *argv[]){
 
+  /* KLUDGE: gengetopt generates a function which is not completely
+     const-clean in its declaration.  We cast argv here to keep the
+     compiler happy.  -- CSR, 2008-10-08 */
+  if (cmdline_parser (argc, (char *const *) argv, &args_info) != 0)
+    error("Error parsing command line");
+    
   if(argc<2){
     cmdline_parser_print_version ();
     if (strlen(gengetopt_args_info_purpose) > 0)
@@ -175,12 +181,6 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     printf("%s\n", gengetopt_args_info_help[0]);
     exit(0);
   }
-
-  /* KLUDGE: gengetopt generates a function which is not completely
-     const-clean in its declaration.  We cast argv here to keep the
-     compiler happy.  -- CSR, 2008-10-08 */
-  if (cmdline_parser (argc, (char *const *) argv, &args_info) != 0)
-    error("Error parsing command line");
 
   if(args_info.help_given){
     cmdline_parser_print_help();
