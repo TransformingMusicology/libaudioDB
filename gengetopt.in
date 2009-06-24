@@ -1,5 +1,5 @@
 package "audioDB"
-version "version 0.8.preview"
+version "version 0.8.preview ($Revision$)"
 purpose "A feature vector database management system for content-based retrieval."
 
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional

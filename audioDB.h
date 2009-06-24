@@ -1,8 +1,6 @@
 #ifndef __AUDIODB_H_
 #define __AUDIODB_H_
 
-#define VERSION "$LastChangedRevision$"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
