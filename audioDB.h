@@ -259,7 +259,7 @@ class audioDB{
   unsigned lisztLength;
 
   // private methods
-  void error(const char* a, const char* b = "", const char *sysFunc = 0);
+  void error(const char* a, const char* b = "", const char *sysFunc = 0) __attribute__ ((noreturn));
 
   void insertTimeStamps(unsigned n, std::ifstream* timesFile, double* timesdata);
   void initRNG();

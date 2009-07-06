@@ -50,8 +50,6 @@ unsigned audioDB::random_track(unsigned *propTable, unsigned total) {
   }
   error("fell through in random_track()");
 
-  /* FIXME: decorate error's declaration so that this isn't necessary */
-  return 0;
 }
 
 void audioDB::sample(const char *dbName) {
