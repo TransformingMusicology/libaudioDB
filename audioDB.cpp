@@ -929,12 +929,12 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     datum.data = NULL;
   }
   if(datum.power) {
-    free(datum.data);
-    datum.data = NULL;
+    free(datum.power);
+    datum.power = NULL;
   }
   if(datum.times) {
-    free(datum.data);
-    datum.data = NULL;
+    free(datum.times);
+    datum.times = NULL;
   }
 
   if(rs == NULL) {
