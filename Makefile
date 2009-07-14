@@ -8,7 +8,7 @@ GSOAP_INCLUDE=
 
 SHARED_LIB_FLAGS=-shared -Wl,-soname,
 
-LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o lshlib.o index-utils.o query-indexed.o liszt.o
+LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o lshlib.o index-utils.o query-indexed.o liszt.o retrieve.o
 OBJS=$(LIBOBJS) index.o soap.o sample.o cmdline.o audioDB.o common.o
 
 EXECUTABLE=audioDB

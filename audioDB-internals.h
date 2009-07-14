@@ -298,7 +298,7 @@ static inline uint32_t audiodb_index_from_trackinfo(adb_t *adb, uint32_t track_i
 int audiodb_read_data(adb_t *, int, int, double **, size_t *);
 int audiodb_insert_create_datum(adb_insert_t *, adb_datum_t *);
 int audiodb_track_id_datum(adb_t *, uint32_t, adb_datum_t *);
-int audiodb_free_datum(adb_datum_t *);
+int audiodb_really_free_datum(adb_datum_t *);
 int audiodb_datum_qpointers(adb_datum_t *, uint32_t, double **, double **, adb_qpointers_internal_t *);
 int audiodb_query_spec_qpointers(adb_t *, const adb_query_spec_t *, double **, double **, adb_qpointers_internal_t *);
 int audiodb_query_queue_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t *, double *, adb_qpointers_internal_t *);

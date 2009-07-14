@@ -272,7 +272,7 @@ int audiodb_insert_reference(adb_t *adb, const adb_reference_t *reference) {
   }
 }
 
-int audiodb_free_datum(adb_datum_t *datum) {
+int audiodb_really_free_datum(adb_datum_t *datum) {
   if(datum->data) {
     free(datum->data);
     datum->data = NULL;
@@ -398,7 +398,7 @@ int audiodb_insert_create_datum(adb_insert_t *insert, adb_datum_t *datum) {
   if(file) {
     fclose(file);
   }
-  audiodb_free_datum(datum);
+  audiodb_really_free_datum(datum);
   return 1;
 }
 
@@ -421,7 +421,7 @@ int audiodb_insert(adb_t *adb, adb_insert_t *insert) {
       return 1;
     }
     err = audiodb_insert_datum(adb, &datum);
-    audiodb_free_datum(&datum);
+    audiodb_really_free_datum(&datum);
 
     if(err == 2) {
       return 0;

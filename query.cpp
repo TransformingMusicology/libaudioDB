@@ -240,7 +240,7 @@ int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
     return 0;
   }
  error:
-  audiodb_free_datum(d);
+  audiodb_really_free_datum(d);
   return 1;
 }
 
@@ -310,7 +310,7 @@ int audiodb_query_spec_qpointers(adb_t *adb, const adb_query_spec_t *spec, doubl
   /* FIXME: check the overflow logic here */
   if(sequence_start + sequence_length > d.nvectors) {
     if(datum != &d) {
-      audiodb_free_datum(&d);
+      audiodb_really_free_datum(&d);
     }
     return 1;
   }
@@ -333,7 +333,7 @@ int audiodb_query_spec_qpointers(adb_t *adb, const adb_query_spec_t *spec, doubl
   /* Clean up: free any bits of datum that we have ourselves
    * allocated. */
   if(datum != &d) {
-    audiodb_free_datum(&d);
+    audiodb_really_free_datum(&d);
   }
 
   return 0;
@@ -464,10 +464,10 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
       }
       if(audiodb_datum_qpointers(&d, sequence_length, &dbdata, &dbdata_pointer, &dbpointers)) {
         delete qstate->exact_evaluation_queue;
-        audiodb_free_datum(&d);
+        audiodb_really_free_datum(&d);
         return 1;
       }
-      audiodb_free_datum(&d);
+      audiodb_really_free_datum(&d);
     }
     Uns32T qPos = (spec->qid.flags & ADB_QID_FLAG_EXHAUSTIVE) ? pp.qpos : 0;
     Uns32T sPos = pp.spos; // index into l2norm table

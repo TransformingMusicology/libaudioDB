@@ -205,7 +205,11 @@ int audiodb_query_free_results(adb_t *, const adb_query_spec_t *, adb_query_resu
 /* database status */  
 int audiodb_status(adb_ptr mydb, adb_status_ptr status);
 
-/* varoius dump formats */
+/* retrieval of inserted data */
+int audiodb_retrieve_datum(adb_t *, const char *, adb_datum_t *);
+int audiodb_free_datum(adb_t *, adb_datum_t *);
+
+/* various dump formats */
 int audiodb_dump(adb_ptr mydb, const char *outputdir);
 
 /* liszt */
