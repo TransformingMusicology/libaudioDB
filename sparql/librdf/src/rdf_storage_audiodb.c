@@ -1,11 +1,4 @@
-#ifdef HAVE_CONFIG_H
-#include <rdf_config.h>
-#endif
-
-#ifdef WIN32
-#include <win32_rdf_config.h>
-#endif
-
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -14,10 +7,10 @@
 #include <stdlib.h> /* for abort() as used in errors */
 #endif
 #include <sys/types.h>
-
-#include <redland.h>
+#include <librdf.h>
 #include <audioDB_API.h>
 
+#define LIBRDF_SIGN_KEY 0x04Ed1A7D
 
 typedef struct {
 	librdf_model* model;
@@ -60,9 +53,47 @@ static void librdf_storage_audiodb_find_statements_finished(void* context);
 static int librdf_storage_audiodb_sync(librdf_storage *storage);
 
 static void librdf_storage_audiodb_register_factory(librdf_storage_factory *factory);
-#ifdef MODULAR_LIBRDF
 void librdf_storage_module_register_factory(librdf_world *world);
-#endif
+
+void librdf_sign_free(void *ptr)
+{
+	int *p;
+
+	if(!ptr)
+		return;
+
+	p=(int*)ptr;
+	p--;
+
+	if(*p != LIBRDF_SIGN_KEY)
+		return;
+
+	free(p);
+}
+
+
+void* librdf_sign_calloc(size_t nmemb, size_t size)
+{
+	int *p;
+
+	/* turn into bytes */
+	size = nmemb*size + sizeof(int);
+
+	p=(int*)calloc(1, size);
+	*p++ = LIBRDF_SIGN_KEY;
+	return p;
+}
+
+void* librdf_sign_malloc(size_t size)
+{
+	int *p;
+
+	size += sizeof(int);
+
+	p=(int*)malloc(size);
+	*p++ = LIBRDF_SIGN_KEY;
+	return p;
+}
 
 
 static int librdf_storage_audiodb_init(librdf_storage* storage, const char *name, librdf_hash* options) {
@@ -70,7 +101,7 @@ static int librdf_storage_audiodb_init(librdf_storage* storage, const char *name
 	librdf_storage_audiodb_instance* context;
 	char* name_copy;
 
-	context = (librdf_storage_audiodb_instance*)LIBRDF_CALLOC(librdf_storage_audiodb_instance, 1, sizeof(librdf_storage_audiodb_instance));
+	context = (librdf_storage_audiodb_instance*)librdf_sign_calloc(1, sizeof(librdf_storage_audiodb_instance));
 
 	if(!context)
 	{
@@ -85,7 +116,7 @@ static int librdf_storage_audiodb_init(librdf_storage* storage, const char *name
 	
 	// Store the name of the db
 	context->name_len=strlen(name);
-	name_copy=(char*)LIBRDF_MALLOC(cstring, context->name_len+1);
+	name_copy=(char*)librdf_sign_malloc(context->name_len+1);
 	if(!name_copy) {
 		if(options)
 			librdf_free_hash(options);
@@ -100,7 +131,7 @@ static int librdf_storage_audiodb_init(librdf_storage* storage, const char *name
 	if(options)
 		librdf_free_hash(options);
 
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 		"Initialised!");
 
 	return 0;
@@ -108,10 +139,10 @@ static int librdf_storage_audiodb_init(librdf_storage* storage, const char *name
 
 static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* model) {
 
-	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)storage->instance;	
+	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)librdf_storage_get_instance(storage);
 	int db_file_exists = 0;
 
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"open");
 	
 	if(!access((const char*)context->name, F_OK))
@@ -126,7 +157,7 @@ static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* mo
 	
 	if(context->is_new) {
 		if(!(context->adb = audiodb_create(context->name, 0, 0, 0))) {
-			librdf_log(storage->world, 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
+			librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
 					"Unable to create %s", context->name);
 			return 1;
 		}
@@ -134,7 +165,7 @@ static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* mo
 	else
 	{
 		if(!(context->adb = audiodb_open(context->name, O_RDWR))) {	
-			librdf_log(storage->world, 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
+			librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
 					"Unable to open %s", context->name);
 			return 1;
 		}
@@ -144,9 +175,9 @@ static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* mo
 }
 
 static int librdf_storage_audiodb_close(librdf_storage* storage) {
-	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)storage->instance;	
+	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)librdf_storage_get_instance(storage);	
 	
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"close");
 
 	if(context->adb)
@@ -159,51 +190,51 @@ static int librdf_storage_audiodb_close(librdf_storage* storage) {
 }
 
 static int librdf_storage_audiodb_size(librdf_storage* storage) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 		"size");
 	return 0;
 }
 
 static int librdf_storage_audiodb_add_statement(librdf_storage* storage, librdf_statement* statement) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"add statement");
 	return 0;
 }
 
 static int librdf_storage_audiodb_add_statements(librdf_storage* storage, librdf_stream* statement_stream) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"add statements");
 	return 0;
 }
 
 static int librdf_storage_audiodb_remove_statement(librdf_storage* storage, librdf_statement* statement) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"remove statement");
 	return 0;
 }
 
 static int librdf_storage_audiodb_contains_statement(librdf_storage* storage, librdf_statement* statement) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 		"Contains statement");
 	return 0;
 }
 
 static librdf_stream* librdf_storage_audiodb_serialise(librdf_storage* storage) {
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"serialise");
 	return NULL;
 }
 
 static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* storage, librdf_statement* statement) {
 
-	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)storage->instance;	
+	librdf_storage_audiodb_instance* context = (librdf_storage_audiodb_instance*)librdf_storage_get_instance(storage);	
 	librdf_storage_audiodb_find_statements_stream_context* scontext;
 	librdf_stream* stream;
 	
-	librdf_log(storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 	"find statements %s", librdf_statement_to_string(statement));
 
-	scontext = (librdf_storage_audiodb_find_statements_stream_context*)LIBRDF_CALLOC(librdf_storage_audiodb_find_statements_stream_context, 1, sizeof(librdf_storage_audiodb_find_statements_stream_context));
+	scontext = (librdf_storage_audiodb_find_statements_stream_context*)librdf_sign_calloc(1, sizeof(librdf_storage_audiodb_find_statements_stream_context));
 
 	if(!scontext)
 		return NULL;
@@ -219,7 +250,7 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 		return NULL;
 	}
 
-	stream = librdf_new_stream(storage->world,
+	stream = librdf_new_stream(librdf_storage_get_world(storage),
 								(void*)scontext,
 								&librdf_storage_audiodb_find_statements_end_of_stream,
 								&librdf_storage_audiodb_find_statements_next_statement,
@@ -249,7 +280,7 @@ static void librdf_storage_audiodb_find_statements_finished(void* context) {
 	if(scontext->context)
 		librdf_free_node(scontext->context);
 
-	LIBRDF_FREE(librdf_storage_audiodb_find_statements_stream_context, scontext);
+	librdf_sign_free(scontext);
 }
 
 static int librdf_storage_audiodb_get_next_common(librdf_storage_audiodb_instance* scontext,
@@ -260,30 +291,30 @@ static int librdf_storage_audiodb_get_next_common(librdf_storage_audiodb_instanc
 
 
 	if(!*statement) {
-		if(!(*statement = librdf_new_statement(scontext->storage->world)))
+		if(!(*statement = librdf_new_statement(librdf_storage_get_world(scontext->storage))))
 			return 1;
 	}
 	
-	librdf_log(scontext->storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-			"Handle statement %s", librdf_statement_to_string(statement));
+	librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+			"Handle statement %s", librdf_statement_to_string(*statement));
 
 	librdf_statement_clear(*statement);
 
-	node = librdf_new_node_from_uri_string(scontext->storage->world, "testing");
+	node = librdf_new_node_from_uri_string(librdf_storage_get_world(scontext->storage), "testing");
 	
 	if(!node)
 		return 1;
 
 	librdf_statement_set_subject(*statement, node);
 
-	node = librdf_new_node_from_uri_string(scontext->storage->world, "foootle");
+	node = librdf_new_node_from_uri_string(librdf_storage_get_world(scontext->storage), "foootle");
 	
 	if(!node)
 		return 1;
 
 	librdf_statement_set_predicate(*statement, node);
 
-	node = librdf_new_node_from_uri_string(scontext->storage->world, "barble");
+	node = librdf_new_node_from_uri_string(librdf_storage_get_world(scontext->storage), "barble");
 	
 	if(!node)
 		return 1;
@@ -305,7 +336,7 @@ static int librdf_storage_audiodb_find_statements_end_of_stream(void* context) {
 														&scontext->statement,
 														&scontext->context);
 
-		librdf_log(scontext->storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+		librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 			"Handle eos statement %s %d", librdf_statement_to_string(scontext->query_statement), result);
 
 		if(result) {
@@ -328,7 +359,7 @@ static int librdf_storage_audiodb_find_statements_next_statement(void* context) 
 														&scontext->statement,
 														&scontext->context);
 
-	librdf_log(scontext->storage->world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+	librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 		"Handle next statement %s %d", librdf_statement_to_string(scontext->query_statement), result);
 
 	if(result) {
@@ -347,7 +378,7 @@ static void* librdf_storage_audiodb_find_statements_get_statement(void* context,
 		case LIBRDF_ITERATOR_GET_METHOD_GET_CONTEXT:
 			return scontext->context;
 		default:
-			librdf_log(scontext->storage->world,
+			librdf_log(librdf_storage_get_world(scontext->storage),
 				0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
  				"Unknown iterator method flag %d", flags);
 			return NULL;
@@ -363,9 +394,6 @@ static int librdf_storage_audiodb_sync(librdf_storage *storage) {
 
 static void 
 librdf_storage_audiodb_register_factory(librdf_storage_factory *factory) {
-		LIBRDF_ASSERT_CONDITION(!strcmp(factory->name, "audiodb"));
-
-	
 		factory->version            = LIBRDF_STORAGE_INTERFACE_VERSION;
 		factory->init               = librdf_storage_audiodb_init;
 		factory->open               = librdf_storage_audiodb_open;
@@ -378,21 +406,8 @@ librdf_storage_audiodb_register_factory(librdf_storage_factory *factory) {
 		factory->find_statements    = librdf_storage_audiodb_find_statements;
 }
 
-#ifdef MODULAR_LIBRDF
-
 /** Entry point for dynamically loaded storage module */
 void librdf_storage_module_register_factory(librdf_world *world) {
 		librdf_storage_register_factory(world, "audiodb", "AudioDB",
 				&librdf_storage_audiodb_register_factory);
 }
-
-#else
-
-void librdf_init_storage_audiodb(librdf_world *world) {
-		librdf_storage_register_factory(world, "audiodb", "AudioDB",
-				&librdf_storage_audiodb_register_factory);
-}
-
-#endif
-
-
