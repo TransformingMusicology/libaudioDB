@@ -185,6 +185,30 @@ LIBRDF_EXTERNAL_LIBS="`$PKG_CONFIG rasqal --libs` $LIBRDF_EXTERNAL_LIBS"
 rdf_query="rasqal(system $RASQAL_VERSION)"
 AC_MSG_RESULT(system $RASQAL_VERSION)
 
+# Check for redland
+AC_MSG_CHECKING(for redland)
+
+REDLAND_MIN_VERSION=1.0.9
+AC_SUBST(REDLAND_MIN_VERSION)
+if $PKG_CONFIG redland --exists; then
+  :
+else
+  AC_MSG_ERROR(Redland is not installed - see http://librdf.org/ to get a version newer than $REDLAND_MIN_VERSION)
+fi
+
+REDLAND_VERSION=`$PKG_CONFIG redland --modversion 2>/dev/null`
+
+if $PKG_CONFIG redland --atleast-version=$REDLAND_MIN_VERSION; then
+  :
+else
+  AC_MSG_ERROR(Installed redland $REDLAND_VERSION is not newer than $REDLAND_MIN_VERSION)
+fi
+
+LIBRDF_EXTERNAL_CPPFLAGS="`$PKG_CONFIG redland --cflags` $LIBRDF_EXTERNAL_CPPFLAGS"
+LIBRDF_EXTERNAL_LIBS="`$PKG_CONFIG redland --libs` $LIBRDF_EXTERNAL_LIBS"
+
+AC_MSG_RESULT(system $REDLAND_VERSION)
+
 LIBS="$LIBS"
 CPPFLAGS="$CPPFLAGS"
 LDFLAGS="$LDFLAGS"

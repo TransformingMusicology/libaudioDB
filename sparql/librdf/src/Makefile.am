@@ -25,9 +25,9 @@ plugindir = $(libdir)/redland
 
 plugin_LTLIBRARIES = librdf_storage_audiodb.la
 librdf_storage_audiodb_la_SOURCES = rdf_storage_audiodb.c
-librdf_storage_audiodb_la_CPPFLAGS = `pkg-config redland --cflags`
+librdf_storage_audiodb_la_CPPFLAGS = 
 librdf_storage_audiodb_la_LIBADD = -laudioDB
-librdf_storage_audiodb_la_LDFLAGS = -module -avoid-version `pkg-config redland --libs`
+librdf_storage_audiodb_la_LDFLAGS = -module -avoid-version
 
 # Use tar, whatever it is called (better be GNU tar though)
 TAR=@TAR@
@@ -41,7 +41,7 @@ AM_CFLAGS=@LIBRDF_INTERNAL_CPPFLAGS@ @LIBRDF_CPPFLAGS@ @LIBRDF_EXTERNAL_CPPFLAGS
 
 AM_CPPFLAGS += -DPKGDATADIR="\"$(pkgdatadir)\""
 AM_CFLAGS += -DLIBRDF_MODULE_DIR="\"$(libdir)/redland\""
-AM_LDFLAGS = -L/usr/local/lib/
+AM_LDFLAGS = @LIBRDF_INTERNAL_LIBS@ @LIBRDF_EXTERNAL_LIBS@
 
 LOCAL_LIB_DIR=lib
 
