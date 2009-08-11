@@ -4,6 +4,7 @@
 #if !defined(WIN32)
 #include <sys/mman.h>
 #endif
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <errno.h>
@@ -354,6 +355,10 @@ int audiodb_index_norm_shingles(vector<vector<float> > *, double *, double *, ui
 
 #define align_up(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
 #define align_down(x,w) ((x) & ~((1<<w)-1))
+
+#if defined(WIN32)
+#define getpagesize() (64*1024)
+#endif
 
 #define align_page_up(x) (((x) + (getpagesize()-1)) & ~(getpagesize()-1))
 #define align_page_down(x) ((x) & ~(getpagesize()-1))
