@@ -108,6 +108,20 @@ typedef struct adbheader {
 #define ADB_HEADER_FLAG_TIMES		(0x20U)
 #define ADB_HEADER_FLAG_REFERENCES	(0x40U)
 
+/* macros to make file/directory creation non-painful */
+#if defined(WIN32)
+#define mkdir_or_goto_error(dirname) \
+  if(_mkdir(dirname) < 0) { \
+    goto error; \
+  }
+#define ADB_CREAT_PERMISSIONS (_S_IREAD|_S_IWRITE)
+#else
+#define mkdir_or_goto_error(dirname) \
+  if(mkdir(dirname, S_IRWXU|S_IRWXG|S_IRWXO) < 0) { \
+    goto error; \
+  }
+#define ADB_CREAT_PERMISSIONS (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)
+#endif
 /* the transparent version of the opaque (forward-declared) adb_t. */
 struct adb {
   char *path;
@@ -168,6 +182,22 @@ typedef struct {
 #define maybe_munmap(table, length) \
   { if(table) { \
       munmap(table, length); \
+    } \
+  }
+
+#define malloc_and_fill_or_goto_error(type, var, start, length)   \
+  { void *tmp = malloc(length); \
+    if(tmp == NULL) { \
+      goto error; \
+    } \
+    var = (type) tmp; \
+    lseek_set_or_goto_error(adb->fd, (start)); \
+    read_or_goto_error(adb->fd, var, length); \
+  }
+
+#define maybe_free(var) \
+  { if(var) { \
+      free(var); \
     } \
   }
 

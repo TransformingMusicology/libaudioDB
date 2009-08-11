@@ -46,13 +46,7 @@ adb_t *audiodb_create(const char *path, unsigned datasize, unsigned ntracks, uns
     datadim = ADB_DEFAULT_DATADIM;
   }
 
-  if ((fd = open(path, O_RDWR|O_CREAT|O_EXCL, 
-#if defined(WIN32)
-                 _S_IREAD|_S_IWRITE
-#else
-                 S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
-#endif
-                 )) < 0) {
+  if ((fd = open(path, O_RDWR|O_CREAT|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
     goto error;
   }
 

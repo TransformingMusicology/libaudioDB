@@ -43,20 +43,18 @@ int audiodb_dump(adb_t *adb, const char *output) {
       powerTableLength = align_page_up(length/dim);
     }
 
-    mmap_or_goto_error(char *, fileTable, adb->header->fileTableOffset, fileTableLength);
+    malloc_and_fill_or_goto_error(char *, fileTable, adb->header->fileTableOffset, fileTableLength);
     if (adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
-      mmap_or_goto_error(char *, featureFileNameTable, adb->header->dataOffset, fileTableLength);
-      mmap_or_goto_error(char *, powerFileNameTable, adb->header->powerTableOffset, fileTableLength);
-      mmap_or_goto_error(char *, timesFileNameTable, adb->header->timesTableOffset, fileTableLength);
+      malloc_and_fill_or_goto_error(char *, featureFileNameTable, adb->header->dataOffset, fileTableLength);
+      malloc_and_fill_or_goto_error(char *, powerFileNameTable, adb->header->powerTableOffset, fileTableLength);
+      malloc_and_fill_or_goto_error(char *, timesFileNameTable, adb->header->timesTableOffset, fileTableLength);
     } else {
-      mmap_or_goto_error(double *, powerTable, adb->header->powerTableOffset, powerTableLength);
-      mmap_or_goto_error(double *, timesTable, adb->header->timesTableOffset, timesTableLength);
+      malloc_and_fill_or_goto_error(double *, powerTable, adb->header->powerTableOffset, powerTableLength);
+      malloc_and_fill_or_goto_error(double *, timesTable, adb->header->timesTableOffset, timesTableLength);
     }
   }
 
-  if((mkdir(output, S_IRWXU|S_IRWXG|S_IRWXO)) < 0) {
-    goto error;
-  }
+  mkdir_or_goto_error(output);
 
   if ((getcwd(cwd, PATH_MAX)) == 0) {
     goto error;
@@ -69,25 +67,25 @@ int audiodb_dump(adb_t *adb, const char *output) {
   }
   directory_changed = 1;
 
-  if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+  if ((fLfd = open("featureList.txt", O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
     goto error;
   }
 
   times = adb->header->flags & ADB_HEADER_FLAG_TIMES;
   if (times) {
-    if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+    if ((tLfd = open("timesList.txt", O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
       goto error;
     }
   }
 
   power = adb->header->flags & ADB_HEADER_FLAG_POWER;
   if (power) {
-    if ((pLfd = open("powerList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+    if ((pLfd = open("powerList.txt", O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
       goto error;
     }
   }
 
-  if ((kLfd = open("keyList.txt", O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+  if ((kLfd = open("keyList.txt", O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
     goto error;
   }
   
@@ -127,7 +125,7 @@ int audiodb_dump(adb_t *adb, const char *output) {
       }
     } else {
       snprintf(fName, 256, "%05d.features", k);
-      if ((ffd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+      if ((ffd = open(fName, O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
         goto error;
       }
       write_or_goto_error(ffd, &(adb->header->dim), sizeof(uint32_t));
@@ -177,7 +175,7 @@ int audiodb_dump(adb_t *adb, const char *output) {
       if (power) {
 	uint32_t one = 1;
 	snprintf(fName, 256, "%05d.power", k);
-	if ((pfd = open(fName, O_CREAT|O_RDWR|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
+	if ((pfd = open(fName, O_CREAT|O_RDWR|O_EXCL, ADB_CREAT_PERMISSIONS)) < 0) {
           goto error;
 	}
         write_or_goto_error(pfd, &one, sizeof(uint32_t));
@@ -231,12 +229,12 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
   }
   fclose(kLFile);
     
-  maybe_munmap(fileTable, fileTableLength);
-  maybe_munmap(timesTable, timesTableLength);
-  maybe_munmap(powerTable, powerTableLength);
-  maybe_munmap(featureFileNameTable, fileTableLength);
-  maybe_munmap(timesFileNameTable, fileTableLength);
-  maybe_munmap(powerFileNameTable, fileTableLength);
+  maybe_free(fileTable);
+  maybe_free(timesTable);
+  maybe_free(powerTable);
+  maybe_free(featureFileNameTable);
+  maybe_free(timesFileNameTable);
+  maybe_free(powerFileNameTable);
 
   if((chdir(cwd)) < 0) {
     /* don't goto error because the error handling will try to
@@ -271,12 +269,12 @@ if [ -z \"$1\" ]; then echo usage: $0 newdb; exit 1; fi\n\n\
     fclose(scriptFile);
   }
 
-  maybe_munmap(fileTable, fileTableLength);
-  maybe_munmap(timesTable, timesTableLength);
-  maybe_munmap(powerTable, powerTableLength);
-  maybe_munmap(featureFileNameTable, fileTableLength);
-  maybe_munmap(timesFileNameTable, fileTableLength);
-  maybe_munmap(powerFileNameTable, fileTableLength);
+  maybe_free(fileTable);
+  maybe_free(timesTable);
+  maybe_free(powerTable);
+  maybe_free(featureFileNameTable);
+  maybe_free(timesFileNameTable);
+  maybe_free(powerFileNameTable);
 
   if(directory_changed) {
     int gcc_warning_workaround = chdir(cwd);
