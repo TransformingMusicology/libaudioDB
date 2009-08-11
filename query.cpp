@@ -203,16 +203,16 @@ int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
     /* create a reference/insert, then use adb_insert_create_datum() */
     adb_reference_t reference = {0};
     char features[ADB_MAXSTR], power[ADB_MAXSTR], times[ADB_MAXSTR];
-    lseek(adb->fd, adb->header->dataOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+    lseek_set_or_goto_error(adb->fd, adb->header->dataOffset + track_id * ADB_FILETABLE_ENTRY_SIZE);
     read_or_goto_error(adb->fd, features, ADB_MAXSTR);
     reference.features = features;
     if(adb->header->flags & ADB_HEADER_FLAG_POWER) {
-      lseek(adb->fd, adb->header->powerTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->powerTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE);
       read_or_goto_error(adb->fd, power, ADB_MAXSTR);
       reference.power = power;
     }
     if(adb->header->flags & ADB_HEADER_FLAG_TIMES) {
-      lseek(adb->fd, adb->header->timesTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->timesTableOffset + track_id * ADB_FILETABLE_ENTRY_SIZE);
       read_or_goto_error(adb->fd, times, ADB_MAXSTR);
       reference.times = times;
     }
@@ -223,18 +223,12 @@ int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
     d->dim = adb->header->dim;
     d->key = (*adb->keys)[track_id].c_str();
     /* read out stuff from the database tables */
-    d->data = (double *) malloc(d->nvectors * d->dim * sizeof(double));
-    lseek(adb->fd, adb->header->dataOffset + track_offset, SEEK_SET);
-    read_or_goto_error(adb->fd, d->data, d->nvectors * d->dim * sizeof(double));
+    malloc_and_fill_or_goto_error(double *, d->data, adb->header->dataOffset + track_offset, d->nvectors * d->dim * sizeof(double));
     if(adb->header->flags & ADB_HEADER_FLAG_POWER) {
-      d->power = (double *) malloc(d->nvectors * sizeof(double));
-      lseek(adb->fd, adb->header->powerTableOffset + track_offset / d->dim, SEEK_SET);
-      read_or_goto_error(adb->fd, d->power, d->nvectors * sizeof(double));
+      malloc_and_fill_or_goto_error(double *, d->power, adb->header->powerTableOffset + track_offset / d->dim, d->nvectors * sizeof(double));
     }
     if(adb->header->flags & ADB_HEADER_FLAG_TIMES) {
-      d->times = (double *) malloc(2 * d->nvectors * sizeof(double));
-      lseek(adb->fd, adb->header->timesTableOffset + track_offset / d->dim, SEEK_SET);
-      read_or_goto_error(adb->fd, d->times, 2 * d->nvectors * sizeof(double));
+      malloc_and_fill_or_goto_error(double *, d->times, adb->header->timesTableOffset + 2 * track_offset / d->dim, 2 * d->nvectors * sizeof(double));
     }
     return 0;
   }
@@ -351,7 +345,7 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
   dbpointers->l2norm_data = new double[nvectors];
 
   double *snpp = dbpointers->l2norm_data, *sppp = 0;
-  lseek(adb->fd, adb->header->l2normTableOffset, SEEK_SET);
+  lseek_set_or_goto_error(adb->fd, adb->header->l2normTableOffset);
   read_or_goto_error(adb->fd, dbpointers->l2norm_data, nvectors * sizeof(double));
 
   if (using_power) {
@@ -360,7 +354,7 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
     }
     dbpointers->power_data = new double[nvectors];
     sppp = dbpointers->power_data;
-    lseek(adb->fd, adb->header->powerTableOffset, SEEK_SET);
+    lseek_set_or_goto_error(adb->fd, adb->header->powerTableOffset);
     read_or_goto_error(adb->fd, dbpointers->power_data, nvectors * sizeof(double));
   }
 
@@ -387,12 +381,7 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
 
     dbpointers->mean_duration = new double[adb->header->numFiles];
 
-    times_table = (double *) malloc(2 * nvectors * sizeof(double));
-    if(!times_table) {
-      goto error;
-    }
-    lseek(adb->fd, adb->header->timesTableOffset, SEEK_SET);
-    read_or_goto_error(adb->fd, times_table, 2 * nvectors * sizeof(double));
+    malloc_and_fill_or_goto_error(double *, times_table, adb->header->timesTableOffset, 2 * nvectors * sizeof(double));
     for(unsigned int k = 0; k < adb->header->numFiles; k++) {
       size_t track_length = (*adb->track_lengths)[k];
       unsigned int j;
@@ -412,18 +401,10 @@ static int audiodb_set_up_dbpointers(adb_t *adb, const adb_query_spec_t *spec, a
   return 0;
 
  error:
-  if(dbpointers->l2norm_data) {
-    delete [] dbpointers->l2norm_data;
-  }
-  if(dbpointers->power_data) {
-    delete [] dbpointers->power_data;
-  }
-  if(dbpointers->mean_duration) {
-    delete [] dbpointers->mean_duration;
-  }
-  if(times_table) {
-    free(times_table);
-  }
+  maybe_delete_array(dbpointers->l2norm_data);
+  maybe_delete_array(dbpointers->power_data);
+  maybe_delete_array(dbpointers->mean_duration);
+  maybe_free(times_table);
   return 1;
   
 }
@@ -613,26 +594,15 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
  loop_finish:
 
   free(data_buffer);
-
-  // Clean up
-  if(query_data)
-    delete[] query_data;
-  if(qpointers.l2norm_data)
-    delete[] qpointers.l2norm_data;
-  if(qpointers.power_data)
-    delete[] qpointers.power_data;
-  if(qpointers.mean_duration)
-    delete[] qpointers.mean_duration;
-  if(dbpointers.power_data)
-    delete[] dbpointers.power_data;
-  if(dbpointers.l2norm_data)
-    delete[] dbpointers.l2norm_data;
-  if(D)
-    delete[] D;
-  if(DD)
-    delete[] DD;
-  if(dbpointers.mean_duration)
-    delete[] dbpointers.mean_duration;
+  maybe_delete_array(query_data);
+  maybe_delete_array(qpointers.power_data);
+  maybe_delete_array(qpointers.l2norm_data);
+  maybe_delete_array(qpointers.mean_duration);
+  maybe_delete_array(dbpointers.power_data);
+  maybe_delete_array(dbpointers.l2norm_data);
+  maybe_delete_array(dbpointers.mean_duration);
+  maybe_delete_array(D);
+  maybe_delete_array(DD);
 
   return 0;
 }

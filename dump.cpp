@@ -99,7 +99,7 @@ int audiodb_dump(adb_t *adb, const char *output) {
   }
   kLFile = fdopen(kLfd, "w");
 
-  lseek(adb->fd, adb->header->dataOffset, SEEK_SET);
+  lseek_set_or_goto_error(adb->fd, adb->header->dataOffset);
 
   for(unsigned k = 0; k < nfiles; k++) {
     fprintf(kLFile, "%s\n", fileTable + k*ADB_FILETABLE_ENTRY_SIZE);

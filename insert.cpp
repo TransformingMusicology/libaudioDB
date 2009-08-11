@@ -134,9 +134,9 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
   nfiles = adb->header->numFiles;
 
   /* FIXME: checking for all these lseek()s */
-  lseek(adb->fd, adb->header->fileTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+  lseek_set_or_goto_error(adb->fd, adb->header->fileTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE);
   write_or_goto_error(adb->fd, datum->key, strlen(datum->key)+1);
-  lseek(adb->fd, adb->header->trackTableOffset + nfiles * ADB_TRACKTABLE_ENTRY_SIZE, SEEK_SET);
+  lseek_set_or_goto_error(adb->fd, adb->header->trackTableOffset + nfiles * ADB_TRACKTABLE_ENTRY_SIZE);
   write_or_goto_error(adb->fd, &datum->nvectors, ADB_TRACKTABLE_ENTRY_SIZE);
   if(adb->header->flags & ADB_HEADER_FLAG_REFERENCES) {
     char cwd[PATH_MAX];
@@ -145,14 +145,14 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
     if(!getcwd(cwd, PATH_MAX)) {
       goto error;
     }
-    lseek(adb->fd, adb->header->dataOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+    lseek_set_or_goto_error(adb->fd, adb->header->dataOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE);
     if(*((char *) datum->data) != '/') {
       write_or_goto_error(adb->fd, cwd, strlen(cwd));
       write_or_goto_error(adb->fd, &slash, 1);
     }
     write_or_goto_error(adb->fd, datum->data, strlen((const char *) datum->data)+1);
     if(datum->power) {
-      lseek(adb->fd, adb->header->powerTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->powerTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE);
       if(*((char *) datum->power) != '/') {
         write_or_goto_error(adb->fd, cwd, strlen(cwd));
         write_or_goto_error(adb->fd, &slash, 1);
@@ -160,7 +160,7 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
       write_or_goto_error(adb->fd, datum->power, strlen((const char *) datum->power)+1);
     }
     if(datum->times) {
-      lseek(adb->fd, adb->header->timesTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->timesTableOffset + nfiles * ADB_FILETABLE_ENTRY_SIZE);
       if(*((char *) datum->times) != '/') {
         write_or_goto_error(adb->fd, cwd, strlen(cwd));
         write_or_goto_error(adb->fd, &slash, 1);
@@ -168,14 +168,14 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
       write_or_goto_error(adb->fd, datum->times, strlen((const char *) datum->times)+1);
     }
   } else {
-    lseek(adb->fd, adb->header->dataOffset + offset, SEEK_SET);
+    lseek_set_or_goto_error(adb->fd, adb->header->dataOffset + offset);
     write_or_goto_error(adb->fd, datum->data, sizeof(double) * datum->nvectors * datum->dim);
     if(datum->power) {
-      lseek(adb->fd, adb->header->powerTableOffset + offset / datum->dim, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->powerTableOffset + offset / datum->dim);
       write_or_goto_error(adb->fd, datum->power, sizeof(double) * datum->nvectors);
     }
     if(datum->times) {
-      lseek(adb->fd, adb->header->timesTableOffset + offset / datum->dim * 2, SEEK_SET);
+      lseek_set_or_goto_error(adb->fd, adb->header->timesTableOffset + offset / datum->dim * 2);
       write_or_goto_error(adb->fd, datum->times, sizeof(double) * datum->nvectors * 2);
     }
   }
@@ -188,7 +188,7 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
     l2norm_buffer = (double *) malloc(datum->nvectors * sizeof(double));
     
     audiodb_l2norm_buffer((double *) datum->data, datum->dim, datum->nvectors, l2norm_buffer);
-    lseek(adb->fd, adb->header->l2normTableOffset + offset / datum->dim, SEEK_SET);
+    lseek_set_or_goto_error(adb->fd, adb->header->l2normTableOffset + offset / datum->dim);
     write_or_goto_error(adb->fd, l2norm_buffer, sizeof(double) * datum->nvectors);
     free(l2norm_buffer);
     l2norm_buffer = NULL;
@@ -208,9 +208,7 @@ static int audiodb_insert_datum_internal(adb_t *adb, adb_datum_internal_t *datum
   return audiodb_sync_header(adb);
 
  error:
-  if(l2norm_buffer) {
-    free(l2norm_buffer);
-  }
+  maybe_free(l2norm_buffer);
   return 1;
 }
 

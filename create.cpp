@@ -88,20 +88,15 @@ adb_t *audiodb_create(const char *path, unsigned datasize, unsigned ntracks, uns
 
   write_or_goto_error(fd, header, ADB_HEADER_SIZE);
 
-  // go to the location corresponding to the last byte
-  if (lseek (fd, header->dbSize - 1, SEEK_SET) == -1) {
-    goto error;
-  }
-
-  // write a dummy byte at the last location
+  // go to the location corresponding to the last byte of the database
+  // file, and write a byte there.
+  lseek_set_or_goto_error(fd, header->dbSize - 1);
   write_or_goto_error(fd, "", 1);
 
   free(header);
   return audiodb_open(path, O_RDWR);
 
  error:
-  if(header) {
-    free(header);
-  }
+  maybe_free(header);
   return NULL;
 }
