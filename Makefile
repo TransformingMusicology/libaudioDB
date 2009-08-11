@@ -54,19 +54,19 @@ soapServer.cpp soapClient.cpp soapC.cpp soapH.h adb.nsmap: audioDBws.h
 	$(SOAPCPP2) audioDBws.h
 
 $(LIBOBJS): %.o: %.cpp audioDB_API.h audioDB-internals.h accumulator.h accumulators.h
-	g++ -c $(CFLAGS) $(GSL_INCLUDE) -Wall $<
+	$(CXX) -c $(CFLAGS) $(GSL_INCLUDE) -Wall $<
 
 %.o: %.cpp audioDB.h audioDB_API.h adb.nsmap cmdline.h reporter.h ReporterBase.h lshlib.h
-	g++ -c $(CFLAGS) $(GSOAP_INCLUDE) $(GSL_INCLUDE) -Wall  $<
+	$(CXX) -c $(CFLAGS) $(GSOAP_INCLUDE) $(GSL_INCLUDE) -Wall  $<
 
 cmdline.o: cmdline.c cmdline.h
-	gcc -c $(CFLAGS) $<
+	$(CC) -c $(CFLAGS) $<
 
 $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
-	g++ -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
+	$(CXX) -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 $(LIBRARY): $(LIBOBJS)
-	g++ $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^ 
+	$(CXX) $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^
 
 tags:
 	ctags *.cpp *.h
@@ -94,7 +94,7 @@ test: $(EXECUTABLE) $(LIBRARY)
 	sh -c "cd tests && sh ./run-tests.sh"
 
 xthresh: xthresh.c
-	gcc -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
+	$(CC) -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
 
 install:
 	cp $(LIBRARY) /usr/local/lib/
