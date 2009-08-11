@@ -10,18 +10,6 @@ void sighup_action(int signal, siginfo_t *info, void *context) {
 }
 #endif
 
-void audioDB::get_lock(int fd, bool exclusive) {
-  if(acquire_lock(fd, exclusive)) {
-    error("fcntl lock error", "", "fcntl");
-  }
-}
-
-void audioDB::release_lock(int fd) {
-  if (divest_lock(fd)) {
-    error("fcntl unlock error", "", "fcntl");
-  }
-}
-
 void audioDB::error(const char* a, const char* b, const char *sysFunc) {
  
 

@@ -278,8 +278,6 @@ class audioDB{
   void cleanup();
   ~audioDB();
   int processArgs(const unsigned argc, const char* argv[]);
-  void get_lock(int fd, bool exclusive);
-  void release_lock(int fd);
   void create(const char* dbName);
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);

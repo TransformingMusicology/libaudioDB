@@ -13,6 +13,7 @@ void audiodb_close(adb_t *adb) {
   if(adb->cached_lsh) {
     delete adb->cached_lsh;
   }
+  divest_lock(adb->fd);
   close(adb->fd);
   free(adb);
 }

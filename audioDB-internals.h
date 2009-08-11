@@ -1,12 +1,23 @@
+#if defined(WIN32)
+#include <sys/locking.h>
+#endif
+#if !defined(WIN32)
 #include <sys/mman.h>
+#endif
 #include <sys/types.h>
 
 #include <errno.h>
 #include <fcntl.h>
+#if defined(WIN32)
+#include <io.h>
+#endif
 #include <limits.h>
 #include <math.h>
 #include <string.h>
 #include <unistd.h>
+#if defined(WIN32)
+#include <windows.h>
+#endif
 
 #include <algorithm>
 #include <iostream>

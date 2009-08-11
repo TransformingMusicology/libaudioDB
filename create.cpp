@@ -49,9 +49,6 @@ adb_t *audiodb_create(const char *path, unsigned datasize, unsigned ntracks, uns
   if ((fd = open(path, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)) < 0) {
     goto error;
   }
-  if (acquire_lock(fd, true)) {
-    goto error;
-  }
 
   header = (adb_header_t *) malloc(sizeof(adb_header_t));
   if(!header) {
