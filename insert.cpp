@@ -346,8 +346,13 @@ int audiodb_insert_create_datum(adb_insert_t *insert, adb_datum_t *datum) {
      * will do the right thing for us on all platforms.
      *
      * I hate C.
+     *
+     * Addendum: the above reasoning is skewered on Win32, where off_t
+     * is apparently signed 32-bit always (i.e. no large-file
+     * support).  So now, we cast datum->dim to size_t, so that our
+     * types are the same on both sides.  I hate C even more.
      */
-    if(((off_t) (st.st_size - sizeof(uint32_t))) != (size / datum->dim)) {
+    if((st.st_size - sizeof(uint32_t)) != (size / (size_t) datum->dim)) {
       goto error;
     }
     read_or_goto_error(fd, &dim, sizeof(uint32_t));
