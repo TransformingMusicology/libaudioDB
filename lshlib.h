@@ -11,36 +11,13 @@
 #ifndef __LSHLIB_H
 #define __LSHLIB_H
 
-#include <vector>
-#include <queue>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <string.h>
-#include <iostream>
-#include <fstream>
-#include <math.h>
-#include <sys/time.h>
-#include <assert.h>
-#include <float.h>
-#include <signal.h>
-#include <time.h>
-#include <limits.h>
-#include <errno.h>
-#ifdef MT19937
-#include "mt19937/mt19937ar.h"
-#endif
+using namespace std;
 
 #define IntT int
 #define LongUns64T long long unsigned
 #define Uns32T unsigned
 #define Int32T int
 #define BooleanT int
-#define TRUE 1
-#define FALSE 0
 
 // A big number (>> max #  of points)
 #define INDEX_START_EMPTY 1000000000U
@@ -78,7 +55,7 @@
 
 #define O2_INDEX_MAXSTR (256)
 
-unsigned align_up(unsigned x, unsigned w);
+#define align_up(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
 
 #define O2_SERIAL_FUNCTIONS_SIZE (align_up(sizeof(float) * O2_SERIAL_MAX_TABLES * O2_SERIAL_MAX_FUNS * O2_SERIAL_MAX_DIM \
 + sizeof(float) * O2_SERIAL_MAX_TABLES * O2_SERIAL_MAX_FUNS + \
@@ -106,8 +83,6 @@ unsigned align_up(unsigned x, unsigned w);
 #endif
 
 #define LSH_CORE_ARRAY_BIT (0x80000000) //  LSH_CORE_ARRAY test bit for list head
-
-using namespace std;
 
 Uns32T get_page_logn();
 

@@ -2,6 +2,7 @@ extern "C" {
 #include "audioDB_API.h"
 }
 #include "audioDB-internals.h"
+#include "lshlib.h"
 
 /*
  * Routines and datastructures which are specific to indexed queries.
@@ -40,7 +41,7 @@ int audiodb_index_init_query(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   return true;
 }
 
-void audiodb_index_add_point_approximate(void *user_data, Uns32T pointID, Uns32T qpos, float dist) {
+void audiodb_index_add_point_approximate(void *user_data, uint32_t pointID, uint32_t qpos, float dist) {
   adb_qcallback_t *data = (adb_qcallback_t *) user_data;
   adb_t *adb = data->adb;
   adb_qstate_internal_t *qstate = data->qstate;
@@ -59,7 +60,7 @@ void audiodb_index_add_point_approximate(void *user_data, Uns32T pointID, Uns32T
 
 // Maintain a queue of points to pass to audiodb_query_queue_loop()
 // for exact evaluation
-void audiodb_index_add_point_exact(void *user_data, Uns32T pointID, Uns32T qpos, float dist) {
+void audiodb_index_add_point_exact(void *user_data, uint32_t pointID, uint32_t qpos, float dist) {
   adb_qcallback_t *data = (adb_qcallback_t *) user_data;
   adb_t *adb = data->adb;
   adb_qstate_internal_t *qstate = data->qstate;

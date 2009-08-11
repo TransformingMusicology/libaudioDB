@@ -3,7 +3,7 @@ extern "C" {
 }
 #include "audioDB-internals.h"
 
-PointPair::PointPair(Uns32T a, Uns32T b, Uns32T c) :
+PointPair::PointPair(uint32_t a, uint32_t b, uint32_t c) :
   trackID(a), qpos(b), spos(c) {
 };
 

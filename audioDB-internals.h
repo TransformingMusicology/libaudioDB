@@ -1,15 +1,26 @@
+#include <sys/mman.h>
 #include <sys/types.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <math.h>
+#include <string.h>
 #include <unistd.h>
 
-#include <set>
-#include <queue>
-#include <map>
-#include <string>
 #include <algorithm>
+#include <iostream>
+#include <map>
+#include <queue>
+#include <set>
+#include <string>
+#include <vector>
 
-#include "pointpair.h"
 #include "accumulator.h"
+#include "pointpair.h"
 #include "lshlib.h"
+
+using namespace std;
 
 /* this struct is for writing polymorphic routines as puns.  When
  * inserting, we might have a "datum" (with actual numerical data) or

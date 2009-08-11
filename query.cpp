@@ -104,6 +104,7 @@ int audiodb_query_free_results(adb_t *adb, const adb_query_spec_t *spec, adb_que
   return 0;
 }
 
+/* FIXME: we should check the return values from allocation */
 static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, int track, unsigned int numVectors, double *query, double *data_buffer, double **D, double **DD) {
   unsigned int j, k, l, w;
   double *dp, *qp, *sp;
@@ -114,10 +115,8 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
   for(j = 0; j < numVectors; j++) {
     // Sum products matrix
     D[j] = new double[(*adb->track_lengths)[track]]; 
-    assert(D[j]);
     // Matched filter matrix
     DD[j]=new double[(*adb->track_lengths)[track]];
-    assert(DD[j]);
   }
 
   // Dot product
@@ -447,8 +446,8 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
    */
   double dist;
   double *dbdata = 0, *dbdata_pointer;
-  Uns32T currentTrack = 0x80000000; // KLUDGE: Initialize with a value outside of track index range
-  Uns32T npairs = qstate->exact_evaluation_queue->size();
+  uint32_t currentTrack = 0x80000000; // KLUDGE: Initialize with a value outside of track index range
+  uint32_t npairs = qstate->exact_evaluation_queue->size();
   while(npairs--) {
     PointPair pp = qstate->exact_evaluation_queue->top();
     if(currentTrack != pp.trackID) {
@@ -469,8 +468,8 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
       }
       audiodb_really_free_datum(&d);
     }
-    Uns32T qPos = (spec->qid.flags & ADB_QID_FLAG_EXHAUSTIVE) ? pp.qpos : 0;
-    Uns32T sPos = pp.spos; // index into l2norm table
+    uint32_t qPos = (spec->qid.flags & ADB_QID_FLAG_EXHAUSTIVE) ? pp.qpos : 0;
+    uint32_t sPos = pp.spos; // index into l2norm table
     // Test power thresholds before computing distance
     if( ( (!power_refine) || audiodb_powers_acceptable(&spec->refine, qpointers->power[qPos], dbpointers.power[sPos])) &&
 	( qPos<qpointers->nvectors-sequence_length+1 && sPos<(*adb->track_lengths)[pp.trackID]-sequence_length+1 ) ){

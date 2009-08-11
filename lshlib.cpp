@@ -1,5 +1,27 @@
-#include "lshlib.h"
+#include <vector>
+#include <queue>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <string.h>
+#include <iostream>
+#include <fstream>
+#include <math.h>
+#include <sys/time.h>
+#include <assert.h>
+#include <float.h>
+#include <signal.h>
+#include <time.h>
+#include <limits.h>
+#include <errno.h>
+#ifdef MT19937
+#include "mt19937/mt19937ar.h"
+#endif
 
+#include "lshlib.h"
 
 void err(char*s){cout << s << endl;exit(2);}
 
@@ -7,8 +29,6 @@ Uns32T get_page_logn(){
   int pagesz = (int)sysconf(_SC_PAGESIZE);
   return (Uns32T)log2((double)pagesz);  
 }
-
-unsigned align_up(unsigned x, unsigned w) { return (((x) + ((1<<w)-1)) & ~((1<<w)-1)); }
 
 void H::error(const char* a, const char* b, const char *sysFunc) {
   cerr << a << ": " << b << endl;

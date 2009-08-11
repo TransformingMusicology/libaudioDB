@@ -2,6 +2,7 @@ extern "C" {
 #include "audioDB_API.h"
 }
 #include "audioDB-internals.h"
+#include "lshlib.h"
 
 /*
  * Routines which are common to both indexed query and index creation:
@@ -15,7 +16,7 @@ extern "C" {
  * information in a filename is going to lose: it's impossible to
  * maintain backwards-compatibility.  Instead we should probably store
  * the index metadata inside the audiodb instance. */
-char *audiodb_index_get_name(const char *dbName, double radius, Uns32T sequenceLength) {
+char *audiodb_index_get_name(const char *dbName, double radius, uint32_t sequenceLength) {
   char *indexName;
   if(strlen(dbName) > (ADB_MAXSTR - 32)) {
     return NULL;
@@ -26,7 +27,7 @@ char *audiodb_index_get_name(const char *dbName, double radius, Uns32T sequenceL
   return indexName;
 }
 
-bool audiodb_index_exists(const char *dbName, double radius, Uns32T sequenceLength) {
+bool audiodb_index_exists(const char *dbName, double radius, uint32_t sequenceLength) {
   char *indexName = audiodb_index_get_name(dbName, radius, sequenceLength);
   if(!indexName) {
     return false;
@@ -68,9 +69,9 @@ LSH *audiodb_index_allocate(adb_t *adb, char *indexName, bool load_tables) {
   return lsh;
 }
 
-vector<vector<float> > *audiodb_index_initialize_shingles(Uns32T sz, Uns32T dim, Uns32T seqLen) {
+vector<vector<float> > *audiodb_index_initialize_shingles(uint32_t sz, uint32_t dim, uint32_t seqLen) {
   std::vector<std::vector<float> > *vv = new vector<vector<float> >(sz);
-  for(Uns32T i=0 ; i < sz ; i++) {
+  for(uint32_t i=0 ; i < sz ; i++) {
     (*vv)[i]=vector<float>(dim * seqLen);
   }
   return vv;
@@ -80,8 +81,8 @@ void audiodb_index_delete_shingles(vector<vector<float> > *vv) {
   delete vv;
 }
 
-void audiodb_index_make_shingle(vector<vector<float> >* vv, Uns32T idx, double* fvp, Uns32T dim, Uns32T seqLen){
-  assert(idx<(*vv).size());
+void audiodb_index_make_shingle(vector<vector<float> >* vv, uint32_t idx, double* fvp, uint32_t dim, uint32_t seqLen){
+
   vector<float>::iterator ve = (*vv)[idx].end();
   vector<float>::iterator vi = (*vv)[idx].begin();
   // First feature vector in shingle
@@ -107,23 +108,23 @@ void audiodb_index_make_shingle(vector<vector<float> >* vv, Uns32T idx, double* 
 
 // in-place norming, no deletions.  If using power, return number of
 // shingles above power threshold.
-int audiodb_index_norm_shingles(vector<vector<float> >* vv, double* snp, double* spp, Uns32T dim, Uns32T seqLen, double radius, bool normed_vectors, bool use_pthreshold, float pthreshold) {
+int audiodb_index_norm_shingles(vector<vector<float> >* vv, double* snp, double* spp, uint32_t dim, uint32_t seqLen, double radius, bool normed_vectors, bool use_pthreshold, float pthreshold) {
   int z = 0; // number of above-threshold shingles
   float l2norm;
   double power;
   float oneOverRadius = 1./(float)sqrt(radius); // Passed radius is really radius^2
   float oneOverSqrtl2NormDivRad = oneOverRadius;
-  Uns32T shingleSize = seqLen * dim;
+  uint32_t shingleSize = seqLen * dim;
 
   if(!spp) {
     return -1;
   }
-  for(Uns32T a=0; a<(*vv).size(); a++){
+  for(uint32_t a=0; a<(*vv).size(); a++){
     l2norm = (float)(*snp++);
     if(normed_vectors)
       oneOverSqrtl2NormDivRad = (1./l2norm)*oneOverRadius;
     
-    for(Uns32T b=0; b < shingleSize ; b++)
+    for(uint32_t b=0; b < shingleSize ; b++)
       (*vv)[a][b]*=oneOverSqrtl2NormDivRad;
 
     power = *spp++;
