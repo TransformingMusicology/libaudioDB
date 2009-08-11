@@ -66,7 +66,7 @@ $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 	$(CXX) -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 $(LIBRARY): $(LIBOBJS)
-	$(CXX) $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $(LIBGSL) $^
+	$(CXX) $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $^
 
 tags:
 	ctags *.cpp *.h
