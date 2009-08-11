@@ -182,7 +182,9 @@ static inline int audiodb_sync_header(adb_t *adb) {
     goto error;
   }
 
-#if defined(_POSIX_SYNCHRONIZED_IO) && (_POSIX_SYNCHRONIZED_IO > 0)
+#if defined(WIN32)
+  _commit(adb->fd);
+#elif defined(_POSIX_SYNCHRONIZED_IO) && (_POSIX_SYNCHRONIZED_IO > 0)
   fdatasync(adb->fd);
 #else
   fsync(adb->fd);
