@@ -192,6 +192,11 @@ typedef struct {
     } \
   }
 
+#define lseek_set_or_goto_error(fd, offset) \
+  { if(lseek(fd, offset, SEEK_SET) == (off_t) -1) \
+      goto error; \
+  } \
+
 static inline int audiodb_sync_header(adb_t *adb) {
   off_t pos;
   pos = lseek(adb->fd, (off_t) 0, SEEK_CUR);

@@ -28,18 +28,25 @@ static int audiodb_collect_keys(adb_t *adb) {
   if(adb->header->length > 0) {
     unsigned nfiles = adb->header->numFiles;
     key_table_length = align_page_up(nfiles * ADB_FILETABLE_ENTRY_SIZE);
-    mmap_or_goto_error(char *, key_table, adb->header->fileTableOffset, key_table_length);
+    key_table = (char *)malloc(key_table_length);
+    if(!key_table) {
+      goto error;
+    }
+    lseek_set_or_goto_error(adb->fd, adb->header->fileTableOffset);
+    read_or_goto_error(adb->fd, key_table, key_table_length);
     for (unsigned int k = 0; k < nfiles; k++) {
       adb->keys->push_back(key_table + k*ADB_FILETABLE_ENTRY_SIZE);
       (*adb->keymap)[(key_table + k*ADB_FILETABLE_ENTRY_SIZE)] = k;
     }
-    munmap(key_table, key_table_length);
+    free(key_table);
   }
 
   return 0;
 
  error:
-  maybe_munmap(key_table, key_table_length);
+  if(key_table) {
+    free(key_table);
+  }
   return 1;
 }
 
@@ -49,7 +56,12 @@ static int audiodb_collect_track_lengths(adb_t *adb) {
   if(adb->header->length > 0) {
     unsigned nfiles = adb->header->numFiles;
     track_table_length = align_page_up(nfiles * ADB_TRACKTABLE_ENTRY_SIZE);
-    mmap_or_goto_error(uint32_t *, track_table, adb->header->trackTableOffset, track_table_length);
+    track_table = (uint32_t *) malloc(track_table_length);
+    if (!track_table) {
+      goto error;
+    }
+    lseek_set_or_goto_error(adb->fd, adb->header->trackTableOffset);
+    read_or_goto_error(adb->fd, track_table, track_table_length);
     off_t offset = 0;
     for (unsigned int k = 0; k < nfiles; k++) {
       uint32_t track_length = track_table[k];
@@ -57,13 +69,15 @@ static int audiodb_collect_track_lengths(adb_t *adb) {
       adb->track_offsets->push_back(offset);
       offset += track_length * adb->header->dim * sizeof(double);
     }
-    munmap(track_table, track_table_length);
+    free(track_table);
   }
 
   return 0;
 
  error:
-  maybe_munmap(track_table, track_table_length);
+  if(track_table) {
+    free(track_table);
+  }
   return 1;
 }
 
