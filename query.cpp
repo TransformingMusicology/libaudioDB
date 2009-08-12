@@ -226,9 +226,13 @@ int audiodb_track_id_datum(adb_t *adb, uint32_t track_id, adb_datum_t *d) {
     malloc_and_fill_or_goto_error(double *, d->data, adb->header->dataOffset + track_offset, d->nvectors * d->dim * sizeof(double));
     if(adb->header->flags & ADB_HEADER_FLAG_POWER) {
       malloc_and_fill_or_goto_error(double *, d->power, adb->header->powerTableOffset + track_offset / d->dim, d->nvectors * sizeof(double));
+    } else {
+      d->power = NULL;
     }
     if(adb->header->flags & ADB_HEADER_FLAG_TIMES) {
       malloc_and_fill_or_goto_error(double *, d->times, adb->header->timesTableOffset + 2 * track_offset / d->dim, 2 * d->nvectors * sizeof(double));
+    } else {
+      d->times = NULL;
     }
     return 0;
   }
