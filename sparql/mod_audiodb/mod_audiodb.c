@@ -11,13 +11,9 @@
 #include "apreq2/apreq_module_apache2.h"
 #include <rasqal.h>
 
-static int ap_dump_table(void *baton, const char *key, const char *value)
-{
-    if (key && value)
-        fprintf(stderr, "%s:%s\n", key, value);
-    fflush(stderr);
-    return 1;
-}
+#define BASE_URI "http://purl.org/ontology/af/"
+#define JSON_URI "http://www.w3.org/2001/sw/DataAccess/json-sparql/"
+#define SPARQL_URI "http://www.w3.org/TR/2006/WD-rdf-sparql-XMLres-20070614/"
 
 static int log_out(void *user_data, librdf_log_message *message)
 {
@@ -44,7 +40,10 @@ static int adb_handle_sparql_req(request_rec *r) {
 	if(apreq_args(h, &form_table) != APR_SUCCESS)
 		return DECLINED;
 
-	const unsigned char *query_string = apr_table_get(form_table, "query");
+	const char *query_string = apr_table_get(form_table, "query");
+	const char *output = apr_table_get(form_table, "output");
+	if(!output)
+		output = "xml";
 
 	int rc = 0;
 	librdf_world* world = librdf_new_world();
@@ -65,7 +64,7 @@ static int adb_handle_sparql_req(request_rec *r) {
 	}
 
 	librdf_query *query;
-	if (!(query = librdf_new_query(world, "sparql", NULL, query_string, NULL)))
+	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL)))
 	{
 		rc = 3;
 		goto error;
@@ -78,9 +77,17 @@ static int adb_handle_sparql_req(request_rec *r) {
 		goto error;
 	}
 
-	librdf_uri *sparql_uri = librdf_new_uri( world, "http://www.w3.org/TR/2006/WD-rdf-sparql-XMLres-20070614/");
 
-	unsigned char* out = librdf_query_results_to_string(results, sparql_uri, librdf_new_uri(world, "http://purl.org/ontology/af/")); 
+	librdf_uri *output_uri;
+
+	if(strcmp(output, "json") == 0)
+		output_uri = librdf_new_uri( world,(unsigned char *) JSON_URI );
+	else
+		output_uri = librdf_new_uri( world,(unsigned char *) SPARQL_URI );
+
+	const unsigned char* out = librdf_query_results_to_string(results, output_uri, librdf_new_uri(world, (unsigned char*) BASE_URI)); 
+	
+	librdf_free_uri(output_uri);
 	librdf_storage_close(storage);
 	librdf_free_storage(storage);
 	librdf_free_world(world);
