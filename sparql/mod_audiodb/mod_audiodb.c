@@ -9,6 +9,7 @@
 #include <apreq_parser.h>
 #include <apreq_param.h>
 #include "apreq2/apreq_module_apache2.h"
+#include <rasqal.h>
 
 static int ap_dump_table(void *baton, const char *key, const char *value)
 {
@@ -46,18 +47,10 @@ static int adb_handle_sparql_req(request_rec *r) {
 	const unsigned char *query_string = apr_table_get(form_table, "query");
 
 	int rc = 0;
-
 	librdf_world* world = librdf_new_world();
-	if(!world)
-	{
-		rc = 1;
-		goto error;
-	}
-
-
 	librdf_world_open(world);
 	librdf_world_set_logger(world, NULL, log_out);
-	librdf_storage* storage = librdf_new_storage(world, "audiodb", "/tmp/test.adb", "new='yes'");
+	librdf_storage* storage = librdf_new_storage(world, "audiodb", "/tmp/test_database.adb", NULL);
 	if(!storage)
 	{
 		rc = 2;
@@ -85,7 +78,13 @@ static int adb_handle_sparql_req(request_rec *r) {
 		goto error;
 	}
 
-	ap_rprintf(r, "Everything went awesomely!");
+	librdf_uri *sparql_uri = librdf_new_uri( world, "http://www.w3.org/TR/2006/WD-rdf-sparql-XMLres-20070614/");
+
+	unsigned char* out = librdf_query_results_to_string(results, sparql_uri, librdf_new_uri(world, "http://purl.org/ontology/af/")); 
+	librdf_storage_close(storage);
+	librdf_free_storage(storage);
+	librdf_free_world(world);
+	ap_rprintf(r, out); 
 
 	rc = 0;
 	return r->status;
