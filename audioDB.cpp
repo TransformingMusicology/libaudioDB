@@ -149,8 +149,18 @@ void audioDB::cleanup() {
     delete reporter;
   if(rng)
     gsl_rng_free(rng);
-  if(infid>0)
+  if(infid>0) {
     close(infid);
+    infid = 0;
+  }
+  if(powerfd) {
+    close(powerfd);
+    powerfd = 0;
+  }
+  if(timesFile) {
+    delete timesFile;
+    timesFile = 0;
+  }
   if(adb) {
     audiodb_close(adb);
     adb = NULL;
