@@ -17,6 +17,11 @@
 
 #define LIBRDF_SIGN_KEY 0x04Ed1A7D
 
+#define AF_DIMENSION "http://purl.org/ontology/af/dimension"
+#define AF_VECTORS "http://purl.org/ontology/af/vectors"
+#define MO_SIGNAL "http://purl.org/ontology/mo/Signal"
+#define RDF_TYPE "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+
 
 typedef struct {
 	librdf_model* model;
@@ -221,6 +226,8 @@ static int librdf_storage_audiodb_contains_statement(librdf_storage* storage, li
 	librdf_node* subject = librdf_statement_get_subject(statement);
 	librdf_node* object = librdf_statement_get_object(statement);
 	librdf_node* predicate = librdf_statement_get_predicate(statement);
+	librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
+		"Contains statement %s?", librdf_statement_to_string(statement));
 
 
 	if(subject && object && predicate)
@@ -236,19 +243,12 @@ static int librdf_storage_audiodb_contains_statement(librdf_storage* storage, li
 			{
 				// Grab the track via audioDB
 				adb_datum_t datum = {0};
-				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-					"Retrieve datum");
 				int result = audiodb_retrieve_datum(
 					context->adb, 
 					librdf_uri_as_string(librdf_node_get_uri(subject)),
 					&datum);
-				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-					"Back...");
 				if(result == 0)
 				{
-					librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-						"Found datum");
-
 					// Found it! Free up the datum.
 					audiodb_free_datum(context->adb, &datum);
 					return 1;
@@ -364,7 +364,6 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 		librdf_storage_audiodb_find_statements_finished((void*)scontext);
 		return NULL;
 	}
-
 	scontext->results = result_data_new();
 
 	// This will need factoring out
@@ -372,23 +371,27 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 	librdf_node* object = librdf_statement_get_object(statement);
 	librdf_node* predicate = librdf_statement_get_predicate(statement);
 
-	librdf_uri* dimension = librdf_new_uri(world, "http://purl.org/ontology/af/dimension");
-	librdf_uri* vectors = librdf_new_uri(world, "http://purl.org/ontology/af/vectors");
+	bool subjres = (subject && librdf_node_is_resource(subject)); 
+	bool predres = (predicate && librdf_node_is_resource(predicate)); 
+	bool objres = (object && librdf_node_is_resource(object)); 
 
-	if(librdf_node_is_resource(subject) && librdf_node_is_resource(predicate))
+	librdf_uri* dimension = librdf_new_uri(world, AF_DIMENSION);
+	librdf_uri* vectors = librdf_new_uri(world, AF_VECTORS);
+	librdf_uri* signal = librdf_new_uri(world, MO_SIGNAL);
+	librdf_uri* type = librdf_new_uri(world, RDF_TYPE);
+
+	if(subjres && predres)
 	{
-		librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-			"Got SPX");
+		librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Got SPX");
 		librdf_uri* predicate_uri = librdf_node_get_uri(predicate);
+		librdf_uri* subject_uri = librdf_node_get_uri(subject);
 		if(librdf_uri_equals(predicate_uri, dimension) || librdf_uri_equals(predicate_uri, vectors)) 
 		{
 			// Need dimension or vectors - so get the track datum.
 			adb_datum_t datum = {0};
-			librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-				"Retrieve datum");
 			int result = audiodb_retrieve_datum(
 				context->adb, 
-				librdf_uri_as_string(librdf_node_get_uri(subject)),
+				librdf_uri_as_string(subject_uri),
 				&datum);
 			if(result == 0)
 			{
@@ -396,36 +399,62 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 				raptor_stringbuffer* buffer = raptor_new_stringbuffer();
 				
 				if(librdf_uri_equals(predicate_uri, dimension))
-				{
 					raptor_stringbuffer_append_decimal(buffer, datum.dim);
-					value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "xsd:integer"));
-				}
 				else if(librdf_uri_equals(predicate_uri, vectors))
-				{
 					raptor_stringbuffer_append_decimal(buffer, datum.nvectors);
-					value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "xsd:integer"));
-				}
-			
-			//	raptor_free_stringbuffer(value);
+
+				value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "xsd:integer"));
 
 				result_data_add(world, scontext->results);
 				
 				result_list* list = scontext->results;
 				
-
 				list->tail->statement = librdf_new_statement(world);
 				librdf_statement_set_subject(list->tail->statement, subject); 
 				librdf_statement_set_object(list->tail->statement, value);
 				librdf_statement_set_predicate(list->tail->statement, predicate);
+				
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Add statement %s", librdf_statement_to_string(list->tail->statement)); 
 			}
 
-			librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-				"Done!");
 		}
+	}
+	else if(predres && objres)
+	{
+		// Got XPO
+		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "XPO"); 
+		librdf_uri* predicate_uri = librdf_node_get_uri(predicate);
+		librdf_uri* object_uri = librdf_node_get_uri(object);
+
+		if(librdf_uri_equals(predicate_uri, type) && librdf_uri_equals(object_uri, signal))
+		{
+			adb_liszt_results_t* liszt_results = audiodb_liszt(context->adb);
+
+			uint32_t k;
+			for(k = 0; k < liszt_results->nresults; k++) {
+				result_data_add(world, scontext->results);
+				result_list* list = scontext->results;
+				list->tail->statement = librdf_new_statement(world);
+				librdf_statement_set_subject(list->tail->statement, librdf_new_node_from_uri(world, librdf_new_uri(world, liszt_results->entries[k].key))); 
+
+				librdf_statement_set_predicate(list->tail->statement, predicate);
+				librdf_statement_set_object(list->tail->statement, object);
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Add statement %s", librdf_statement_to_string(list->tail->statement)); 
+			}
+			
+			audiodb_liszt_free_results(context->adb, liszt_results);
+			
+		}
+	}
+	else
+	{
+		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Halp?"); 
 	}
 	librdf_free_uri(dimension);
 	librdf_free_uri(vectors);
-
+	librdf_free_uri(signal);
+	librdf_free_uri(type);
+	
 	stream = librdf_new_stream(world,
 		(void*)scontext,
 		&librdf_storage_audiodb_find_statements_end_of_stream,
@@ -468,7 +497,7 @@ static int librdf_storage_audiodb_find_statements_end_of_stream(void* context) {
 	librdf_storage_audiodb_find_statements_stream_context* scontext=(librdf_storage_audiodb_find_statements_stream_context*)context;
 	librdf_world* world = librdf_storage_get_world(scontext->storage);
 	librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-		"Finished?");
+		"Finished? %d", (scontext->results->head == NULL));
 
 	return (scontext->results->head == NULL);
 }
@@ -496,7 +525,7 @@ static void* librdf_storage_audiodb_find_statements_get_statement(void* context,
 	librdf_world* world = librdf_storage_get_world(scontext->storage);
 	librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
 		"Get next");
-
+	
 	switch(flags) {
 		case LIBRDF_ITERATOR_GET_METHOD_GET_OBJECT:
 			return scontext->results->head->statement;
@@ -508,7 +537,6 @@ static void* librdf_storage_audiodb_find_statements_get_statement(void* context,
  				"Unknown iterator method flag %d", flags);
 			return NULL;
 	}
-
 }
 
 
