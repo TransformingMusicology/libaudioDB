@@ -1,8 +1,10 @@
 
-#include <httpd.h>
+
+#include "httpd.h"
+#include "http_config.h"
+#include "http_log.h"
+#include "http_protocol.h"
 #include <ap_config.h>
-#include <http_config.h>
-#include <http_protocol.h>
 #include <apr_strings.h>
 #include <librdf.h>
 #include <apreq_module.h>
@@ -15,17 +17,48 @@
 #define JSON_URI "http://www.w3.org/2001/sw/DataAccess/json-sparql/"
 #define SPARQL_URI "http://www.w3.org/TR/2006/WD-rdf-sparql-XMLres-20070614/"
 
-static int log_out(void *user_data, librdf_log_message *message)
-{
+module AP_MODULE_DECLARE_DATA audiodb_module;
+
+typedef struct {
+	char *dbpath;
+} adb_config;
+
+/**
+ * Config bits and pieces
+ **/
+
+static void *create_audiodb_config(apr_pool_t* p, server_rec* s) {
+	adb_config *config = (adb_config *)apr_pcalloc(p, sizeof(adb_config));
+	config->dbpath = NULL;
+	return config;
+}
+
+static const char* set_database_path(cmd_parms *parms, void *mconfig, const char *arg) {
+	adb_config *config = ap_get_module_config(parms->server->module_config, &audiodb_module);
+	config->dbpath = (char *)arg;
+	return NULL;
+}
+
+static const command_rec mod_audiodb_cmds[] = {
+
+	AP_INIT_TAKE1("DatabasePath", set_database_path, NULL, RSRC_CONF, "The AudioDB database to use"),
+	{NULL}
+};
+
+static int log_message(void *user_data, librdf_log_message *message) {
 	fprintf(stderr, "%s\n", librdf_log_message_message(message));
 	fflush(stderr);
 	return 1;
 }
 
+
 static int adb_handle_sparql_req(request_rec *r) {
 	if(strcmp(r->handler, "audiodb-sparql-handler") != 0) {
 		return DECLINED;
 	}
+
+	adb_config* config = ap_get_module_config(r->server->module_config,
+		&audiodb_module);
 
 	r->content_type = "text/plain";
 	r->status = OK;
@@ -45,36 +78,42 @@ static int adb_handle_sparql_req(request_rec *r) {
 	if(!output)
 		output = "xml";
 
-	int rc = 0;
 	librdf_world* world = librdf_new_world();
 	librdf_world_open(world);
-	librdf_world_set_logger(world, NULL, log_out);
-	librdf_storage* storage = librdf_new_storage(world, "audiodb", "/tmp/test_database.adb", NULL);
+	librdf_world_set_logger(world, NULL, log_message);
+
+	if(!config->dbpath)
+	{
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "DatabasePath is required");
+		return DECLINED;
+	}	
+
+	librdf_storage* storage = librdf_new_storage(world, "audiodb", config->dbpath, NULL);
 	if(!storage)
 	{
-		rc = 2;
-		goto error;
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to open audioDB: %s", config->dbpath);
+		return DECLINED;
 	}
 
 	librdf_model *model;
 	if (!(model = librdf_new_model(world, storage, NULL)))
 	{
-		rc = 5;	
-		goto error;
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to create model");
+		return DECLINED;
 	}
 
 	librdf_query *query;
 	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL)))
 	{
-		rc = 3;
-		goto error;
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to parse query");
+		return DECLINED;
 	}
 
 	librdf_query_results *results;
 	if (!(results = librdf_query_execute(query, model)))
 	{
-		rc = 4;
-		goto error;
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to execute query");
+		return DECLINED;
 	}
 
 
@@ -93,12 +132,8 @@ static int adb_handle_sparql_req(request_rec *r) {
 	librdf_free_world(world);
 	ap_rprintf(r, out); 
 
-	rc = 0;
-	return r->status;
+	return OK; 
 
-	error:
-		ap_rprintf(r, "Fail %d", rc);
-		return OK;
 }
 
 static void mod_audiodb_register_hooks (apr_pool_t *p) {
@@ -109,8 +144,8 @@ module AP_MODULE_DECLARE_DATA audiodb_module = {
 	STANDARD20_MODULE_STUFF,
 	NULL,
 	NULL,
+	create_audiodb_config,
 	NULL,
-	NULL,
-	NULL,
+	mod_audiodb_cmds,
 	mod_audiodb_register_hooks,
 };
