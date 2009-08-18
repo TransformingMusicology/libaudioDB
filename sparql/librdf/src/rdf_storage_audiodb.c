@@ -403,7 +403,7 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 				else if(librdf_uri_equals(predicate_uri, vectors))
 					raptor_stringbuffer_append_decimal(buffer, datum.nvectors);
 
-				value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "xsd:integer"));
+				value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "http://www.w3.org/2001/XMLSchema#integer"));
 
 				result_data_add(world, scontext->results);
 				
