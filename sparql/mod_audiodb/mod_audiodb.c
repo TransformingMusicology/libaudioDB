@@ -53,8 +53,14 @@ static int log_message(void *user_data, librdf_log_message *message) {
 
 
 static int adb_handle_sparql_req(request_rec *r) {
+	librdf_world* world = NULL;
+	librdf_storage* storage = NULL;
+	librdf_uri *output_uri = NULL;
+
+	int rc = DECLINED;
+
 	if(strcmp(r->handler, "audiodb-sparql-handler") != 0) {
-		return DECLINED;
+		goto error;
 	}
 
 	adb_config* config = ap_get_module_config(r->server->module_config,
@@ -70,54 +76,66 @@ static int adb_handle_sparql_req(request_rec *r) {
 
 	const apr_table_t *form_table;
 	apreq_handle_t *h = apreq_handle_apache2(r);
-	if(apreq_args(h, &form_table) != APR_SUCCESS)
-		return DECLINED;
+
+
+	if (r->method_number == M_POST) {
+		if (apreq_body(h, &form_table) != APR_SUCCESS)
+			goto error;
+	}
+	else {
+		if (apreq_args(h, &form_table) != APR_SUCCESS) 
+			goto error;
+	}
+
 
 	const char *query_string = apr_table_get(form_table, "query");
 	const char *output = apr_table_get(form_table, "output");
-	if(!output)
-		output = "xml";
 
-	librdf_world* world = librdf_new_world();
+	if(!query_string)
+		query_string = "DESCRIBE ";
+
+	if(!output)
+		output = "json";
+
+	world = librdf_new_world();
 	librdf_world_open(world);
 	librdf_world_set_logger(world, NULL, log_message);
 
 	if(!config->dbpath)
 	{
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "DatabasePath is required");
-		return DECLINED;
+		goto error;
 	}	
+	
+	// First make sure we actually have a valid query
+	librdf_query *query;
+	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL)))
+	{
+		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to parse query");
+		goto error;
+	}
 
-	librdf_storage* storage = librdf_new_storage(world, "audiodb", config->dbpath, NULL);
+	storage = librdf_new_storage(world, "audiodb", config->dbpath, NULL);
 	if(!storage)
 	{
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to open audioDB: %s", config->dbpath);
-		return DECLINED;
+		goto error;
 	}
 
 	librdf_model *model;
 	if (!(model = librdf_new_model(world, storage, NULL)))
 	{
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to create model");
-		return DECLINED;
-	}
-
-	librdf_query *query;
-	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL)))
-	{
-		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to parse query");
-		return DECLINED;
+		goto error;
 	}
 
 	librdf_query_results *results;
 	if (!(results = librdf_query_execute(query, model)))
 	{
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to execute query");
-		return DECLINED;
+		goto error;
 	}
 
-
-	librdf_uri *output_uri;
 
 	if(strcmp(output, "json") == 0)
 		output_uri = librdf_new_uri( world,(unsigned char *) JSON_URI );
@@ -126,13 +144,24 @@ static int adb_handle_sparql_req(request_rec *r) {
 
 	const unsigned char* out = librdf_query_results_to_string(results, output_uri, librdf_new_uri(world, (unsigned char*) BASE_URI)); 
 	
-	librdf_free_uri(output_uri);
-	librdf_storage_close(storage);
-	librdf_free_storage(storage);
-	librdf_free_world(world);
 	ap_rprintf(r, out); 
+	
+	rc = OK;
 
-	return OK; 
+	error:
+
+	if(output_uri)
+		librdf_free_uri(output_uri);
+
+	if(storage) {
+		librdf_storage_close(storage);
+		librdf_free_storage(storage);
+	}
+
+	if(world)
+		librdf_free_world(world);
+
+	return rc; 
 
 }
 
