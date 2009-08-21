@@ -1,0 +1,16 @@
+Quick Installation
+==================
+
+Requires: librdf, audioDB. 
+
+Compilation should just be: 
+
+./autogen.sh
+./configure
+make
+sudo make install
+
+The storage module will then be installed in your lib/redland directory,
+with the storage creatable with the 'audiodb' type, a la:
+
+storage = librdf_new_storage(world, "audiodb", "mydb.adb", NULL);

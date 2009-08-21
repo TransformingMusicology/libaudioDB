@@ -1,0 +1,40 @@
+Quick Installation
+==================
+
+Requires: apreq2, audioDB, apxs
+
+Ensure that you have something like the following in your httpd.conf:
+
+#LoadModule directive to aid module installations
+#LoadModule dummy_module /usr/lib/apache2/modules/mod_dummy.so
+LoadModule apreq_module    /usr/lib/apache2/modules/mod_apreq2.so
+LoadModule audiodb_module     /usr/lib/apache2/modules/mod_audiodb.so
+
+Then you should be able to do:
+
+./autogen.sh
+./configure
+make
+sudo make install
+
+Configuration
+=============
+
+To configure the database, add the following to your site configuration:
+
+DatabasePath "/tmp/test_database.adb"
+<Location /sparql>
+	SetHandler audiodb-sparql-handler
+</Location>
+
+Where /tmp/test_database.adb is the location of your audioDB database,
+(the file must be readable by the user that apache runs as), and /sparql
+is the path to your endpoint.
+
+Usage
+=====
+
+Queries may be submitted to the endpoint by GET or POST, with 'query'
+containing the SPARQL query, and 'output' containing either text/json
+or application/sparql-results+xml (the default). A 400 response occurs
+on error.
