@@ -21,7 +21,9 @@
 #define AF_VECTORS "http://purl.org/ontology/af/vectors"
 #define MO_SIGNAL "http://purl.org/ontology/mo/Signal"
 #define RDF_TYPE "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-
+#define MUSIM_ELEMENT "http://purl.org/ontology/musim#element"
+#define MUSIM_DISTANCE "http://purl.org/ontology/musim#distance"
+#define MUSIM_SIMILARITY "http://purl.org/ontology/musim#Similarity"
 
 typedef struct {
 	librdf_model* model;
@@ -29,7 +31,6 @@ typedef struct {
 	char* name;
 	size_t name_len;
 	int is_new;
-
 	adb_t* adb;
 
 } librdf_storage_audiodb_instance;
@@ -159,7 +160,9 @@ static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* mo
 		unlink(context->name);
 
 	context->adb = NULL;
-	
+	context->model = librdf_new_model(librdf_storage_get_world(storage),
+		librdf_new_storage(librdf_storage_get_world(storage), "memory", NULL, NULL), NULL);	
+
 	if(context->is_new) {
 		if(!(context->adb = audiodb_create(context->name, 0, 0, 0))) {
 			librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
@@ -169,7 +172,7 @@ static int librdf_storage_audiodb_open(librdf_storage* storage, librdf_model* mo
 	}
 	else
 	{
-		if(!(context->adb = audiodb_open(context->name, O_RDWR))) {	
+		if(!(context->adb = audiodb_open(context->name, O_RDONLY))) {	
 			librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_ERROR, LIBRDF_FROM_STORAGE, NULL,
 					"Unable to open %s", context->name);
 			return 1;
@@ -325,7 +328,6 @@ typedef struct {
 	librdf_storage_audiodb_instance* audiodb_context;
 	int finished;
 	librdf_statement* statement;
-	librdf_statement* query_statement;
 	librdf_node* context;
 	result_list *results;
 
@@ -358,36 +360,32 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 	// Store a reference to the storage instance.
 	scontext->audiodb_context = context;
 
-	// Clone the query statement and store away.
-	scontext->query_statement = librdf_new_statement_from_statement(statement);
-	if(!scontext->query_statement) {
-		librdf_storage_audiodb_find_statements_finished((void*)scontext);
-		return NULL;
-	}
 	scontext->results = result_data_new();
-
+		
 	// This will need factoring out
 	librdf_node* subject = librdf_statement_get_subject(statement);
 	librdf_node* object = librdf_statement_get_object(statement);
 	librdf_node* predicate = librdf_statement_get_predicate(statement);
 
-	bool subjres = (subject && librdf_node_is_resource(subject)); 
-	bool predres = (predicate && librdf_node_is_resource(predicate)); 
-	bool objres = (object && librdf_node_is_resource(object)); 
-
 	librdf_uri* dimension = librdf_new_uri(world, AF_DIMENSION);
 	librdf_uri* vectors = librdf_new_uri(world, AF_VECTORS);
 	librdf_uri* signal = librdf_new_uri(world, MO_SIGNAL);
 	librdf_uri* type = librdf_new_uri(world, RDF_TYPE);
+	librdf_uri* element = librdf_new_uri(world, MUSIM_ELEMENT);
+	librdf_uri* distance = librdf_new_uri(world, MUSIM_DISTANCE); 
+	librdf_uri* similarity = librdf_new_uri(world, MUSIM_SIMILARITY); 
 
-	if(subjres && predres)
-	{
+	// SPX (given a resource and a predicate, but no object)	
+	if(subject && librdf_node_is_resource(subject) && 
+	   predicate && librdf_node_is_resource(predicate) && 
+	   (!object || object && librdf_node_is_blank(object))) {
 		librdf_log(librdf_storage_get_world(storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Got SPX");
 		librdf_uri* predicate_uri = librdf_node_get_uri(predicate);
 		librdf_uri* subject_uri = librdf_node_get_uri(subject);
+			
+		// Need dimension or vectors - so get the track datum and populate.
 		if(librdf_uri_equals(predicate_uri, dimension) || librdf_uri_equals(predicate_uri, vectors)) 
 		{
-			// Need dimension or vectors - so get the track datum.
 			adb_datum_t datum = {0};
 			int result = audiodb_retrieve_datum(
 				context->adb, 
@@ -396,14 +394,14 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 			if(result == 0)
 			{
 				librdf_node* value;
-				raptor_stringbuffer* buffer = raptor_new_stringbuffer();
+				char buffer[16];
 				
 				if(librdf_uri_equals(predicate_uri, dimension))
-					raptor_stringbuffer_append_decimal(buffer, datum.dim);
+					snprintf(buffer, 16, "%d", datum.dim);
 				else if(librdf_uri_equals(predicate_uri, vectors))
-					raptor_stringbuffer_append_decimal(buffer, datum.nvectors);
+					snprintf(buffer, 16, "%d", datum.nvectors);
 
-				value = librdf_new_node_from_typed_literal(world, raptor_stringbuffer_as_string(buffer), NULL, librdf_new_uri(world, "http://www.w3.org/2001/XMLSchema#integer"));
+				value = librdf_new_node_from_typed_literal(world, buffer, NULL, librdf_new_uri(world, "http://www.w3.org/2001/XMLSchema#integer"));
 
 				result_data_add(world, scontext->results);
 				
@@ -413,21 +411,77 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 				librdf_statement_set_subject(list->tail->statement, subject); 
 				librdf_statement_set_object(list->tail->statement, value);
 				librdf_statement_set_predicate(list->tail->statement, predicate);
-				
-				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Add statement %s", librdf_statement_to_string(list->tail->statement)); 
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Return statement %s", librdf_statement_to_string(list->tail->statement)); 
 			}
-
 		}
-	}
-	else if(predres && objres)
-	{
-		// Got XPO
+	} // XPO (given a predicate and an object, but no subject)	
+	else if(!subject &&
+		predicate && librdf_node_is_resource(predicate) && 
+		object && librdf_node_is_resource(object)) {
+
 		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "XPO"); 
 		librdf_uri* predicate_uri = librdf_node_get_uri(predicate);
 		librdf_uri* object_uri = librdf_node_get_uri(object);
 
-		if(librdf_uri_equals(predicate_uri, type) && librdf_uri_equals(object_uri, signal))
+		if(librdf_uri_equals(predicate_uri, type)) {
+			// Need everything of type mo:Signal - currently all track IDs. 
+			if(librdf_uri_equals(object_uri, signal)) {
+				adb_liszt_results_t* liszt_results = audiodb_liszt(context->adb);
+
+				uint32_t k;
+				for(k = 0; k < liszt_results->nresults; k++) {
+					result_data_add(world, scontext->results);
+					result_list* list = scontext->results;
+					list->tail->statement = librdf_new_statement(world);
+					librdf_statement_set_subject(list->tail->statement, librdf_new_node_from_uri(world, librdf_new_uri(world, liszt_results->entries[k].key))); 
+
+					librdf_statement_set_predicate(list->tail->statement, predicate);
+					librdf_statement_set_object(list->tail->statement, object);
+					librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Return statement %s", librdf_statement_to_string(list->tail->statement)); 
+				}
+
+				audiodb_liszt_free_results(context->adb, liszt_results);
+			} 
+			else if(librdf_uri_equals(object_uri, similarity)) {
+				// mo:Similarity doesn't actually exist in our store - so we create one 
+				// and put it into an in-memory store.
+				result_data_add(world, scontext->results);
+				result_list* list = scontext->results;
+				list->tail->statement = librdf_new_statement(world);
+				librdf_statement_set_subject(list->tail->statement, librdf_new_node_from_blank_identifier(world, NULL));
+				librdf_statement_set_predicate(list->tail->statement, predicate);
+				librdf_statement_set_object(list->tail->statement, object);
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Cache statement %s", librdf_statement_to_string(list->tail->statement));
+				librdf_model_add_statement(context->model, list->tail->statement);
+			}
+		}
+	} // sPO (given a blank identifier as the subject, a predicate and an object - this just stores them in the cache). 
+	else if(subject && librdf_node_is_blank(subject) &&
+		predicate && librdf_node_is_resource(predicate) &&
+		object && librdf_node_is_resource(object)) {
+
+		// TODO : Verify that the contents are plausible entries in the store.
+
+		result_data_add(world, scontext->results);
+		result_list* list = scontext->results;
+		list->tail->statement = librdf_new_statement(world);
+
+		librdf_statement_set_subject(list->tail->statement, subject); 
+		librdf_statement_set_predicate(list->tail->statement, predicate);
+		librdf_statement_set_object(list->tail->statement, object);
+
+		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Cache statement %s", librdf_statement_to_string(list->tail->statement));
+		librdf_model_add_statement(context->model, list->tail->statement);
+	} // sPX (given a blank identifier as the subject, a predicate, and no object) 
+	else if(subject && (librdf_node_is_blank(subject) || librdf_node_is_resource(subject)) &&
+		predicate && librdf_node_is_resource(predicate) &&
+		!object) {
+		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "sPX"); 
+		librdf_uri* predicate_uri = librdf_node_get_uri(predicate);
+
+		if(librdf_uri_equals(predicate_uri, element))
 		{
+			// Fill in all possible elements, and cache the statements.
 			adb_liszt_results_t* liszt_results = audiodb_liszt(context->adb);
 
 			uint32_t k;
@@ -435,25 +489,110 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 				result_data_add(world, scontext->results);
 				result_list* list = scontext->results;
 				list->tail->statement = librdf_new_statement(world);
-				librdf_statement_set_subject(list->tail->statement, librdf_new_node_from_uri(world, librdf_new_uri(world, liszt_results->entries[k].key))); 
 
+				librdf_statement_set_subject(list->tail->statement, subject);
+				librdf_statement_set_object(list->tail->statement, librdf_new_node_from_uri(world, librdf_new_uri(world, liszt_results->entries[k].key))); 
 				librdf_statement_set_predicate(list->tail->statement, predicate);
-				librdf_statement_set_object(list->tail->statement, object);
-				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Add statement %s", librdf_statement_to_string(list->tail->statement)); 
+
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Cache statement %s", librdf_statement_to_string(list->tail->statement)); 
+				librdf_model_add_statement(context->model, list->tail->statement);
 			}
-			
+
 			audiodb_liszt_free_results(context->adb, liszt_results);
-			
+
 		}
+		if(librdf_uri_equals(predicate_uri, distance))
+		{
+			// This requires both elements to be defined - check those first,
+			// and use a blank identifier if not.
+			librdf_statement* element_search = librdf_new_statement(world);
+			librdf_statement_set_subject(element_search, subject);
+			librdf_statement_set_predicate(element_search, librdf_new_node_from_uri(world, element));
+			librdf_stream* elements = librdf_model_find_statements(context->model, element_search);
+			int count = 0;
+
+			char* keys[2];
+
+			while (!librdf_stream_end(elements) && count < 2) {
+				keys[count] = librdf_uri_as_string(
+					librdf_node_get_uri(
+					librdf_statement_get_object(
+					librdf_new_statement_from_statement(
+					librdf_stream_get_object(elements)))));
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Key %d %s", count, keys[count]); 
+				librdf_stream_next(elements);
+				count++;
+			}
+
+			double dist = 0;
+			
+			// TODO : Trigger an error case here.
+
+			if(count == 2)
+			{
+				// Calculate the distance
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Calculate distance"); 
+
+				adb_query_spec_t qspec = {0};
+				adb_datum_t datum = {0};
+				datum.key = keys[0]; 
+				
+				qspec.refine.flags = ADB_REFINE_INCLUDE_KEYLIST;
+				qspec.refine.include.nkeys = 1;
+				qspec.refine.include.keys = &keys[1];
+				qspec.refine.hopsize = 1;
+
+				qspec.qid.datum = &datum;
+				qspec.qid.sequence_length = 10;
+				qspec.qid.flags = ADB_QID_FLAG_EXHAUSTIVE;
+				qspec.qid.sequence_start = 0;
+
+				qspec.params.accumulation = ADB_ACCUMULATION_PER_TRACK;
+				qspec.params.distance = ADB_DISTANCE_EUCLIDEAN;
+				qspec.params.npoints = 1;
+				qspec.params.ntracks = 1;
+
+				adb_query_results_t* results = audiodb_query_spec(context->adb, &qspec);
+				dist = results->results[0].dist;
+
+				char value[16];
+				snprintf(value, 16, "%f", dist);
+
+				result_data_add(world, scontext->results);
+				result_list* list = scontext->results;
+				list->tail->statement = librdf_new_statement(world);
+	
+				librdf_statement_set_subject(list->tail->statement, subject);
+				librdf_statement_set_predicate(list->tail->statement, predicate);
+				librdf_statement_set_object(list->tail->statement,
+					librdf_new_node_from_typed_literal(world, value, NULL, librdf_new_uri(world, "http://www.w3.org/2001/XMLSchema#decimal")));
+
+				librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Cache statement %s", librdf_statement_to_string(list->tail->statement)); 
+				librdf_model_add_statement(context->model, list->tail->statement);
+			}
+		}
+		
+	}
+	else if(subject && predicate && object)
+	{
+		result_data_add(world, scontext->results);
+		result_list* list = scontext->results;
+		list->tail->statement = librdf_new_statement_from_statement(statement);
+		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Cache statement %s", librdf_statement_to_string(list->tail->statement)); 
+		librdf_model_add_statement(context->model, list->tail->statement);
 	}
 	else
 	{
 		librdf_log(world, 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL, "Halp?"); 
 	}
+
 	librdf_free_uri(dimension);
 	librdf_free_uri(vectors);
 	librdf_free_uri(signal);
 	librdf_free_uri(type);
+	librdf_free_uri(element);
+	librdf_free_uri(distance);
+	librdf_free_uri(similarity);
 	
 	stream = librdf_new_stream(world,
 		(void*)scontext,
@@ -475,14 +614,8 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 static void librdf_storage_audiodb_find_statements_finished(void* context) {
 	librdf_storage_audiodb_find_statements_stream_context* scontext=(librdf_storage_audiodb_find_statements_stream_context*)context;
 		
-	librdf_log(librdf_storage_get_world(scontext->storage), 0, LIBRDF_LOG_INFO, LIBRDF_FROM_STORAGE, NULL,
-		"Finished!");
-
 	if(scontext->storage)
 		librdf_storage_remove_reference(scontext->storage);
-
-	if(scontext->query_statement)
-		librdf_free_statement(scontext->query_statement);
 
 	if(scontext->statement)
 		librdf_free_statement(scontext->statement);
