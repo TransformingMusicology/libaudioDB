@@ -1,0 +1,10 @@
+PREFIX musim: <http://purl.org/ontology/musim#>       
+
+SELECT ?distance
+WHERE
+{
+	_:s a musim:Similarity;
+		musim:element <http://KSA_CHARM_306>;
+		musim:element <http://KSA_CHARM_309>; 
+		musim:distance ?distance.
+}

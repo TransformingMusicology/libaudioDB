@@ -1,0 +1,15 @@
+PREFIX mo: <http://purl.org/ontology/mo/>
+PREFIX af: <http://purl.org/ontology/af/>
+PREFIX musim: <http://purl.org/ontology/musim#> 
+
+SELECT ?signal ?distance
+WHERE
+{
+        ?signal a mo:Signal.
+
+        _:s a musim:Similarity;
+            musim:element <http://KSA_CHARM_306>;
+            musim:element ?signal;
+            musim:distance ?distance.
+} ORDER BY (?distance) LIMIT 5
+
