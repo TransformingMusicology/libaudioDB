@@ -56,19 +56,18 @@ static int adb_handle_sparql_req(request_rec *r) {
 	librdf_world* world = NULL;
 	librdf_storage* storage = NULL;
 	librdf_uri *output_uri = NULL;
-
 	int rc = DECLINED;
 
 	if(strcmp(r->handler, "audiodb-sparql-handler") != 0) {
 		goto error;
 	}
 
+	rc = OK;
+
 	adb_config* config = ap_get_module_config(r->server->module_config,
 		&audiodb_module);
 
-	r->content_type = "text/plain";
-	r->status = OK;
-	r->status_line = "200 OK";
+	r->status = HTTP_BAD_REQUEST;
 
 	if(!r->args) {
 		r->args = "";
@@ -94,59 +93,62 @@ static int adb_handle_sparql_req(request_rec *r) {
 	if(!query_string)
 		query_string = "DESCRIBE ";
 
-	if(!output)
-		output = "json";
-
 	world = librdf_new_world();
 	librdf_world_open(world);
 	librdf_world_set_logger(world, NULL, log_message);
 
-	if(!config->dbpath)
-	{
+	if(!config->dbpath) {
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "DatabasePath is required");
 		goto error;
 	}	
 	
 	// First make sure we actually have a valid query
 	librdf_query *query;
-	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL)))
-	{
+	if (!(query = librdf_new_query(world, "sparql", NULL, (unsigned char*)query_string, NULL))) {
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to parse query");
+		ap_rprintf(r, "Unable to parse query"); 
 		goto error;
 	}
 
 	storage = librdf_new_storage(world, "audiodb", config->dbpath, NULL);
-	if(!storage)
-	{
+	if(!storage) {
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to open audioDB: %s", config->dbpath);
+		ap_rprintf(r, "Unable to open audioDB"); 
 		goto error;
 	}
 
 	librdf_model *model;
-	if (!(model = librdf_new_model(world, storage, NULL)))
-	{
+	if (!(model = librdf_new_model(world, storage, NULL))) {
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to create model");
+		ap_rprintf(r, "Unable to create model"); 
 		goto error;
 	}
 
 	librdf_query_results *results;
-	if (!(results = librdf_query_execute(query, model)))
-	{
+	if (!(results = librdf_query_execute(query, model))) {
 		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, 0, r, "Unable to execute query");
+		ap_rprintf(r, "Unable to execute query"); 
 		goto error;
 	}
 
+	
 
-	if(strcmp(output, "json") == 0)
+	if(!output)
+		output = "application/sparql-results+xml";
+
+	if(strcmp(output, "text/json") == 0) {
+		r->content_type = "text/json";
 		output_uri = librdf_new_uri( world,(unsigned char *) JSON_URI );
-	else
+	}
+	else {
+		r->content_type = "application/sparql-results+xml";
 		output_uri = librdf_new_uri( world,(unsigned char *) SPARQL_URI );
-
+	}
 	const unsigned char* out = librdf_query_results_to_string(results, output_uri, librdf_new_uri(world, (unsigned char*) BASE_URI)); 
 	
 	ap_rprintf(r, out); 
 	
-	rc = OK;
+	r->status = HTTP_OK;
 
 	error:
 
