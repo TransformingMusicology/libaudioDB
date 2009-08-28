@@ -67,21 +67,6 @@ typedef struct adb_qpointers_internal {
   double *mean_duration;
 } adb_qpointers_internal_t;
 
-/* this struct is for maintaining per-query state.  We don't want to
- * store this stuff in the adb struct itself, because (a) it doesn't
- * belong there and (b) in principle people might do two queries in
- * parallel using the same adb handle.  (b) is in practice a little
- * bit academic because at the moment we're seeking all over the disk
- * using adb->fd, but changing to use pread() might win us
- * threadsafety eventually.
- */
-typedef struct adb_qstate_internal {
-  Accumulator *accumulator;
-  std::set<std::string> *allowed_keys;
-  std::priority_queue<PointPair> *exact_evaluation_queue;
-  LSH *lsh;
-} adb_qstate_internal_t;
-
 /* this struct is the in-memory representation of the binary
  * information stored at the head of each adb file */
 typedef struct adbheader {
@@ -167,6 +152,22 @@ typedef struct {
               ((r1.qpos == r2.qpos) && (strcmp(r1.key, r2.key) < 0)))));
   }
 } adb_result_triple_lt;
+
+/* this struct is for maintaining per-query state.  We don't want to
+ * store this stuff in the adb struct itself, because (a) it doesn't
+ * belong there and (b) in principle people might do two queries in
+ * parallel using the same adb handle.  (b) is in practice a little
+ * bit academic because at the moment we're seeking all over the disk
+ * using adb->fd, but changing to use pread() might win us
+ * threadsafety eventually.
+ */
+typedef struct adb_qstate_internal {
+  Accumulator *accumulator;
+  std::set<std::string> *allowed_keys;
+  std::priority_queue<PointPair> *exact_evaluation_queue;
+  std::set< adb_result_t, adb_result_triple_lt > *set;
+  LSH *lsh;
+} adb_qstate_internal_t;
 
 /* We could go gcc-specific here and use typeof() instead of passing
  * in an explicit type.  Answers on a postcard as to whether that's a

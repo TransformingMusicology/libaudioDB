@@ -8,13 +8,11 @@ private:
   unsigned int pointNN;
   unsigned int trackNN;
   std::map<adb_result_t, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_result_key_lt> *queues;
-  std::set< adb_result_t, adb_result_triple_lt > *set;
 };
 
 template <class T> PerTrackAccumulator<T>::PerTrackAccumulator(unsigned int pointNN, unsigned int trackNN)
-  : pointNN(pointNN), trackNN(trackNN), queues(0), set(0) {
+  : pointNN(pointNN), trackNN(trackNN), queues(0) {
   queues = new std::map<adb_result_t, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_result_key_lt>;
-  set = new std::set< adb_result_t, adb_result_triple_lt >;
 }
 
 template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
@@ -25,30 +23,23 @@ template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
     }
     delete queues;
   }
-  if(set) {
-    delete set;
-  }
 }
 
 template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r) {
   if(!isnan(r->dist)) {
-    if(set->find(*r) == set->end()) {
-      set->insert(*r);
-
-      typename std::map< adb_result_t, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_result_key_lt>::iterator it;
-      std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *queue;
-      it = queues->find(*r);
-      if(it == queues->end()) {
-        queue = new std::priority_queue< adb_result_t, std::vector< adb_result_t >, T >;
-        (*queues)[*r] = queue;
-      } else {
-        queue = (*it).second;
-      }
-
-      queue->push(*r);
-      if(queue->size() > pointNN) {
-        queue->pop();
-      }
+    typename std::map< adb_result_t, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_result_key_lt>::iterator it;
+    std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *queue;
+    it = queues->find(*r);
+    if(it == queues->end()) {
+      queue = new std::priority_queue< adb_result_t, std::vector< adb_result_t >, T >;
+      (*queues)[*r] = queue;
+    } else {
+      queue = (*it).second;
+    }
+    
+    queue->push(*r);
+    if(queue->size() > pointNN) {
+      queue->pop();
     }
   }
 }

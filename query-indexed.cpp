@@ -54,7 +54,10 @@ void audiodb_index_add_point_approximate(void *user_data, uint32_t pointID, uint
     r.dist = dist;
     r.qpos = qpos;
     r.ipos = spos;
-    qstate->accumulator->add_point(&r);
+    if(qstate->set->find(r) == qstate->set->end()) {
+      qstate->set->insert(r);
+      qstate->accumulator->add_point(&r);
+    }
   }
 }
 
@@ -94,6 +97,8 @@ int audiodb_index_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   double radius = spec->refine.radius;
   bool use_absolute_threshold = spec->refine.flags & ADB_REFINE_ABSOLUTE_THRESHOLD;
   double absolute_threshold = spec->refine.absolute_threshold;
+
+  qstate->set = new std::set< adb_result_t, adb_result_triple_lt >;
 
   if(spec->qid.flags & ADB_QID_FLAG_ALLOW_FALSE_POSITIVES) {
     add_point_func = &audiodb_index_add_point_approximate;  
@@ -163,6 +168,9 @@ int audiodb_index_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   if(!(spec->qid.flags & ADB_QID_FLAG_ALLOW_FALSE_POSITIVES)) {
     audiodb_query_queue_loop(adb, spec, qstate, query, &qpointers);
   }
+
+  delete qstate->set;
+
   
  // Clean up
   if(query_data)

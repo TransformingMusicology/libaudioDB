@@ -477,7 +477,10 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
         r.dist = dist;
         r.qpos = pp.qpos;
         r.ipos = pp.spos;
-        qstate->accumulator->add_point(&r);
+	if(qstate->set->find(r) == qstate->set->end()) {
+	  qstate->set->insert(r);
+	  qstate->accumulator->add_point(&r);
+	}
       }
     }
     qstate->exact_evaluation_queue->pop();

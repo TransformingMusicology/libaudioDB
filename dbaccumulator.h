@@ -7,32 +7,24 @@ public:
 private:
   unsigned int pointNN;
   std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *queue;
-  std::set< adb_result_t, adb_result_triple_lt > *set;
 };
 
 template <class T> DBAccumulator<T>::DBAccumulator(unsigned int pointNN)
-  : pointNN(pointNN), queue(0), set(0) {
+  : pointNN(pointNN), queue(0) {
   queue = new std::priority_queue< adb_result_t, std::vector<adb_result_t>, T>;
-  set = new std::set<adb_result_t, adb_result_triple_lt>;
 }
 
 template <class T> DBAccumulator<T>::~DBAccumulator() {
   if(queue) {
     delete queue;
   }
-  if(set) {
-    delete set;
-  }
 }
 
 template <class T> void DBAccumulator<T>::add_point(adb_result_t *r) {
   if(!isnan(r->dist)) {
-    if(set->find(*r) == set->end()) {
-      set->insert(*r);
-      queue->push(*r);
-      if(queue->size() > pointNN) {
-        queue->pop();
-      }
+    queue->push(*r);
+    if(queue->size() > pointNN) {
+      queue->pop();
     }
   }
 }
