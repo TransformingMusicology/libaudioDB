@@ -6,7 +6,12 @@ LIBGSL=-lgsl -lgslcblas
 GSL_INCLUDE=
 GSOAP_INCLUDE=
 
-SHARED_LIB_FLAGS=-shared -Wl,-soname,
+PREFIX=/usr/local
+EXEC_PREFIX=$(PREFIX)
+LIBDIR=$(EXEC_PREFIX)/lib
+BINDIR=$(EXEC_PREFIX)/bin
+INCLUDEDIR=$(PREFIX)/include
+MANDIR=$(PREFIX)/share/man
 
 LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o index-utils.o query-indexed.o liszt.o retrieve.o lshlib.o
 OBJS=$(LIBOBJS) index.o soap.o sample.o cmdline.o audioDB.o common.o
@@ -16,6 +21,7 @@ EXECUTABLE=audioDB
 SOVERSION=0
 MINORVERSION=0
 LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
+SHARED_LIB_FLAGS=-shared -Wl,-soname,lib$(EXECUTABLE).so.$(SOVERSION)
 
 override CFLAGS+=-g -O3 -fPIC 
 
@@ -33,13 +39,13 @@ ifeq ($(shell uname),Darwin)
 ifeq ($(shell sysctl -n hw.optional.x86_64),1)
 override CFLAGS+=-arch x86_64
 endif
-override SHARED_LIB_FLAGS=-dynamiclib -current_version $(SOVERSION).$(MINORVERSION) -Wl -install_name 
 override LIBRARY=lib$(EXECUTABLE).$(SOVERSION).$(MINORVERSION).dylib
+override SHARED_LIB_FLAGS=-dynamiclib -current_version $(SOVERSION) -Wl -install_name $(LIBRARY)
 endif
 
-.PHONY: all clean test
+.PHONY: all clean test install $(EXECUTABLE).pc
 
-all: $(LIBRARY) $(EXECUTABLE)
+all: $(LIBRARY) $(EXECUTABLE) $(EXECUTABLE).1
 
 $(EXECUTABLE).1: $(EXECUTABLE)
 	$(HELP2MAN) ./$(EXECUTABLE) > $(EXECUTABLE).1
@@ -66,7 +72,7 @@ $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 	$(CXX) -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 $(LIBRARY): $(LIBOBJS)
-	$(CXX) $(SHARED_LIB_FLAGS)$(LIBRARY) -o $(LIBRARY) $(CFLAGS) $^
+	$(CXX) $(SHARED_LIB_FLAGS) -o $(LIBRARY) $(CFLAGS) $^
 
 tags:
 	ctags *.cpp *.h
@@ -88,7 +94,6 @@ distclean: clean
 	-rm *.o
 	-rm -rf audioDB.dump
 
-
 test: $(EXECUTABLE) $(LIBRARY)
 	sh -c "cd libtests && sh ./run-tests.sh"
 	sh -c "cd tests && sh ./run-tests.sh"
@@ -96,9 +101,15 @@ test: $(EXECUTABLE) $(LIBRARY)
 xthresh: xthresh.c
 	$(CC) -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
 
-install:
-	cp $(LIBRARY) /usr/local/lib/
-	ln -sf /usr/local/lib/$(LIBRARY) /usr/local/lib/lib$(EXECUTABLE).so.$(SOVERSION)
-	ln -sf /usr/local/lib/lib$(EXECUTABLE).so.$(SOVERSION) /usr/local/lib/lib$(EXECUTABLE).so
-	ldconfig
-	cp audioDB_API.h /usr/local/include/
+$(EXECUTABLE).pc:
+	./make-pc.sh "$(EXECUTABLE)" "$(LIBDIR)" "$(INCLUDEDIR)" $(SOVERSION) $(MINORVERSION) > $(EXECUTABLE).pc
+
+install: $(EXECUTABLE).pc
+	mkdir -m755 -p $(LIBDIR)/pkgconfig $(BINDIR) $(INCLUDEDIR) $(MANDIR)/man1
+	install -m644 $(LIBRARY) $(LIBDIR)
+	ldconfig -n $(LIBDIR)
+	ln -s $(LIBRARY) $(LIBDIR)/lib$(EXECUTABLE).so
+	install -m755 $(EXECUTABLE) $(BINDIR)
+	install -m644 audioDB_API.h $(INCLUDEDIR)
+	install -m644 $(EXECUTABLE).1 $(MANDIR)/man1
+	install $(EXECUTABLE).pc $(LIBDIR)/pkgconfig
