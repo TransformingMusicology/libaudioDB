@@ -95,14 +95,6 @@ LIBRDF_INTERNAL_CPPFLAGS=
 # -Ldir -llib
 LIBRDF_INTERNAL_LIBS=
 
-# Libraries linked externally also may be internal - presently just
-# raptor and rasqal but in future may include others
-# Currently only substituted into redland-src-config.
-# -Dfoo -Idir
-LIBRDF_EXTERNAL_CPPFLAGS=
-# -Ldir -llib
-LIBRDF_EXTERNAL_LIBS=
-
 # do these first because somehow they get messed up by bdb checks
 AC_CHECK_TYPES([byte])
 AC_CHECK_TYPES([u32])
@@ -128,86 +120,7 @@ CPPFLAGS="$LIBRDF_CPPFLAGS"
 LDFLAGS="$LIBRDF_LDFLAGS"
 LIBS="$LIBRDF_LIBS"
 
-
-dnl Checks for RDF parsers
-parser_modules=raptor
-rdf_parsers_available=
-
-# Check for raptor
-AC_MSG_CHECKING(for raptor)
-
-RAPTOR_MIN_VERSION=1.4.17
-AC_SUBST(RAPTOR_MIN_VERSION)
-if $PKG_CONFIG raptor --exists; then
-  :
-else
-  AC_MSG_ERROR(Raptor is not installed - see http://librdf.org/raptor/ to get a version newer than $RAPTOR_MIN_VERSION)
-fi
-
-RAPTOR_VERSION=`$PKG_CONFIG raptor --modversion 2>/dev/null`
-
-if $PKG_CONFIG raptor --atleast-version=$RAPTOR_MIN_VERSION; then
-  :
-else
-  AC_MSG_ERROR(Installed raptor $RAPTOR_VERSION is too old - need $RAPTOR_MIN_VERSION)
-fi
-
-LIBRDF_EXTERNAL_CPPFLAGS="`$PKG_CONFIG raptor --cflags` $LIBRDF_EXTERNAL_CPPFLAGS"
-LIBRDF_EXTERNAL_LIBS="`$PKG_CONFIG raptor --libs` $LIBRDF_EXTERNAL_LIBS"
-
-rdf_parsers_available="$parser_available raptor(system $RAPTOR_VERSION)"
-AC_MSG_RESULT(system $RAPTOR_VERSION)
-
-# Check for rasqal
-AC_MSG_CHECKING(for rasqal)
-
-RASQAL_MIN_VERSION=0.9.16
-RASQAL_MAX_VERSION=0.9.99
-AC_SUBST(RASQAL_MIN_VERSION)
-AC_SUBST(RASQAL_MAX_VERSION)
-if $PKG_CONFIG rasqal --exists; then
-  :
-else
-  AC_MSG_ERROR(Rasqal is not installed - see http://librdf.org/rasqal/ to get a version in range $RASQAL_MIN_VERSION to $RASQAL_MAX_VERSION)
-fi
-
-RASQAL_VERSION=`$PKG_CONFIG rasqal --modversion 2>/dev/null`
-
-if $PKG_CONFIG rasqal --atleast-version=$RASQAL_MIN_VERSION --max-version=$RASQAL_MAX_VERSION; then
-  :
-else
-  AC_MSG_ERROR(Installed rasqal $RASQAL_VERSION is not in range $RASQAL_MIN_VERSION to $RASQAL_MAX_VERSION)
-fi
-
-LIBRDF_EXTERNAL_CPPFLAGS="`$PKG_CONFIG rasqal --cflags` $LIBRDF_EXTERNAL_CPPFLAGS"
-LIBRDF_EXTERNAL_LIBS="`$PKG_CONFIG rasqal --libs` $LIBRDF_EXTERNAL_LIBS"
-
-rdf_query="rasqal(system $RASQAL_VERSION)"
-AC_MSG_RESULT(system $RASQAL_VERSION)
-
-# Check for redland
-AC_MSG_CHECKING(for redland)
-
-REDLAND_MIN_VERSION=1.0.9
-AC_SUBST(REDLAND_MIN_VERSION)
-if $PKG_CONFIG redland --exists; then
-  :
-else
-  AC_MSG_ERROR(Redland is not installed - see http://librdf.org/ to get a version newer than $REDLAND_MIN_VERSION)
-fi
-
-REDLAND_VERSION=`$PKG_CONFIG redland --modversion 2>/dev/null`
-
-if $PKG_CONFIG redland --atleast-version=$REDLAND_MIN_VERSION; then
-  :
-else
-  AC_MSG_ERROR(Installed redland $REDLAND_VERSION is not newer than $REDLAND_MIN_VERSION)
-fi
-
-LIBRDF_EXTERNAL_CPPFLAGS="`$PKG_CONFIG redland --cflags` $LIBRDF_EXTERNAL_CPPFLAGS"
-LIBRDF_EXTERNAL_LIBS="`$PKG_CONFIG redland --libs` $LIBRDF_EXTERNAL_LIBS"
-
-AC_MSG_RESULT(system $REDLAND_VERSION)
+PKG_CHECK_MODULES([DEPS], [raptor >= 1.4.17 rasqal >= 0.9.16 redland >= 1.0.9])
 
 LIBS="$LIBS"
 CPPFLAGS="$CPPFLAGS"
@@ -215,8 +128,8 @@ LDFLAGS="$LDFLAGS"
 
 LIBRDF_LIBTOOLLIBS=librdf.la
 
-AC_SUBST(LIBRDF_EXTERNAL_CPPFLAGS)
-AC_SUBST(LIBRDF_EXTERNAL_LIBS)
+AC_SUBST(DEPS_CFLAGS)
+AC_SUBST(DEPS_LIBS)
 
 AC_SUBST(LIBRDF_INTERNAL_CPPFLAGS)
 AC_SUBST(LIBRDF_INTERNAL_LIBS)
