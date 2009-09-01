@@ -1,10 +1,10 @@
 HELP2MAN=help2man
 GENGETOPT=gengetopt
 SOAPCPP2=soapcpp2
-GSOAP_CPP=-lgsoap++
-LIBGSL=-lgsl -lgslcblas
-GSL_INCLUDE=
-GSOAP_INCLUDE=
+GSOAP_INCLUDE=$(shell pkg-config --cflags gsoap++)
+GSOAP_CPP=$(shell pkg-config --libs gsoap++)
+GSL_INCLUDE=$(shell pkg-config --cflags gsl)
+LIBGSL=$(shell pkg-config --libs gsl)
 
 PREFIX=/usr/local
 EXEC_PREFIX=$(PREFIX)
