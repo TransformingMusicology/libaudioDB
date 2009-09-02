@@ -120,7 +120,7 @@ CPPFLAGS="$LIBRDF_CPPFLAGS"
 LDFLAGS="$LIBRDF_LDFLAGS"
 LIBS="$LIBRDF_LIBS"
 
-PKG_CHECK_MODULES([DEPS], [raptor >= 1.4.17 rasqal >= 0.9.16 redland >= 1.0.9])
+PKG_CHECK_MODULES([DEPS], [audioDB raptor >= 1.4.17 rasqal >= 0.9.16 redland >= 1.0.9])
 
 LIBS="$LIBS"
 CPPFLAGS="$CPPFLAGS"
