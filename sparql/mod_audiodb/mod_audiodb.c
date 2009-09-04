@@ -27,21 +27,21 @@ typedef struct {
  * Config bits and pieces
  **/
 
-static void *create_audiodb_config(apr_pool_t* p, server_rec* s) {
+static void *create_audiodb_dir_config(apr_pool_t* p, server_rec* s) {
 	adb_config *config = (adb_config *)apr_pcalloc(p, sizeof(adb_config));
 	config->dbpath = NULL;
 	return config;
 }
 
-static const char* set_database_path(cmd_parms *parms, void *mconfig, const char *arg) {
+/*static const char* set_database_path(cmd_parms *parms, void *mconfig, const char *arg) {
 	adb_config *config = ap_get_module_config(parms->server->module_config, &audiodb_module);
 	config->dbpath = (char *)arg;
 	return NULL;
-}
+}*/
 
 static const command_rec mod_audiodb_cmds[] = {
 
-	AP_INIT_TAKE1("DatabasePath", set_database_path, NULL, RSRC_CONF, "The AudioDB database to use"),
+	AP_INIT_TAKE1("DatabasePath", ap_set_file_slot, (void*)APR_OFFSETOF(adb_config, dbpath), ACCESS_CONF, "The AudioDB database to use"),
 	{NULL}
 };
 
@@ -64,7 +64,7 @@ static int adb_handle_sparql_req(request_rec *r) {
 
 	rc = OK;
 
-	adb_config* config = ap_get_module_config(r->server->module_config,
+	adb_config* config = ap_get_module_config(r->per_dir_config,
 		&audiodb_module);
 
 	r->status = HTTP_BAD_REQUEST;
@@ -173,9 +173,10 @@ static void mod_audiodb_register_hooks (apr_pool_t *p) {
 
 module AP_MODULE_DECLARE_DATA audiodb_module = {
 	STANDARD20_MODULE_STUFF,
+	create_audiodb_dir_config,
 	NULL,
 	NULL,
-	create_audiodb_config,
+	//create_audiodb_config,
 	NULL,
 	mod_audiodb_cmds,
 	mod_audiodb_register_hooks,

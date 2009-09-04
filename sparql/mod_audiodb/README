@@ -22,8 +22,8 @@ Configuration
 
 To configure the database, add the following to your site configuration:
 
-DatabasePath "/tmp/test_database.adb"
 <Location /sparql>
+	DatabasePath "/tmp/test_database.adb"
 	SetHandler audiodb-sparql-handler
 </Location>
 
