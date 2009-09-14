@@ -107,7 +107,9 @@ $(EXECUTABLE).pc:
 install: $(EXECUTABLE).pc
 	mkdir -m755 -p $(LIBDIR)/pkgconfig $(BINDIR) $(INCLUDEDIR) $(MANDIR)/man1
 	install -m644 $(LIBRARY) $(LIBDIR)
+ifneq ($(shell uname),Darwin)
 	ldconfig -n $(LIBDIR)
+endif
 	ln -s $(LIBRARY) $(LIBDIR)/lib$(EXECUTABLE).so
 	install -m755 $(EXECUTABLE) $(BINDIR)
 	install -m644 audioDB_API.h $(INCLUDEDIR)
