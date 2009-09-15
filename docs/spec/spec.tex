@@ -206,6 +206,15 @@ The predicate below states that for any consecutive intervals in an interval ind
  	\t3 \langle i_j, i_{j+1} \rangle \inseq ii \implies  second ~ i_j \geq first ~ i_{j+1}@ ii \}
  \end{zed}
 
+\item \textsf{Standard Interval Index - SII} - a Continual Interval Index which has no overlapping intervals and begins at 0. 
+
+%%unchecked
+\begin{zed}
+	StandardIntIndex == \\
+	\t1 \{ cii : ContIntIndex; i_j, i_{j+1}: Interval | \\
+	\t3 first (head~cii) = 0 \land \\
+	\t4 second ~ i_j = first ~ i_{j+1}
+\end{zed}
 % In fact this enables us to specify such a data structure simply as a sequence of increasing times as we can assume the track starts at 0. 
 
 % \begin{zed}
@@ -242,7 +251,7 @@ The predicate below states that for any consecutive intervals in an interval ind
 \begin{axdef}
 	indexduration : ContIntIndex \fun Time 
 \where
-\forall cii : ContIntIndex @ indexduration~cii = first (last~cii)
+\forall cii : ContIntIndex @ indexduration~cii = second (last~cii) - first (head~cii)
 \end{axdef} 
 
 \item \textsf{Segmenter} - a process which computes an interval index  for any track, represented as a function which maps any track to an interval index.
@@ -255,10 +264,10 @@ The predicate below states that for any consecutive intervals in an interval ind
 \end{flushright}
 
 
-In this specification we will consider segmenters that produce a continuous interval index. 
+In this specification we will consider segmenters that produce a standard interval index. 
 
 \begin{zed}
-	Segmenter == Track \fun ContIntIndex  \\
+	Segmenter == Track \fun StandardIntIndex  \\
 \end{zed}
 
 \item The \textsf{Length} of an interval index is the number of intervals contained within it. 
@@ -302,8 +311,7 @@ Every feature kind has a dimension (not necessarily fixed).
 	parameters : \power Var \\
 	dparameters : \power Var \\
 	binding : Binding \\
-	ddimension : Binding \pfun \nat  \\ 
-	fdimension : Dimension  \\
+	ddimension : Binding \pfun Dimension  \\ 
 \where
 	dparameters  \subseteq parameters  \\
 	\forall b : Binding |  b \in (\dom ddimension) @ dparameters \subseteq  (\dom b) 
@@ -315,6 +323,7 @@ Every feature kind has a dimension (not necessarily fixed).
 
 \begin{schema}{Feature}
 	FeatureKind \\
+	fdimension : Dimension  \\
 \where
 	\dom binding = parameters \\
 	fdimension = ddimension~binding
@@ -399,6 +408,14 @@ Every feature kind has a dimension (not necessarily fixed).
 	BelUnitExtractor ==  UnitExtractor
 \end{zed}
 
+The range of the real contained in the bel unit vector is less than 0. 
+
+\begin{zed}
+		\forall t : Track; int : Interval; ux : BelUnitExtractor   @  \\
+		\t5 head (ux~t~int)  \leq 0
+\end{zed}
+
+
 \item \textsf{Feature Extractors} - the set of  all extractors associated with a feature.
 
 As this data structure can be updated over time -  by adding and removing new features, and adding and removing extractors for a feature as new ones arise and old ones are not used - we use a schema. The  predicate states that the feature vector dimension computed by an extractor must be equal to the associated feature dimension. Every feature has a unique associated unit feature  and every extractor has a unique associated unit extractor. Once a user defines a feature, and one its associated extractors, the unit feature and extractor are generated automatically.  
@@ -414,13 +431,6 @@ As this data structure can be updated over time -  by adding and removing new fe
 	\t1 @ e \in featureextractors(f)  \implies  \\
 	\t2 f.fdimension = dimension (e~ t ~ i) \\
 \end{schema}
-
-The range of the real contained in the bel unit vector is less than 0. 
-
-\begin{zed}
-		\forall t : Track; int : Interval; ux : BelUnitExtractor   @  \\
-		\t5 head (ux~t~int)  \leq 0
-\end{zed}
 
 \item \textsf{Track Feature Vectors} - given a segmenter and an extractor the  sequence of feature vectors  for each interval of the track 
 
@@ -468,18 +478,18 @@ extract : Segmenter \fun Extractor \fun Track \fun \seq \FV
   \end{tikzpicture}
 \end{flushright}
 
-\item \textsf{Catalogue Feature Vectors}  - a sequence of track feature vectors for each track in the instance ($features$)
+\item \textsf{Catalogue Feature Vectors}  - a sequence of track feature vectors for each track in the catalogue ($features$)
 
-\item  \textsf{Catalogue Unit Vectors}  - a sequence of track unit vectors for each track in the instance ($unitfeatures$)
+\item  \textsf{Catalogue Unit Vectors}  - a sequence of track unit vectors for each track in the catalogue ($unitfeatures$)
 
 \item \textsf{Catalogue Index} - a sequence of continuous interval indexes (one for each track).
 
 An example can be seen below
 
 \[ \langle 
-\langle (0,r_{11}), (r_{11},r_{12}), (r_{12}, r_{13}) \rangle, 
-\langle (0,r_{21}), (r_{21},r_{22}), (r_{22}, r_{23}, (r_{23}, r_{24}) \rangle, 
-\langle (0,r_{31}), (r_{31},r_{32}), (r_{32}, r_{33}) \rangle, 
+\langle (0,r_{11}), (r_{11},r_{12}), (r_{12}, r_{13}) \rangle, \\ 
+\langle (0,r_{21}), (r_{21},r_{22}), (r_{22}, r_{23}, (r_{23}, r_{24}) \rangle, \\ 
+\langle (0,r_{31}), (r_{31},r_{32}), (r_{32}, r_{33}) \rangle, \\
 \rangle \]
 
 \item \textsf{Instance} - a catalogue, segmenter, feature, extractor, unit  feature, unit extractor, dimension, feature vectors, catal
@@ -525,7 +535,7 @@ Note that every instance must contain a catalogue in the music collection but no
 \end{schema}
 		
 \section{Search Vectors}
-Searching takes place using concatenations of feature vectors to build \emph{search} vectors. For a particular query all search vectors will have a fixed length equal to some multiple (which we will refer to as $sl$) of the dimension of the orignal feature vectors ($d$). 
+Searching takes place using concatenations of feature vectors to build \emph{search} vectors. For a particular query all search vectors will have a fixed length equal to some multiple (which we will refer to as $sl$, the search length) of the dimension of the orignal feature vectors ($d$). 
 
 In the schema below, the function $makesearchvs$ takes a natual number $sl$ and a sequence of feature vectors (associated with a track) to create a sequence of search vectors. The first element of the returned sequence is the concatenation of the first $sl$ feature vectors, the second element is also the concatenation the next $sl$ feature vectors but starting from the second element, and so on until all such sequences are formed.  It should be clear that if the original sequence contains $n$ feature vectors then the output will contain $n-sl+1$ vectors. 
 
@@ -624,7 +634,7 @@ In the schema below, the function $makesearchvs$ takes a natual number $sl$ and 
 	\forall xs :  \seq \FV ; sl : \nat   @ \\
 \t1 sl > \# xs \implies makesearchvs~sl~xs = \langle \rangle  \land \\
 \t1 sl \leq \# xs \implies makesearchvs~sl~xs = \\
-\t2 concat (\langle (0 \upto sl-1) \dres xs  \rangle)  \cat  makesearchvs~sl (tail~xs)
+\t2 concat (\langle (1 \upto sl) \dres xs  \rangle)  \cat  makesearchvs~sl (tail~xs)
 \end{axdef}
 
 
@@ -639,12 +649,21 @@ For any natural number less than the length of feature vectors for each track we
 	unitvs! :  \seq (\seq \Vsl) \\  
 \where
 	searchvs! =   map ~ (makesearchvs ~ sl?) ~ i?.features  \\
-	unitvs! =  map ~ (makesearchvs ~ sl?) ~ i?.features  \\
+	unitvs! =  map ~ (makesearchvs ~ sl?) ~ i?.unit  \\
 \end{schema}
 
 \item \textsf{Hopped Search Vectors}
 
-Rather then generating all possible search vectors we may wish to general vectors starting at equally distanced intervals in the interval index of the tracks in an instance.  Re refer to the size of this interval as $hop$. 
+Rather then generating all possible search vectors we may wish to general vectors starting at equally distanced intervals in the interval index of the tracks in an instance.  We refer to the size of this interval as $hop$. 
+
+\begin{gendef}[X]
+    strip : \nat \fun (\seq X) \fun \seq X
+    \where
+        \forall x : X; xs : \seq X @ \\
+	\t1         strip ~ 0  ~ xs = xs \land \\
+	\t1        strip ~ (n+1) ~ \langle \rangle = \langle \rangle \\
+	\t1         strip ~ (n+1) ~ \langle x \rangle \cat xs = strip ~ n ~ xs
+\end{gendef} 
 
 \begin{axdef}
  	makehopsearchvs : \nat \fun  \nat \fun \seq \Vd \fun \seq \Vdsl
@@ -652,11 +671,11 @@ Rather then generating all possible search vectors we may wish to general vector
 	\forall xs :  \seq \FV ; sl : \nat  ; hop  : \nat  @ \\
 \t1 sl > \# xs \implies makehopsearchvs~sl~hop~xs = \langle \rangle  \land \\
 \t1 sl \leq \# xs \implies makehopsearchvs~sl~hop~xs = \\
-\t2 concat (\langle (0 \upto sl-1) \dres xs  \rangle)  \cat  \\
-\t2 			makehopsearchvs~sl~hop~ ((0 \upto (hop -1)) \ndres xs)
+\t2 concat (\langle (1 \upto sl) \dres xs  \rangle)  \cat  \\
+\t2 			makehopsearchvs~sl~hop~ (strip~hop~xs)
 \end{axdef}
 
-This enables us to define a hop size when generating  search vectors
+This enables us to define a hop size when generating search vectors
 
 \begin{schema}{HopSearchVectors}
 	SearchVectors \\
@@ -665,12 +684,12 @@ This enables us to define a hop size when generating  search vectors
 	hopunitvs! :  \seq (\seq \Vsl) \\  
 \where
 	hopsearchvs! =  map ~ (makehopsearchvs ~i?.d ~ hop?) ~ i?.features  \\
-	hopunitvs! =  map ~ (makehopsearchvs ~ i?.d ~ hop?) ~ i?.features  \\
+	hopunitvs! =  map ~ (makehopsearchvs ~ i?.d ~ hop?) ~ i?.unit  \\
 \end{schema}
 
 \item \textsf{Search Vector Power}
 
-For each Search Vector in an instances search vectors we take the associated unit values and take the arithmetic mean. 
+For each Search Vector in an instance's search vectors we take the associated unit values and take the arithmetic mean. 
 
 \begin{axdef}
 	average : \V \fun \R
@@ -685,7 +704,7 @@ For each Search Vector in an instances search vectors we take the associated uni
 
 \item \textsf{Search Vector Duration}
 
-The duration of the sequence of a the original feature vectors from which the search vector is composed. 
+The duration of the sequence of the original feature vectors from which the search vector is composed. 
 
 \begin{enumerate}
 
@@ -695,7 +714,7 @@ This is defined as the duration of the sequence for each search vector. So for e
 
 \item \textsf{Track Search Vector Durations}
 
-Next we define a function at the level of track search vectors. We define a function which takes a sequence of search vectors for that track, the search length that was used to create them, and the track interval index and returns a sequence of natural numbers each which is the duration of the corresponding search vector
+Next we define a function at the level of track search vectors. We define a function which takes a sequence of search vectors for that track, the search length that was used to create them, and the track interval index and returns a sequence of natural numbers each of which is the duration of the corresponding search vector
 
 \begin{axdef}
 	durationsTsv : \seq \Vdsl  \fun  ContIntIndex \fun \nat \fun  \seq \R
@@ -708,7 +727,7 @@ Next we define a function at the level of track search vectors. We define a func
 
 \item \textsf{Instance Search Vector Durations}
 
-Finally, we define a function called svdurations which takes a sequence of search vectors and calculate the track search vector durations for each sequence.
+Finally, we define a function called svdurations which takes a sequence of search vectors and calculates the track search vector durations for each sequence.
 
 \begin{axdef}
 	durationsIsv : \seq (\seq \Vdsl) \fun (\seq ContIntIndex) \fun \nat \fun  \seq (\seq \R) \\
@@ -724,9 +743,9 @@ Finally, we define a function called svdurations which takes a sequence of searc
 
 \begin{schema}{Durations}
 	SearchVectors \\
-	svdurations : \seq (\seq \R) \\	
+	svdurations! : \seq (\seq \R) \\	
 \where
-	svdurations = durationsIsv ~ searchvs! ~ i?.index ~ sl? 
+	svdurations! = durationsIsv ~ searchvs! ~ i?.index ~ sl? 
 \end{schema}
 
 % \end{enumerate}
@@ -794,21 +813,21 @@ The user identifies a specific part of the track in a singleton instance to be u
 \end{enumerate}
 
 \begin{schema}{PointQuery}
-	SingletonQuery \\
+	GeneralQuery \\
 	start?, end? :  \nat \\
-	sourcetrack! : Track \\
+	sourcetrack? : Track \\
 	sequence! : Sequence \\
       	seqindex! : ContIntIndex \\
 	sl! : \nat \\
 \where
-	sourcetrack! = head (src?.cat)  \\
-	start? \in \dom (src?.seg (sourcetrack!)) \\ 
-	end? \in \dom (src?.seg (sourcetrack!)) \\ 
-	seqindex! =  (start? \upto end?) \dres (src?.seg~sourcetrack!)   \\
+	sourcetrack? \in \ran cat \\
+	start? \in \dom (src?.seg (sourcetrack?)) \\ 
+	end? \in \dom (src?.seg (sourcetrack?)) \\ 
+	seqindex! =  (start? \upto end?) \dres (src?.seg~sourcetrack?)   \\
 	sl! = end? - start? \\
 \end{schema}
 
-In this case the search vectors will be equal to a sequence containing only one sequence. That sequence will itself consist of only one sequence which will be a search vector of dimension $d * sl$ where $d$ is the dimension of the sequence and $sl$ the length of the sequence. 
+In this case the search vectors will be equal to a sequence containing only one sequence. That sequence will be a search vector of dimension $d * sl$ where $d$ is the dimension of the sequence and $sl$ the length of the sequence. 
 
 \[  \langle \langle \Vdsl \rangle \rangle \]
 
@@ -870,9 +889,7 @@ Then we need to generate the following data structure
  \]
 		            
 
-First let us define the function for a calculating the distances for a single search vector and general target search vectors 
-
-\emph{I couldn't do this on one go first time round - too much nesting for me!}
+First let us define the function to calculate the distances for a single search vector.
 
 \begin{axdef}		
 	vectordistances : \Vdsl \fun \seq (\seq \Vdsl) \fun \seq (\seq \R) 
@@ -916,7 +933,7 @@ The next scheme takes a general query and calculates all the distances.
 
 The list can be sorted into ascending order and some threshold set (as we shall see) where we believe it is sensible to expect some acoustic or cognitive similarity. 
 
-Along with the distance between two search vectors, we also output the source track and index,  the target track and index, as well as the duration  the source search vector and power of the associated and corresponding unit vectors. 
+Along with the distance between the two search vectors, we also output the source track and index, the target track and index, the duration of the source and target search vectors, and the powers of the associated unit vectors.
 
 \begin{schema}{Output}
 	srctrack, srcindex, tgttrack, tgtindex : \nat \\
