@@ -43,7 +43,7 @@ subplot(212)
 hold on
 for k=1:10
   if(useLog)
-    semilogx(radii,kk*log(RR(k,:)),[num2str(c(mod(k,length(c))+1)) '-+'],'lineWidth',2)
+    semilogx(radii,kk*log10(RR(k,:)),[num2str(c(mod(k,length(c))+1)) '-+'],'lineWidth',2)
   else
     plot(radii,RR(k,:).^kk,[num2str(c(mod(k,length(c))+1)) '-+'],'lineWidth',2)    
   end
