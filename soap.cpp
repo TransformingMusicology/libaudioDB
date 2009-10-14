@@ -379,6 +379,15 @@ int adb__sequenceQueryByKey(struct soap* soap,xsd__string dbName,
   }
 }
 
+#if defined(WIN32)
+int mkstemp(char *tmpFileName) {
+  int fd = -1;
+  mktemp(tmpFileName);
+  fd = open(tmpFileName,O_RDWR|O_BINARY|O_CREAT|O_EXCL, _S_IREAD|_S_IWRITE);
+  return fd;
+}
+#endif
+
 // Query an audioDB database by vector (serialized)
 int adb__shingleQuery(struct soap* soap, xsd__string dbName, struct adb__queryVector qVector, xsd__string keyList, xsd__string timesFileName, xsd__int queryType, xsd__int queryPos, xsd__int pointNN, xsd__int trackNN, xsd__int sequenceLength, xsd__double radius, xsd__double absolute_threshold, xsd__double relative_threshold, xsd__int exhaustive, xsd__int lsh_exact, xsd__int no_unit_norming, struct adb__queryResponse &adbQueryResponse){
 
