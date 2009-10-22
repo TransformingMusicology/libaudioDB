@@ -1112,7 +1112,7 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
 
   int dbfid;
   if ((dbfid = open (filename, O_RDWR|O_CREAT|O_EXCL, 
-#if defined(__CYGWIN__) || defined(WIN32)
+#if defined(WIN32)
                      _S_IREAD|_S_IWRITE
 #else
                      S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
