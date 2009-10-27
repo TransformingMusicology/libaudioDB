@@ -178,7 +178,7 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
   /* KLUDGE: gengetopt generates a function which is not completely
      const-clean in its declaration.  We cast argv here to keep the
      compiler happy.  -- CSR, 2008-10-08 */
-  if (cmdline_parser (argc, (char *const *) argv, &args_info) != 0)
+  if (cmdline_parser (argc, (char **) argv, &args_info) != 0)
     error("Error parsing command line");
     
   if(argc<2){
