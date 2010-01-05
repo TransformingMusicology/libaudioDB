@@ -249,7 +249,6 @@ class audioDB{
   double timesTol;
   double radius;
   bool query_from_key;
-  Uns32T query_from_key_index;
   bool use_absolute_threshold;
   double absolute_threshold;
   bool use_relative_threshold;
@@ -384,7 +383,6 @@ class audioDB{
     timesTol(0.1),				\
     radius(0),					\
     query_from_key(false),                      \
-    query_from_key_index((uint32_t) -1),        \
     use_absolute_threshold(false),		\
     absolute_threshold(0.0),			\
     use_relative_threshold(false),		\
