@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #if !defined(WIN32)
 #include <sys/mman.h>
 #endif
@@ -16,7 +17,7 @@
 #include <map>
 #include <string>
 #include <math.h>
-#include <sys/time.h>
+#include <time.h>
 #include <assert.h>
 #include <float.h>
 #include <signal.h>

@@ -39,7 +39,21 @@ void audioDB::initRNG() {
     error("could not allocate Random Number Generator");
   }
   /* FIXME: maybe we should use a real source of entropy? */
-  gsl_rng_set(rng, time(NULL));
+  uint32_t seed = 0;
+#ifdef WIN32
+  seed = time(NULL);
+#else
+  struct timeval tv;
+  if(gettimeofday(&tv, NULL) == -1) {
+    error("failed to get time of day");
+  }
+  /* usec field should be less than than 2^20.  We want to mix the
+     usec field, highly-variable, into the high bits of the seconds
+     field, which will be static between closely-spaced runs.  -- CSR,
+     2010-01-05 */
+  seed = tv.tv_sec ^ (tv.tv_usec << 12);
+#endif
+  gsl_rng_set(rng, seed);
 }
 
 void audioDB::initDBHeader(const char* dbName) {
