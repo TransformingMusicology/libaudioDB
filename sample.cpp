@@ -92,8 +92,23 @@ void audioDB::sample(const char *dbName) {
   double sumdist = 0;
   double sumlogdist = 0;
 
+  unsigned key_index = 0;
+  if(query_from_key) {
+    /* naughty use of internals here.  When this is part of the API,
+       it will be a legitimate use of internals.  -- CSR,
+       2010-01-05 */
+    key_index = (*adb->keymap)[key];
+    if(propTable[key_index] == 0) {
+      error("no samples of this length possible for key");
+    }
+  }
   for (unsigned int i = 0; i < nsamples;) {
-    unsigned track1 = random_track(propTable, total);
+    unsigned track1 = 0;
+    if(query_from_key) {
+      track1 = key_index;
+    } else {
+      track1 = random_track(propTable, total);
+    }
     unsigned track2 = random_track(propTable, total);
 
     if(track1 == track2)

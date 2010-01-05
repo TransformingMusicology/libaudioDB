@@ -332,7 +332,19 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     if(sequenceLength < 1 || sequenceLength > 1000) {
       error("seqlen out of range: 1 <= seqlen <= 1000");
     }
-    nsamples = args_info.nsamples_arg;
+    if(args_info.nsamples_given) {
+      nsamples = args_info.nsamples_arg;
+    } else if(args_info.resultlength_given) {
+      nsamples = args_info.resultlength_arg;
+    } else {
+      nsamples = args_info.nsamples_arg;
+    }
+    if(args_info.key_given) {
+      query_from_key = true;
+      key = args_info.key_arg;
+    }
+    
+
     return 0;
   }
 
