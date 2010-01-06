@@ -21,9 +21,9 @@
 #define AF_VECTORS "http://purl.org/ontology/af/vectors"
 #define MO_SIGNAL "http://purl.org/ontology/mo/Signal"
 #define RDF_TYPE "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-#define MUSIM_ELEMENT "http://purl.org/ontology/musim#element"
-#define MUSIM_DISTANCE "http://purl.org/ontology/musim#distance"
-#define MUSIM_SIMILARITY "http://purl.org/ontology/musim#Similarity"
+#define SIMILARITY_ELEMENT "http://purl.org/ontology/similarity/element"
+#define SIMILARITY_DISTANCE "http://purl.org/ontology/similarity/distance"
+#define SIMILARITY_SIMILARITY "http://purl.org/ontology/similarity/Similarity"
 
 typedef struct {
 	librdf_model* model;
@@ -371,9 +371,9 @@ static librdf_stream* librdf_storage_audiodb_find_statements(librdf_storage* sto
 	librdf_uri* vectors = librdf_new_uri(world, AF_VECTORS);
 	librdf_uri* signal = librdf_new_uri(world, MO_SIGNAL);
 	librdf_uri* type = librdf_new_uri(world, RDF_TYPE);
-	librdf_uri* element = librdf_new_uri(world, MUSIM_ELEMENT);
-	librdf_uri* distance = librdf_new_uri(world, MUSIM_DISTANCE); 
-	librdf_uri* similarity = librdf_new_uri(world, MUSIM_SIMILARITY); 
+	librdf_uri* element = librdf_new_uri(world, SIMILARITY_ELEMENT);
+	librdf_uri* distance = librdf_new_uri(world, SIMILARITY_DISTANCE); 
+	librdf_uri* similarity = librdf_new_uri(world, SIMILARITY_SIMILARITY); 
 
 	// SPX (given a resource and a predicate, but no object)	
 	if(subject && librdf_node_is_resource(subject) && 
