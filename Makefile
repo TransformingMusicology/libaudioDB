@@ -6,6 +6,9 @@ GSOAP_CPP=$(shell pkg-config --libs gsoap++)
 GSL_INCLUDE=$(shell pkg-config --cflags gsl)
 LIBGSL=$(shell pkg-config --libs gsl)
 
+TESTDIRS=tests libtests
+BINDINGDIRS=bindings/sb-alien bindings/pd
+
 PREFIX=/usr/local
 EXEC_PREFIX=$(PREFIX)
 LIBDIR=$(EXEC_PREFIX)/lib
@@ -85,8 +88,8 @@ clean:
 	-rm HELP.txt
 	-rm $(EXECUTABLE) $(EXECUTABLE).1 $(OBJS)
 	-rm xthresh
-	-sh -c "cd tests && sh ./clean.sh"
-	-sh -c "cd libtests && sh ./clean.sh"
+	-for d in $(TESTDIRS); do (cd $$d && sh ./clean.sh); done
+	-for d in $(BINDINGDIRS); do (cd $$d && $(MAKE) clean); done
 	-rm $(LIBRARY)
 	-rm tags
 
@@ -95,8 +98,8 @@ distclean: clean
 	-rm -rf audioDB.dump
 
 test: $(EXECUTABLE) $(LIBRARY)
-	sh -c "cd libtests && sh ./run-tests.sh"
-	sh -c "cd tests && sh ./run-tests.sh"
+	for d in $(TESTDIRS); do (cd $$d && sh ./run-tests.sh); done
+	for d in $(BINDINGDIRS); do (cd $$d && $(MAKE) test); done
 
 xthresh: xthresh.c
 	$(CC) -o $@ $(CFLAGS) $(GSL_INCLUDE) $(LIBGSL) $<
