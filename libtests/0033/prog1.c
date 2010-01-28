@@ -28,7 +28,6 @@ int main(int argc, char **argv) {
   adb_query_refine_t refine = {0};
   refine.flags |= ADB_REFINE_RADIUS;
   refine.radius = 5;
-  refine.hopsize = 1;
 
   adb_query_spec_t spec;
   spec.qid = qid;

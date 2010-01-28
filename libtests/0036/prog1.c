@@ -25,7 +25,6 @@ int main(int argc, char **argv) {
   adb_query_parameters_t parms = 
     {ADB_ACCUMULATION_PER_TRACK, ADB_DISTANCE_EUCLIDEAN_NORMED, 10, 10};
   adb_query_refine_t refine = {0};
-  refine.hopsize = 1;
 
   adb_query_spec_t spec;
   spec.qid = qid;

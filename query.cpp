@@ -135,7 +135,7 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
   // Matched Filter
   // HOP SIZE == 1
   double* spd;
-  if(HOP_SIZE == 1) { // HOP_SIZE = shingleHop
+  if(!(spec->refine.flags & ADB_REFINE_HOP_SIZE)) {
     for(w = 0; w < wL; w++) {
       for(j = 0; j < numVectors - w; j++) { 
         sp = DD[j];
@@ -145,7 +145,7 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
 	  *sp++ += *spd++;
       }
     }
-  } else { // HOP_SIZE != 1
+  } else {
     for(w = 0; w < wL; w++) {
       for(j = 0; j < numVectors - w; j += HOP_SIZE) {
         sp = DD[j];
@@ -516,7 +516,7 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
     return 1;
   }
 
-  unsigned j,k,track,trackOffset=0, HOP_SIZE = spec->refine.hopsize;
+  unsigned j,k,track,trackOffset=0;
   unsigned wL = spec->qid.sequence_length;
   double **D = 0;    // Differences query and target 
   double **DD = 0;   // Matched filter distance
@@ -524,6 +524,13 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
   D = new double*[qpointers.nvectors]; // pre-allocate 
   DD = new double*[qpointers.nvectors];
 
+  unsigned HOP_SIZE;
+
+  if(spec->refine.flags & ADB_REFINE_HOP_SIZE) {
+    HOP_SIZE = spec->refine.hopsize;
+  } else {
+    HOP_SIZE = 1;
+  }
   off_t trackIndexOffset;
 
   // Track loop 
