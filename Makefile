@@ -7,7 +7,7 @@ GSL_INCLUDE=$(shell pkg-config --cflags gsl)
 LIBGSL=$(shell pkg-config --libs gsl)
 
 TESTDIRS=tests libtests
-BINDINGDIRS=bindings/sb-alien bindings/pd
+BINDINGDIRS=bindings/sb-alien bindings/pd bindings/python
 
 PREFIX=/usr/local
 EXEC_PREFIX=$(PREFIX)
