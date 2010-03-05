@@ -123,9 +123,9 @@ struct adb {
 
 typedef struct {
   bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
-    return strcmp(r1.key, r2.key) < 0;
+    return strcmp(r1.ikey, r2.ikey) < 0;
   }
-} adb_result_key_lt;
+} adb_result_ikey_lt;
 
 typedef struct {
   bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
@@ -150,7 +150,7 @@ typedef struct {
     return ((r1.ipos < r2.ipos) ||
             ((r1.ipos == r2.ipos) && 
              ((r1.qpos < r2.qpos) ||
-              ((r1.qpos == r2.qpos) && (strcmp(r1.key, r2.key) < 0)))));
+              ((r1.qpos == r2.qpos) && (strcmp(r1.ikey, r2.ikey) < 0)))));
   }
 } adb_result_triple_lt;
 
@@ -168,6 +168,7 @@ typedef struct adb_qstate_internal {
   std::priority_queue<PointPair> *exact_evaluation_queue;
   std::set< adb_result_t, adb_result_triple_lt > *set;
   LSH *lsh;
+  const char *qkey;
 } adb_qstate_internal_t;
 
 /* We could go gcc-specific here and use typeof() instead of passing

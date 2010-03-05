@@ -49,10 +49,11 @@ typedef struct adb_status {
 } adb_status_t;
 
 typedef struct adb_result {
-  const char *key;
-  double dist;
+  const char *qkey;
+  const char *ikey;
   uint32_t qpos;
   uint32_t ipos;
+  double dist;
 } adb_result_t;
 
 #define ADB_REFINE_INCLUDE_KEYLIST 1

@@ -965,7 +965,7 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
 
   for(unsigned int k = 0; k < rs->nresults; k++) {
     adb_result_t r = rs->results[k];
-    reporter->add_point(audiodb_key_index(adb, r.key), r.qpos, r.ipos, r.dist);
+    reporter->add_point(audiodb_key_index(adb, r.ikey), r.qpos, r.ipos, r.dist);
   }
   audiodb_query_free_results(adb, &qspec, rs);
 

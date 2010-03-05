@@ -26,6 +26,7 @@ int audiodb_index_init_query(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
   }
 
   qstate->lsh = audiodb_index_allocate(adb, indexName, corep);
+  qstate->qkey = spec->qid.datum->key;
 
   /* FIXME: it would be nice if the LSH library didn't make me do
    * this. */
@@ -50,7 +51,8 @@ void audiodb_index_add_point_approximate(void *user_data, uint32_t pointID, uint
   std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
   if(qstate->allowed_keys->find((*adb->keys)[trackID]) != keys_end) {
     adb_result_t r;
-    r.key = (*adb->keys)[trackID].c_str();
+    r.ikey = (*adb->keys)[trackID].c_str();
+    r.qkey = qstate->qkey;
     r.dist = dist;
     r.qpos = qpos;
     r.ipos = spos;

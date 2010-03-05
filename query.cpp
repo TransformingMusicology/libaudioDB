@@ -293,6 +293,7 @@ int audiodb_query_spec_qpointers(adb_t *adb, const adb_query_spec_t *spec, doubl
     }
     /* initialize d, and mark that nothing needs freeing later. */
     d = *datum;
+    d.key = "";
     datum = &d;
   } else if (datum->key) {
     uint32_t track_id;
@@ -473,7 +474,8 @@ int audiodb_query_queue_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstat
       if((!(spec->refine.flags & ADB_REFINE_RADIUS)) || 
          dist <= (spec->refine.radius + ADB_DISTANCE_TOLERANCE)) {
         adb_result_t r;
-        r.key = (*adb->keys)[pp.trackID].c_str();
+        r.ikey = (*adb->keys)[pp.trackID].c_str();
+        r.qkey = spec->qid.datum->key;
         r.dist = dist;
         r.qpos = pp.qpos;
         r.ipos = pp.spos;
@@ -587,7 +589,8 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
               if((!(spec->refine.flags & ADB_REFINE_RADIUS)) || 
                  thisDist <= (spec->refine.radius + ADB_DISTANCE_TOLERANCE)) {
                 adb_result_t r;
-                r.key = (*adb->keys)[track].c_str();
+                r.ikey = (*adb->keys)[track].c_str();
+                r.qkey = spec->qid.datum->key;
                 r.dist = thisDist;
                 if(spec->qid.flags & ADB_QID_FLAG_EXHAUSTIVE) {
                   r.qpos = j;

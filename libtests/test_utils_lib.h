@@ -31,7 +31,7 @@ int result_position(adb_query_results_t *r, const char *key, float dist, uint32_
   for(uint32_t k = 0; k < r->nresults; k++) {
     adb_result_t result = r->results[k];
     if(close_enough(dist, result.dist, 1e-4) && (qpos == result.qpos) &&
-       (ipos == result.ipos) && !(strcmp(key, result.key))) {
+       (ipos == result.ipos) && !(strcmp(key, result.ikey))) {
       return k;
     }
   }
