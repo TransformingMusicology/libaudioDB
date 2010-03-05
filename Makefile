@@ -113,7 +113,7 @@ install: $(EXECUTABLE).pc
 ifneq ($(shell uname),Darwin)
 	ldconfig -n $(LIBDIR)
 endif
-	ln -s $(LIBRARY) $(LIBDIR)/lib$(EXECUTABLE).so
+	ln -sf $(LIBRARY) $(LIBDIR)/lib$(EXECUTABLE).so
 	install -m755 $(EXECUTABLE) $(BINDIR)
 	install -m644 audioDB_API.h $(INCLUDEDIR)
 	install -m644 $(EXECUTABLE).1 $(MANDIR)/man1
