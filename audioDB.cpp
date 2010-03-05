@@ -833,9 +833,9 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     qspec.refine.flags |= ADB_REFINE_DURATION_RATIO;
     qspec.refine.duration_ratio = timesTol;
   }
-  /* FIXME: not sure about this any more; maybe it belongs in
-     query_id?  Or maybe we just don't need a flag for it? */
-  qspec.refine.hopsize = sequenceHop;
+
+  qspec.refine.qhopsize = sequenceHop;
+  qspec.refine.ihopsize = sequenceHop;
   if(sequenceHop != 1) {
     qspec.refine.flags |= ADB_REFINE_HOP_SIZE;
   }

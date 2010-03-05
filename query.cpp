@@ -109,7 +109,6 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
   unsigned int j, k, l, w;
   double *dp, *qp, *sp;
 
-  const unsigned HOP_SIZE = spec->refine.hopsize;
   const unsigned wL = spec->qid.sequence_length;
 
   for(j = 0; j < numVectors; j++) {
@@ -132,8 +131,6 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
         *dp += *qp++ * *sp++;
     }
   
-  // Matched Filter
-  // HOP SIZE == 1
   double* spd;
   if(!(spec->refine.flags & ADB_REFINE_HOP_SIZE)) {
     for(w = 0; w < wL; w++) {
@@ -146,14 +143,18 @@ static void audiodb_initialize_arrays(adb_t *adb, const adb_query_spec_t *spec, 
       }
     }
   } else {
+    uint32_t qhop = spec->refine.qhopsize;
+    qhop = qhop ? qhop : 1;
+    uint32_t ihop = spec->refine.ihopsize;
+    ihop = ihop ? ihop : 1;
     for(w = 0; w < wL; w++) {
-      for(j = 0; j < numVectors - w; j += HOP_SIZE) {
+      for(j = 0; j < numVectors - w; j += qhop) {
         sp = DD[j];
         spd = D[j+w]+w;
-        for(k = 0; k < (*adb->track_lengths)[track] - w; k += HOP_SIZE) {
+        for(k = 0; k < (*adb->track_lengths)[track] - w; k += ihop) {
           *sp += *spd;
-          sp += HOP_SIZE;
-          spd += HOP_SIZE;
+          sp += ihop;
+          spd += ihop;
         }
       }
     }
@@ -526,12 +527,16 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
   D = new double*[qpointers.nvectors]; // pre-allocate 
   DD = new double*[qpointers.nvectors];
 
-  unsigned HOP_SIZE;
+  unsigned qhop, ihop;
 
   if(spec->refine.flags & ADB_REFINE_HOP_SIZE) {
-    HOP_SIZE = spec->refine.hopsize;
+    qhop = spec->refine.qhopsize;
+    qhop = qhop ? qhop : 1;
+    ihop = spec->refine.ihopsize;
+    ihop = ihop ? ihop : 1;
   } else {
-    HOP_SIZE = 1;
+    qhop = 1;
+    ihop = 1;
   }
   off_t trackIndexOffset;
 
@@ -567,8 +572,8 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
          fabs(dbpointers.mean_duration[track]-qpointers.mean_duration[0]) < qpointers.mean_duration[0]*spec->refine.duration_ratio) {
 
 	// Search for minimum distance by shingles (concatenated vectors)
-	for(j = 0; j <= qpointers.nvectors - wL; j += HOP_SIZE) {
-	  for(k = 0; k <= (*adb->track_lengths)[track] - wL; k += HOP_SIZE) {
+	for(j = 0; j <= qpointers.nvectors - wL; j += qhop) {
+	  for(k = 0; k <= (*adb->track_lengths)[track] - wL; k += ihop) {
             double thisDist = 0;
             double qn = qpointers.l2norm[j];
             double sn = dbpointers.l2norm[trackIndexOffset + k];

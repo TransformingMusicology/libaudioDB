@@ -77,7 +77,8 @@ typedef struct adb_query_refine {
   double absolute_threshold;
   double relative_threshold;
   double duration_ratio; /* expandfactor */
-  uint32_t hopsize;
+  uint32_t qhopsize;
+  uint32_t ihopsize;
 } adb_query_refine_t;
 
 #define ADB_ACCUMULATION_DB 1
