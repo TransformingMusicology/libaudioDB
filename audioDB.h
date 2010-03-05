@@ -201,7 +201,7 @@ class audioDB{
   bool forWrite;
   int infid;
   struct stat statbuf;  
-  struct adbheader *dbH;
+  struct adb_header *dbH;
   struct adb *adb;
 
   gsl_rng *rng;

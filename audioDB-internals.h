@@ -70,7 +70,7 @@ typedef struct adb_qpointers_internal {
 
 /* this struct is the in-memory representation of the binary
  * information stored at the head of each adb file */
-typedef struct adbheader {
+typedef struct adb_header {
   uint32_t magic;
   uint32_t version;
   uint32_t numFiles;
@@ -87,7 +87,7 @@ typedef struct adbheader {
   off_t dbSize;
 } adb_header_t;
 
-#define ADB_HEADER_SIZE (sizeof(struct adbheader))
+#define ADB_HEADER_SIZE (sizeof(struct adb_header))
 
 #define ADB_HEADER_FLAG_L2NORM		(0x1U)
 #define ADB_HEADER_FLAG_POWER		(0x4U)

@@ -64,12 +64,12 @@ typedef struct adb_result {
 #define ADB_REFINE_DURATION_RATIO 32
 #define ADB_REFINE_HOP_SIZE 64
 
-typedef struct adbkeylist {
+typedef struct adb_keylist {
   uint32_t nkeys;
   const char **keys;
 } adb_keylist_t;
 
-typedef struct adbqueryrefine {
+typedef struct adb_query_refine {
   uint32_t flags;
   adb_keylist_t include;
   adb_keylist_t exclude;
@@ -88,14 +88,14 @@ typedef struct adbqueryrefine {
 #define ADB_DISTANCE_EUCLIDEAN_NORMED 2
 #define ADB_DISTANCE_EUCLIDEAN 3
 
-typedef struct adbqueryparameters {
+typedef struct adb_query_parameters {
   uint32_t accumulation;
   uint32_t distance;
   uint32_t npoints;
   uint32_t ntracks;
 } adb_query_parameters_t;
 
-typedef struct adbqueryresults {
+typedef struct adb_query_results {
   uint32_t nresults;
   adb_result_t *results;
 } adb_query_results_t;
@@ -103,25 +103,25 @@ typedef struct adbqueryresults {
 #define ADB_QID_FLAG_EXHAUSTIVE 1
 #define ADB_QID_FLAG_ALLOW_FALSE_POSITIVES 2
 
-typedef struct adbqueryid {
+typedef struct adb_queryid {
   adb_datum_t *datum;
   uint32_t sequence_length;
   uint32_t flags;
   uint32_t sequence_start;
 } adb_query_id_t;
 
-typedef struct adbqueryspec {
+typedef struct adb_query_spec {
   adb_query_id_t qid;
   adb_query_parameters_t params;
   adb_query_refine_t refine;
 } adb_query_spec_t;
 
-typedef struct adbtrackentry {
+typedef struct adb_track_entry {
   uint32_t nvectors;
   const char *key;
 } adb_track_entry_t;
 
-typedef struct adblisztresults {
+typedef struct adb_liszt_results {
   uint32_t nresults;
   adb_track_entry_t *entries;
 } adb_liszt_results_t;
