@@ -341,7 +341,13 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
       query_from_key = true;
       key = args_info.key_arg;
     }
-    
+    if(!args_info.exhaustive_flag){
+      queryPoint = args_info.qpoint_arg;
+      usingQueryPoint=1;
+      if(queryPoint<0 || queryPoint >O2_MAX_VECTORS)
+        error("queryPoint out of range: 0 <= queryPoint <= O2_MAX_VECTORS");
+    }
+
 
     return 0;
   }
@@ -1072,7 +1078,6 @@ void audioDB::sample(const char *dbName) {
   if(query_from_key) {
     datum.key = key;
     spec.qid.datum = &datum;
-    spec.qid.flags |= ADB_QID_FLAG_EXHAUSTIVE;
     spec.refine.flags |= ADB_REFINE_EXCLUDE_KEYLIST;
     spec.refine.exclude.nkeys = 1;
     spec.refine.exclude.keys = &key;
