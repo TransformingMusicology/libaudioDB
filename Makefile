@@ -16,8 +16,8 @@ BINDIR=$(EXEC_PREFIX)/bin
 INCLUDEDIR=$(PREFIX)/include
 MANDIR=$(PREFIX)/share/man
 
-LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o index-utils.o query-indexed.o liszt.o retrieve.o lshlib.o
-OBJS=$(LIBOBJS) index.o soap.o sample.o cmdline.o audioDB.o common.o
+LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o index-utils.o query-indexed.o liszt.o retrieve.o lshlib.o sample.o
+OBJS=$(LIBOBJS) index.o soap.o cmdline.o audioDB.o common.o
 
 EXECUTABLE=audioDB
 
@@ -75,7 +75,7 @@ $(EXECUTABLE): $(OBJS) soapServer.cpp soapClient.cpp soapC.cpp
 	$(CXX) -o $(EXECUTABLE) $(CFLAGS) $^ $(LIBGSL) $(GSOAP_INCLUDE) $(GSOAP_CPP)
 
 $(LIBRARY): $(LIBOBJS)
-	$(CXX) $(SHARED_LIB_FLAGS) -o $(LIBRARY) $(CFLAGS) $^
+	$(CXX) $(SHARED_LIB_FLAGS) -o $(LIBRARY) $(LIBGSL) $(CFLAGS) $^
 
 tags:
 	ctags *.cpp *.h
