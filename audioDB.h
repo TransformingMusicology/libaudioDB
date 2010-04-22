@@ -279,6 +279,7 @@ class audioDB{
   void create(const char* dbName);
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
+  void datumFromFiles(adb_datum_t *datum);
   void query(const char* dbName, const char* inFile, struct soap *soap=0, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
 

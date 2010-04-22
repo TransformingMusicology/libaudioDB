@@ -1,6 +1,8 @@
 #include "audioDB.h"
 #include "reporter.h"
 
+#include <gsl/gsl_sf.h>
+
 char* SERVER_ADB_ROOT;
 char* SERVER_ADB_FEATURE_ROOT;
 
@@ -340,6 +342,8 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     if(args_info.key_given) {
       query_from_key = true;
       key = args_info.key_arg;
+    } else if (args_info.features_given) {
+      inFile = args_info.features_arg;
     }
     if(!args_info.exhaustive_flag){
       queryPoint = args_info.qpoint_arg;
@@ -779,6 +783,44 @@ void audioDB::batchinsert(const char* dbName, const char* inFile) {
   status(dbName);
 }
 
+void audioDB::datumFromFiles(adb_datum_t *datum) {
+  int fd;
+  struct stat st;
+
+  /* FIXME: around here error conditions will cause all sorts of
+     hideous leaks. */
+  fd = open(inFile, O_RDONLY);
+  if(fd < 0) {
+    error("failed to open feature file", inFile);
+  }
+  fstat(fd, &st);
+  read(fd, &(datum->dim), sizeof(uint32_t));
+  datum->nvectors = (st.st_size - sizeof(uint32_t)) / (datum->dim * sizeof(double));
+  datum->data = (double *) malloc(st.st_size - sizeof(uint32_t));
+  read(fd, datum->data, st.st_size - sizeof(uint32_t));
+  close(fd);
+  if(usingPower) {
+    uint32_t one;
+    fd = open(powerFileName, O_RDONLY);
+    if(fd < 0) {
+      error("failed to open power file", powerFileName);
+    }
+    read(fd, &one, sizeof(uint32_t));
+    if(one != 1) {
+      error("malformed power file dimensionality", powerFileName);
+    }
+    datum->power = (double *) malloc(datum->nvectors * sizeof(double));
+    if(read(fd, datum->power, datum->nvectors * sizeof(double)) != (ssize_t) (datum->nvectors * sizeof(double))) {
+      error("malformed power file", powerFileName);
+    }
+    close(fd);
+  }
+  if(usingTimes) {
+    datum->times = (double *) malloc(2 * datum->nvectors * sizeof(double));
+    insertTimeStamps(datum->nvectors, timesFile, datum->times);
+  }
+}
+
 void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, adb__queryResponse *adbQueryResponse) {
 
   if(!adb) {
@@ -847,41 +889,7 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
   if(query_from_key) {
     datum.key = key;
   } else {
-    int fd;
-    struct stat st;
-
-    /* FIXME: around here error conditions will cause all sorts of
-       hideous leaks. */
-    fd = open(inFile, O_RDONLY);
-    if(fd < 0) {
-      error("failed to open feature file", inFile);
-    }
-    fstat(fd, &st);
-    read(fd, &datum.dim, sizeof(uint32_t));
-    datum.nvectors = (st.st_size - sizeof(uint32_t)) / (datum.dim * sizeof(double));
-    datum.data = (double *) malloc(st.st_size - sizeof(uint32_t));
-    read(fd, datum.data, st.st_size - sizeof(uint32_t));
-    close(fd);
-    if(usingPower) {
-      uint32_t one;
-      fd = open(powerFileName, O_RDONLY);
-      if(fd < 0) {
-        error("failed to open power file", powerFileName);
-      }
-      read(fd, &one, sizeof(uint32_t));
-      if(one != 1) {
-        error("malformed power file dimensionality", powerFileName);
-      }
-      datum.power = (double *) malloc(datum.nvectors * sizeof(double));
-      if(read(fd, datum.power, datum.nvectors * sizeof(double)) != (ssize_t) (datum.nvectors * sizeof(double))) {
-        error("malformed power file", powerFileName);
-      }
-      close(fd);
-    }
-    if(usingTimes) {
-      datum.times = (double *) malloc(2 * datum.nvectors * sizeof(double));
-      insertTimeStamps(datum.nvectors, timesFile, datum.times);
-    }
+    datumFromFiles(&datum);
   }
 
   qspec.qid.datum = &datum;
@@ -1015,8 +1023,6 @@ void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, stru
   audiodb_liszt_free_results(adb, results);  
 }
 
-#include <gsl/gsl_sf.h>
-
 static
 double yfun(double d) {
   return gsl_sf_log(d) - gsl_sf_psi(d);
@@ -1082,7 +1088,8 @@ void audioDB::sample(const char *dbName) {
     spec.refine.exclude.nkeys = 1;
     spec.refine.exclude.keys = &key;
   } else if(inFile) {
-    error("sample from feature file not supported (yet)");
+    datumFromFiles(&datum);
+    spec.qid.datum = &datum;
   } else {
     spec.qid.datum = NULL; /* full db sample */
   }
@@ -1096,6 +1103,19 @@ void audioDB::sample(const char *dbName) {
 
   if(!(results = audiodb_sample_spec(adb, &spec))) {
     error("error in audiodb_sample_spec");
+  }
+
+  if(datum.data) {
+    free(datum.data);
+    datum.data = NULL;
+  }
+  if(datum.power) {
+    free(datum.power);
+    datum.power = NULL;
+  }
+  if(datum.times) {
+    free(datum.times);
+    datum.times = NULL;
   }
 
   if(results->nresults != nsamples) {
