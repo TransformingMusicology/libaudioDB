@@ -147,8 +147,6 @@ void audioDB::cleanup() {
     munmap(powerFileNameTable, fileTableLength);
   if(reporter)
     delete reporter;
-  if(rng)
-    gsl_rng_free(rng);
   if(infid>0) {
     close(infid);
     infid = 0;
@@ -846,7 +844,8 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     int fd;
     struct stat st;
 
-    /* FIXME: around here there are all sorts of hideous leaks. */
+    /* FIXME: around here error conditions will cause all sorts of
+       hideous leaks. */
     fd = open(inFile, O_RDONLY);
     if(fd < 0) {
       error("failed to open feature file", inFile);
@@ -1009,6 +1008,150 @@ void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, stru
   }
   audiodb_liszt_free_results(adb, results);  
 }
+
+#include <gsl/gsl_sf.h>
+
+static
+double yfun(double d) {
+  return gsl_sf_log(d) - gsl_sf_psi(d);
+}
+
+static
+double yinv(double y) {
+  double a = 1.0e-5;
+  double b = 1000.0;
+
+  double ay = yfun(a);
+  double by = yfun(b);
+
+  double c = 0;
+  double cy;
+
+  /* FIXME: simple binary search; there's probably some clever solver
+     in gsl somewhere which is less sucky. */
+  while ((b - a) > 1.0e-5) {
+    c = (a + b) / 2;
+    cy = yfun(c);
+    if (cy > y) {
+      a = c;
+      ay = cy;
+    } else {
+      b = c;
+      by = cy;
+    }
+  }
+
+  return c;
+}
+
+void audioDB::sample(const char *dbName) {
+  if(!adb) {
+    if(!(adb = audiodb_open(dbName, O_RDONLY))) {
+      error("failed to open database", dbName);
+    }
+  }
+
+  adb_status_t status;
+  if(audiodb_status(adb, &status)) {
+    error("error getting status");
+  }
+
+  double sumdist = 0;
+  double sumlogdist = 0;
+
+  adb_query_results_t *results;
+  adb_query_spec_t spec = {{0},{0},{0}};
+  adb_datum_t datum = {0};
+
+  spec.refine.qhopsize = sequenceHop;
+  spec.refine.ihopsize = sequenceHop;
+  if(sequenceHop != 1) {
+    spec.refine.flags |= ADB_REFINE_HOP_SIZE;
+  }
+
+  if(query_from_key) {
+    datum.key = key;
+    spec.qid.datum = &datum;
+    spec.qid.flags |= ADB_QID_FLAG_EXHAUSTIVE;
+    spec.refine.flags |= ADB_REFINE_EXCLUDE_KEYLIST;
+    spec.refine.exclude.nkeys = 1;
+    spec.refine.exclude.keys = &key;
+  } else if(inFile) {
+    error("sample from feature file not supported (yet)");
+  } else {
+    spec.qid.datum = NULL; /* full db sample */
+  }
+  spec.qid.sequence_length = sequenceLength;
+  spec.qid.flags |= usingQueryPoint ? 0 : ADB_QID_FLAG_EXHAUSTIVE;
+  spec.qid.sequence_start = queryPoint;
+
+  spec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
+  spec.params.accumulation = ADB_ACCUMULATION_DB;
+  spec.params.npoints = nsamples;
+
+  if(!(results = audiodb_sample_spec(adb, &spec))) {
+    error("error in audiodb_sample_spec");
+  }
+
+  if(results->nresults != nsamples) {
+    error("mismatch in sample count");
+  }
+
+  for(uint32_t i = 0; i < nsamples; i++) {
+    double d = results->results[i].dist;
+    sumdist += d;
+    sumlogdist += log(d);
+  }
+
+  audiodb_query_free_results(adb, &spec, results);
+
+  unsigned total = 0;
+  unsigned count = 0;
+  adb_liszt_results_t *liszt;
+  if(!(liszt = audiodb_liszt(adb))) {
+    error("liszt failed");
+  }
+  for(uint32_t i = 0; i < liszt->nresults; i++) {
+    unsigned int prop = (liszt->entries[i].nvectors - sequenceLength)/sequenceHop + 1;
+    prop = prop > 0 ? prop : 0;
+    if (prop > 0) {
+      count++;
+    }
+    total += prop;
+  }
+
+  /* FIXME: the mean isn't really what we should be using here; it's
+     more a question of "how many independent sequences of length
+     sequenceLength are there in the database? */
+  unsigned meanN = total / count;
+
+  double sigma2 = sumdist / (sequenceLength * status.dim * nsamples);
+  double d = 2 * yinv(log(sumdist/nsamples) - sumlogdist/nsamples);
+
+  std::cout << "Summary statistics" << std::endl;
+  std::cout << "number of samples: " << nsamples << std::endl;
+  std::cout << "sum of distances (S): " << sumdist << std::endl;
+  std::cout << "sum of log distances (L): " << sumlogdist << std::endl;
+
+  /* FIXME: we'll also want some more summary statistics based on
+     propTable, for the minimum-of-X estimate */
+  std::cout << "mean number of applicable sequences (N): " << meanN << std::endl;
+  std::cout << std::endl;
+  std::cout << "Estimated parameters" << std::endl;
+  std::cout << "sigma^2: " << sigma2 << "; ";
+  std::cout << "Msigma^2: " << sumdist / nsamples << std::endl;
+  std::cout << "d: " << d << std::endl;
+
+  double logw = (2 / d) * gsl_sf_log(-gsl_sf_log(0.99));
+  double logxthresh = gsl_sf_log(sumdist / nsamples) + logw
+    - (2 / d) * gsl_sf_log(meanN)
+    - gsl_sf_log(d/2)
+    - (2 / d) * gsl_sf_log(2 / d)
+    + (2 / d) * gsl_sf_lngamma(d / 2);
+
+  std::cout << "track xthresh: " << exp(logxthresh) << std::endl;
+}
+
 
 // This entry point is visited once per instance
 // so it is a good place to set any global state variables

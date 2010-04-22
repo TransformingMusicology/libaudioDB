@@ -21,7 +21,6 @@
 #include <assert.h>
 #include <float.h>
 #include <signal.h>
-#include <gsl/gsl_rng.h>
 
 // includes for LSH indexing
 extern "C" {
@@ -204,8 +203,6 @@ class audioDB{
   struct adb_header *dbH;
   struct adb *adb;
 
-  gsl_rng *rng;
-  
   char* fileTable;
   unsigned* trackTable;
   double* l2normTable;
@@ -264,7 +261,6 @@ class audioDB{
   void error(const char* a, const char* b = "", const char *sysFunc = 0) __attribute__ ((noreturn));
 
   void insertTimeStamps(unsigned n, std::ifstream* timesFile, double* timesdata);
-  void initRNG();
   void initDBHeader(const char *dbName);
   void initInputFile(const char *inFile);
   void initTables(const char* dbName, const char* inFile = 0);
@@ -347,7 +343,6 @@ class audioDB{
     infid(0),					\
     dbH(0),					\
     adb(0),                                     \
-    rng(0),                                     \
     fileTable(0),				\
     trackTable(0),				\
     l2normTable(0),				\

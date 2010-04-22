@@ -67,6 +67,31 @@ static int audiodb_collect_track_lengths(adb_t *adb) {
   return 1;
 }
 
+static int audiodb_init_rng(adb_t *adb) {
+  gsl_rng *rng = gsl_rng_alloc(gsl_rng_mt19937);
+  if(!rng) {
+    return 1;
+  }
+  /* FIXME: maybe we should use a real source of entropy? */
+  uint32_t seed = 0;
+#ifdef WIN32
+  seed = time(NULL);
+#else
+  struct timeval tv;
+  if(gettimeofday(&tv, NULL) == -1) {
+    return 1;
+  }
+  /* usec field should be less than than 2^20.  We want to mix the
+     usec field, highly-variable, into the high bits of the seconds
+     field, which will be static between closely-spaced runs.  -- CSR,
+     2010-01-05 */
+  seed = tv.tv_sec ^ (tv.tv_usec << 12);
+#endif
+  gsl_rng_set(rng, seed);
+  adb->rng = rng;
+  return 0;
+}
+
 adb_t *audiodb_open(const char *path, int flags) {
   adb_t *adb = 0;
   int fd = -1;
@@ -128,6 +153,9 @@ adb_t *audiodb_open(const char *path, int flags) {
     goto error;
   }
   adb->cached_lsh = 0;
+  if(audiodb_init_rng(adb)) {
+    goto error;
+  }
   return adb;
 
  error:
@@ -142,6 +170,9 @@ adb_t *audiodb_open(const char *path, int flags) {
     }
     if(adb->track_lengths) {
       delete adb->track_lengths;
+    }
+    if(adb->rng) {
+      gsl_rng_free(adb->rng);
     }
     free(adb);
   }

@@ -33,29 +33,6 @@ void audioDB::error(const char* a, const char* b, const char *sysFunc) {
     }
 }
 
-void audioDB::initRNG() {
-  rng = gsl_rng_alloc(gsl_rng_mt19937);
-  if(!rng) {
-    error("could not allocate Random Number Generator");
-  }
-  /* FIXME: maybe we should use a real source of entropy? */
-  uint32_t seed = 0;
-#ifdef WIN32
-  seed = time(NULL);
-#else
-  struct timeval tv;
-  if(gettimeofday(&tv, NULL) == -1) {
-    error("failed to get time of day");
-  }
-  /* usec field should be less than than 2^20.  We want to mix the
-     usec field, highly-variable, into the high bits of the seconds
-     field, which will be static between closely-spaced runs.  -- CSR,
-     2010-01-05 */
-  seed = tv.tv_sec ^ (tv.tv_usec << 12);
-#endif
-  gsl_rng_set(rng, seed);
-}
-
 void audioDB::initDBHeader(const char* dbName) {
   if(!adb) {
     adb = audiodb_open(dbName, forWrite ? O_RDWR : O_RDONLY);
@@ -140,13 +117,6 @@ void audioDB::initInputFile (const char *inFile) {
 }
 
 void audioDB::initTables(const char* dbName, const char* inFile) {
-  /* FIXME: initRNG() really logically belongs in the audioDB
-     contructor.  However, there are of the order of four constructors
-     at the moment, and more to come from API implementation.  Given
-     that duplication, I think this is the least worst place to put
-     it; the assumption is that nothing which doesn't look at a
-     database will need an RNG.  -- CSR, 2008-07-02 */
-  initRNG();
   initDBHeader(dbName);
   if(inFile)
     initInputFile(inFile);

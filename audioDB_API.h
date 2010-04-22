@@ -167,6 +167,9 @@ int audiodb_dump(adb_t *, const char *outputdir);
 adb_liszt_results_t *audiodb_liszt(adb_t *);
 int audiodb_liszt_free_results(adb_t *, adb_liszt_results_t *);
 
+/* sample */
+adb_query_results_t *audiodb_sample_spec(adb_t *, const adb_query_spec_t *);
+
 /* backwards compatibility */
 int audiodb_insert(adb_t *, adb_insert_t *ins);
 int audiodb_batchinsert(adb_t *, adb_insert_t *ins, unsigned int size);

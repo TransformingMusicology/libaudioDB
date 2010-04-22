@@ -6,6 +6,7 @@
 #endif
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include <stdio.h>
 #include <errno.h>
@@ -20,6 +21,8 @@
 #if defined(WIN32)
 #include <windows.h>
 #endif
+
+#include <gsl/gsl_rng.h>
 
 #include <algorithm>
 #include <iostream>
@@ -119,6 +122,7 @@ struct adb {
   std::vector<uint32_t> *track_lengths;
   std::vector<off_t> *track_offsets;
   LSH *cached_lsh;
+  gsl_rng *rng;
 };
 
 typedef struct {
@@ -374,6 +378,7 @@ vector<vector<float> > *audiodb_index_initialize_shingles(uint32_t, uint32_t, ui
 void audiodb_index_delete_shingles(vector<vector<float> > *);
 void audiodb_index_make_shingle(vector<vector<float> > *, uint32_t, double *, uint32_t, uint32_t);
 int audiodb_index_norm_shingles(vector<vector<float> > *, double *, double *, uint32_t, uint32_t, double, bool, bool, float);
+int audiodb_sample_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t *);
 
 #define ADB_MAXSTR (512U)
 #define ADB_FILETABLE_ENTRY_SIZE (256U)
