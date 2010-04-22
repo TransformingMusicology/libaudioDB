@@ -35,56 +35,41 @@ adb_query_results_t *audiodb_sample_spec(adb_t *adb, const adb_query_spec_t *qsp
     }
   }
 
-  if(!(qspec->qid.datum)) {
-    switch(qspec->params.distance) {
-    case ADB_DISTANCE_DOT_PRODUCT:
+  /* FIXME: this paragraph is the same as in audiodb_query_spec(). */
+  switch(qspec->params.distance) {
+  case ADB_DISTANCE_DOT_PRODUCT:
+    switch(qspec->params.accumulation) {
+    case ADB_ACCUMULATION_DB:
       qstate.accumulator = new DBAccumulator<adb_result_dist_gt>(qspec->params.npoints);
       break;
-    case ADB_DISTANCE_EUCLIDEAN_NORMED:
-    case ADB_DISTANCE_EUCLIDEAN:
+    case ADB_ACCUMULATION_PER_TRACK:
+      qstate.accumulator = new PerTrackAccumulator<adb_result_dist_gt>(qspec->params.npoints, qspec->params.ntracks);
+      break;
+    case ADB_ACCUMULATION_ONE_TO_ONE:
+      qstate.accumulator = new NearestAccumulator<adb_result_dist_gt>();
+      break;
+    default:
+      goto error;
+    }
+    break;
+  case ADB_DISTANCE_EUCLIDEAN_NORMED:
+  case ADB_DISTANCE_EUCLIDEAN:
+    switch(qspec->params.accumulation) {
+    case ADB_ACCUMULATION_DB:
       qstate.accumulator = new DBAccumulator<adb_result_dist_lt>(qspec->params.npoints);
       break;
-    default:
-      goto error;
-    }
-  } else {
-    /* FIXME: this paragraph is the same as in audiodb_query_spec(),
-     apart from only being taken in one branch */
-    switch(qspec->params.distance) {
-    case ADB_DISTANCE_DOT_PRODUCT:
-      switch(qspec->params.accumulation) {
-      case ADB_ACCUMULATION_DB:
-        qstate.accumulator = new DBAccumulator<adb_result_dist_gt>(qspec->params.npoints);
-        break;
-      case ADB_ACCUMULATION_PER_TRACK:
-        qstate.accumulator = new PerTrackAccumulator<adb_result_dist_gt>(qspec->params.npoints, qspec->params.ntracks);
-        break;
-      case ADB_ACCUMULATION_ONE_TO_ONE:
-        qstate.accumulator = new NearestAccumulator<adb_result_dist_gt>();
-        break;
-      default:
-        goto error;
-      }
+    case ADB_ACCUMULATION_PER_TRACK:
+      qstate.accumulator = new PerTrackAccumulator<adb_result_dist_lt>(qspec->params.npoints, qspec->params.ntracks);
       break;
-    case ADB_DISTANCE_EUCLIDEAN_NORMED:
-    case ADB_DISTANCE_EUCLIDEAN:
-      switch(qspec->params.accumulation) {
-      case ADB_ACCUMULATION_DB:
-        qstate.accumulator = new DBAccumulator<adb_result_dist_lt>(qspec->params.npoints);
-        break;
-      case ADB_ACCUMULATION_PER_TRACK:
-        qstate.accumulator = new PerTrackAccumulator<adb_result_dist_lt>(qspec->params.npoints, qspec->params.ntracks);
-        break;
-      case ADB_ACCUMULATION_ONE_TO_ONE:
-        qstate.accumulator = new NearestAccumulator<adb_result_dist_lt>();
-        break;
-      default:
-        goto error;
-      }
-     break;
+    case ADB_ACCUMULATION_ONE_TO_ONE:
+      qstate.accumulator = new NearestAccumulator<adb_result_dist_lt>();
+      break;
     default:
       goto error;
     }
+    break;
+  default:
+    goto error;
   }
 
   if(audiodb_sample_loop(adb, qspec, &qstate)) {

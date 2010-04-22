@@ -1119,6 +1119,7 @@ void audioDB::sample(const char *dbName) {
     }
     total += prop;
   }
+  audiodb_liszt_free_results(adb, liszt);
 
   /* FIXME: the mean isn't really what we should be using here; it's
      more a question of "how many independent sequences of length
