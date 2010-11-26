@@ -11,13 +11,37 @@
 #ifndef __LSHLIB_H
 #define __LSHLIB_H
 
-using namespace std;
+#include <vector>
+#include <queue>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <string.h>
+#include <iostream>
+#include <fstream>
+#include <math.h>
+#include <sys/time.h>
+#include <assert.h>
+#include <float.h>
+#include <signal.h>
+#include <time.h>
+#include <limits.h>
+#include <errno.h>
+#ifdef MT19937
+#include "mt19937/mt19937ar.h"
+#endif
+#include "multiprobe.h"
 
 #define IntT int
 #define LongUns64T long long unsigned
 #define Uns32T unsigned
 #define Int32T int
 #define BooleanT int
+#define TRUE 1
+#define FALSE 0
 
 // A big number (>> max #  of points)
 #define INDEX_START_EMPTY 1000000000U
@@ -55,7 +79,7 @@ using namespace std;
 
 #define O2_INDEX_MAXSTR (256)
 
-#define align_up(x,w) (((x) + ((1<<w)-1)) & ~((1<<w)-1))
+unsigned align_up(unsigned x, unsigned w);
 
 #define O2_SERIAL_FUNCTIONS_SIZE (align_up(sizeof(float) * O2_SERIAL_MAX_TABLES * O2_SERIAL_MAX_FUNS * O2_SERIAL_MAX_DIM \
 + sizeof(float) * O2_SERIAL_MAX_TABLES * O2_SERIAL_MAX_FUNS + \
@@ -71,6 +95,7 @@ using namespace std;
   fclose(dbFile);error("write error in serial_write_format2",TOKENSTR);}	
 
 //#define LSH_DUMP_CORE_TABLES  // set to dump hashtables on load
+//#define _LSH_DEBUG_             // turn on debugging information
 //#define USE_U_FUNCTIONS       // set to use partial hashfunction re-use
 
 // Backward-compatible CORE ARRAY lsh index
@@ -84,7 +109,13 @@ using namespace std;
 
 #define LSH_CORE_ARRAY_BIT (0x80000000) //  LSH_CORE_ARRAY test bit for list head
 
+#ifndef LSH_MULTI_PROBE_COUNT
+#define LSH_MULTI_PROBE_COUNT 1 // How many adjacent hash-buckets to probe in LSH retrieval
+#endif
+
 Uns32T get_page_logn();
+
+using namespace std;
 
 // Disk table entry
 typedef class SerialElement SerialElementT;
@@ -202,10 +233,12 @@ class H{
   Uns32T bucketCount;  // count of number of point buckets allocated
   Uns32T pointCount;    // count of number of points inserted
   Uns32T collisionCount; // number of points collided in a hash-table row
+  Uns32T tablesPointCount; // count of points per hash table on load
 
   Uns32T t1;       // first hash table key
   Uns32T t2;       // second hash table key
   Uns32T P;        // hash table prime number
+
 
   Uns32T N; // num rows per table
   Uns32T C; // num collision per row
@@ -216,6 +249,9 @@ class H{
   Uns32T p; // current point
   float w;     // width of hash slots (relative to normalized feature space)
   float radius;// scaling coefficient for data (1./radius)
+
+  MultiProbe* multiProbePtr; // Utility class for handling multi-probe queries
+  float ** boundaryDistances; // Array of query bucket-boundary-distances per hashtable
 
   void initialize_data_structures();
   void initialize_lsh_functions();
@@ -250,6 +286,7 @@ class H{
   // Interface to hash functions
   void compute_hash_functions(vector<float>& v);
   void generate_hash_keys(Uns32T* g, Uns32T* r1, Uns32T* r2);
+  void generate_multiprobe_keys(Uns32T*g, Uns32T* r1, Uns32T* r2);
   Uns32T get_t1(){return t1;} // hash-key t1
   Uns32T get_t2(){return t2;} // hash-key t2
 };
@@ -267,6 +304,8 @@ class G: public H{
   void release_lock(int fd);
   int serial_create(char* filename, Uns32T FMT);
   int serial_create(char* filename, float binWidth, Uns32T nTables, Uns32T nRows, Uns32T nCols, Uns32T k, Uns32T d, Uns32T FMT);
+  char* serial_mmap(int dbfid, Uns32T sz, Uns32T w, off_t offset = 0);
+  void serial_munmap(char* db, Uns32T N);
   int serial_open(char* filename,int writeFlag);
   void serial_close(int dbfid);
 
@@ -306,10 +345,7 @@ class G: public H{
   float* get_serial_hashfunction_base(char* db);
   SerialElementT* get_serial_hashtable_base(char* db);  
   Uns32T get_serial_hashtable_offset();                   // Size of SerialHeader + HashFunctions
-  SerialHeaderT* serial_get_header(int fd);
-  void serial_write_header(int fd, SerialHeaderT *header);
-  void serial_get_table(int, int, void *, size_t);
-  void serial_write_table(int, int, void *, size_t);
+  SerialHeaderT* serial_get_header(char* db);
   SerialHeaderT* lshHeader;
 
   // Core Retrieval/Inspections Functions
@@ -354,7 +390,8 @@ class G: public H{
   float get_mean_collision_rate(){ return (float) pointCount / bucketCount ; }
   char* get_indexName(){return indexName;}
   void dump_hashtables();
-
+  void dump_core_row(Uns32T n);
+  void dump_disk_row(char*, Uns32T n);
 };
 
 typedef class G LSH;
