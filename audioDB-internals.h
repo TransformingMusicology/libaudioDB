@@ -18,6 +18,7 @@
 #include <math.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 #if defined(WIN32)
 #include <windows.h>
 #endif

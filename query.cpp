@@ -248,16 +248,16 @@ int audiodb_datum_qpointers(adb_datum_t *d, uint32_t sequence_length, double **v
   qpointers->nvectors = nvectors;
 
   size_t vector_size = nvectors * sizeof(double) * d->dim;
-  *vector_data = new double[vector_size];
+  *vector_data = new double[vector_size / sizeof(double) ];
   memcpy(*vector_data, d->data, vector_size);
 
-  qpointers->l2norm_data = new double[vector_size / d->dim];
+  qpointers->l2norm_data = new double[vector_size / (sizeof(double)*d->dim)];
   audiodb_l2norm_buffer(*vector_data, d->dim, nvectors, qpointers->l2norm_data);
   audiodb_sequence_sum(qpointers->l2norm_data, nvectors, sequence_length);
   audiodb_sequence_sqrt(qpointers->l2norm_data, nvectors, sequence_length);
 
   if(d->power) {
-    qpointers->power_data = new double[vector_size / d->dim];
+    qpointers->power_data = new double[vector_size / (sizeof(double)*d->dim)];
     memcpy(qpointers->power_data, d->power, vector_size / d->dim);
     audiodb_sequence_sum(qpointers->power_data, nvectors, sequence_length);
     audiodb_sequence_average(qpointers->power_data, nvectors, sequence_length);
