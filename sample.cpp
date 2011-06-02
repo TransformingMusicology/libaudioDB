@@ -104,6 +104,7 @@ uint32_t audiodb_random_track(adb_t *adb, uint32_t *propTable, unsigned total) {
     }
   }
   /* can't happen */
+  printf("sofar: %d; total: %d; thing: %f\n", sofar, total, thing);
   return (uint32_t) -1;
 }
 
@@ -188,11 +189,11 @@ int audiodb_sample_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_int
   for(uint32_t i = 0; i < adb->header->numFiles; i++) {
     uint32_t prev = i == 0 ? 0 : props[i-1];
     if(qstate->allowed_keys->find((*adb->keys)[i]) == keys_end) {
-      props[i] = prev;
+      props[i] = 0;
     } else {
       uint32_t add = (*adb->track_lengths)[i] - spec->qid.sequence_length + 1;
-      props[i] = prev + add > 0 ? add : 0;
-      total += add;
+      props[i] = add > 0 ? add : 0;
+      total += props[i];
     }
   }
 
