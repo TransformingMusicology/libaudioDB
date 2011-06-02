@@ -187,11 +187,10 @@ int audiodb_sample_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_int
 
   std::set<std::string>::iterator keys_end = qstate->allowed_keys->end();
   for(uint32_t i = 0; i < adb->header->numFiles; i++) {
-    uint32_t prev = i == 0 ? 0 : props[i-1];
     if(qstate->allowed_keys->find((*adb->keys)[i]) == keys_end) {
       props[i] = 0;
     } else {
-      uint32_t add = (*adb->track_lengths)[i] - spec->qid.sequence_length + 1;
+      int32_t add = (*adb->track_lengths)[i] - spec->qid.sequence_length + 1;
       props[i] = add > 0 ? add : 0;
       total += props[i];
     }
