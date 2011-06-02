@@ -1137,7 +1137,7 @@ void audioDB::sample(const char *dbName) {
     error("liszt failed");
   }
   for(uint32_t i = 0; i < liszt->nresults; i++) {
-    unsigned int prop = (liszt->entries[i].nvectors - sequenceLength)/sequenceHop + 1;
+    int prop = (liszt->entries[i].nvectors - sequenceLength)/sequenceHop + 1;
     prop = prop > 0 ? prop : 0;
     if (prop > 0) {
       count++;
