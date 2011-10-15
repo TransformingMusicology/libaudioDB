@@ -88,6 +88,7 @@ typedef struct adb_query_refine {
 #define ADB_DISTANCE_DOT_PRODUCT 1
 #define ADB_DISTANCE_EUCLIDEAN_NORMED 2
 #define ADB_DISTANCE_EUCLIDEAN 3
+#define ADB_DISTANCE_KULLBACK_LEIBLER_DIVERGENCE 4
 
 typedef struct adb_query_parameters {
   uint32_t accumulation;

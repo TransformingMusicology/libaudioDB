@@ -272,6 +272,23 @@ static inline double audiodb_dot_product(double *p, double *q, size_t count) {
   return result;
 }
 
+static inline double audiodb_kullback_leibler(double *p, double *q, size_t count) {
+  double a,b, tmp1, tmp2, result = 0;
+  while(count--){
+    a = *p++;
+    b = *q++;    
+    tmp1 = a * log( a / b );
+    if(isnan(tmp1))
+      tmp1=0.0;
+    tmp2 = b * log( b / a );
+    if(isnan(tmp2))
+      tmp2=0.0;
+    result += ( tmp1 + tmp2 ) / 2.0;
+  }
+  return result;
+}
+
+
 static inline void audiodb_l2norm_buffer(double *d, size_t dim, size_t nvectors, double *l) {
   while(nvectors--) {
     double *d1 = d;
@@ -386,9 +403,9 @@ int audiodb_sample_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t
 #define ADB_TRACKTABLE_ENTRY_SIZE (sizeof(uint32_t))
 #define ADB_DISTANCE_TOLERANCE (1e-6)
 
-#define ADB_DEFAULT_DATASIZE (1355U) /* in MB */
-#define ADB_DEFAULT_NTRACKS (20000U)
-#define ADB_DEFAULT_DATADIM (9U)
+#define ADB_DEFAULT_DATASIZE (2000U) /* in MB */
+#define ADB_DEFAULT_NTRACKS (200000U)
+#define ADB_DEFAULT_DATADIM (12U)
 
 #define ADB_FIXME_LARGE_ADB_SIZE (ADB_DEFAULT_DATASIZE+1)
 #define ADB_FIXME_LARGE_ADB_NTRACKS (ADB_DEFAULT_NTRACKS+1)

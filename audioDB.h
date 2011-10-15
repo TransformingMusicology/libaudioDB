@@ -71,6 +71,7 @@ extern "C" {
 #define COM_EXHAUSTIVE "--exhaustive"
 #define COM_LSH_EXACT "--lsh_exact"
 #define COM_NO_UNIT_NORMING "--no_unit_norming"
+#define COM_DISTANCE_KULLBACK "--distance_kullback"
 
 #define O2_DEFAULT_POINTNN (10U)
 #define O2_DEFAULT_TRACKNN  (10U)
@@ -236,6 +237,7 @@ class audioDB{
   unsigned sequenceHop;
   bool normalizedDistance;
   bool no_unit_norming;
+  bool distance_kullback;
   unsigned queryPoint;
   unsigned usingQueryPoint;
   unsigned usingTimes;
@@ -369,6 +371,7 @@ class audioDB{
     sequenceHop(1),				\
     normalizedDistance(true),			\
     no_unit_norming(false),                     \
+    distance_kullback(false),                   \
     queryPoint(0),				\
     usingQueryPoint(0),				\
     usingTimes(0),				\

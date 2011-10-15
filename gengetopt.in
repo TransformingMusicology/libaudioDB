@@ -80,6 +80,7 @@ option "lsh_use_u_functions" - "use m independent hash functions combinatoricall
 section "Normalization control parameters" sectiondesc="These parameters control the normalization of feaures at query time\n"
 
 option "no_unit_norming" - "do not unit norm features when querying an L2Norm databases." flag off
+option "distance_kullback" - "use symmetric kullback divergence for distance function" flag off
 
 section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
 

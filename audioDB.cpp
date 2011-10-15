@@ -447,6 +447,7 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
   }
 
   // Set no_unit_norm flag  
+  distance_kullback = args_info.distance_kullback_flag;
   no_unit_norming = args_info.no_unit_norming_flag;
   lsh_use_u_functions = args_info.lsh_use_u_functions_flag;
 
@@ -919,7 +920,10 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
   case O2_SEQUENCE_QUERY:
   case O2_N_SEQUENCE_QUERY:
     qspec.params.accumulation = ADB_ACCUMULATION_PER_TRACK;
-    qspec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
+    if (distance_kullback)
+      qspec.params.distance = ADB_DISTANCE_KULLBACK_LEIBLER_DIVERGENCE;
+    else
+      qspec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
     qspec.params.npoints = pointNN;
     qspec.params.ntracks = trackNN;
     switch(queryType) {
@@ -941,7 +945,10 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     break;
   case O2_ONE_TO_ONE_N_SEQUENCE_QUERY:
     qspec.params.accumulation = ADB_ACCUMULATION_ONE_TO_ONE;
-    qspec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
+    if (distance_kullback)
+      qspec.params.distance = ADB_DISTANCE_KULLBACK_LEIBLER_DIVERGENCE;
+    else
+      qspec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
     qspec.params.npoints = 0;
     qspec.params.ntracks = 0;
     if(!(qspec.refine.flags & ADB_REFINE_RADIUS)) {
@@ -1096,8 +1103,10 @@ void audioDB::sample(const char *dbName) {
   spec.qid.sequence_length = sequenceLength;
   spec.qid.flags |= usingQueryPoint ? 0 : ADB_QID_FLAG_EXHAUSTIVE;
   spec.qid.sequence_start = queryPoint;
-
-  spec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
+  if (distance_kullback)
+    spec.params.distance = ADB_DISTANCE_KULLBACK_LEIBLER_DIVERGENCE;
+  else
+    spec.params.distance = no_unit_norming ? ADB_DISTANCE_EUCLIDEAN : ADB_DISTANCE_EUCLIDEAN_NORMED;
   spec.params.accumulation = ADB_ACCUMULATION_DB;
   spec.params.npoints = nsamples;
 
