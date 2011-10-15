@@ -1,7 +1,7 @@
 HELP2MAN=help2man
 GENGETOPT=gengetopt
 SOAPCPP2=soapcpp2
-GSOAP_INCLUDE=-I$(HOME)/src/gsoap-2.8/gsoap -L$(HOME)/src/gsoap-2.8/gsoap
+GSOAP_INCLUDE=$(shell pkg-config --cflags gsoap++)
 GSOAP_CPP=$(shell pkg-config --libs gsoap++)
 GSL_INCLUDE=$(shell pkg-config --cflags gsl)
 LIBGSL=$(shell pkg-config --libs gsl)
@@ -26,11 +26,7 @@ MINORVERSION=0
 LIBRARY=lib$(EXECUTABLE).so.$(SOVERSION).$(MINORVERSION)
 SHARED_LIB_FLAGS=-shared -Wl,-soname,lib$(EXECUTABLE).so.$(SOVERSION)
 
-# set for production operation
 override CFLAGS+=-g -O3 -fPIC 
-
-# set for debug operation
-#override CFLAGS+=-ggdb -DDEBUG -fPIC
 
 # set to generate profile (gprof) and coverage (gcov) info
 #override CFLAGS+=-fprofile-arcs -ftest-coverage -pg
