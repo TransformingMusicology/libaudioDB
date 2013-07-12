@@ -403,9 +403,9 @@ int audiodb_sample_loop(adb_t *, const adb_query_spec_t *, adb_qstate_internal_t
 #define ADB_TRACKTABLE_ENTRY_SIZE (sizeof(uint32_t))
 #define ADB_DISTANCE_TOLERANCE (1e-6)
 
-#define ADB_DEFAULT_DATASIZE (2000U) /* in MB */
-#define ADB_DEFAULT_NTRACKS (200000U)
-#define ADB_DEFAULT_DATADIM (12U)
+#define ADB_DEFAULT_DATASIZE (1355U) /* in MB */
+#define ADB_DEFAULT_NTRACKS (20000U)
+#define ADB_DEFAULT_DATADIM (9U)
 
 #define ADB_FIXME_LARGE_ADB_SIZE (ADB_DEFAULT_DATASIZE+1)
 #define ADB_FIXME_LARGE_ADB_NTRACKS (ADB_DEFAULT_NTRACKS+1)

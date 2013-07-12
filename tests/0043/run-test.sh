@@ -4,6 +4,8 @@
 
 if [ -f testdb ]; then rm -f testdb; fi
 
+. clean.sh
+
 # Directories to store database / features
 DBDIR=dbdir
 FDIR=fdir
