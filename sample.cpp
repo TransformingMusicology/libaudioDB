@@ -260,6 +260,8 @@ int audiodb_sample_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_int
     if(isfinite(v1norm) && isfinite(v2norm) && isfinite(v1v2)) {
       switch(spec->params.distance) {
       case ADB_DISTANCE_EUCLIDEAN_NORMED:
+        if(v1norm == 0 || v2norm == 0)
+          continue;
         dist = 2 - 2 * v1v2 / sqrt(v1norm * v2norm);
         break;
       case ADB_DISTANCE_EUCLIDEAN:
