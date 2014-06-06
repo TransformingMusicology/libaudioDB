@@ -264,6 +264,14 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     relative_threshold = args_info.relative_threshold_arg;
   }
 
+  if (args_info.rotate_given) {
+    use_rotate = true;
+    if (args_info.rotate_arg < -1) {
+      error("rotate out of range: should be -1 or greater");
+    }
+    rotate = args_info.rotate_arg;
+  }
+
   if (args_info.adb_root_given){
     adb_root = args_info.adb_root_arg;
   }
@@ -822,6 +830,31 @@ void audioDB::datumFromFiles(adb_datum_t *datum) {
   }
 }
 
+void audioDB::rotateDatum(adb_datum_t *datum, int amount) {
+  printf("amount: %d\n", amount);
+  printf("dim: %d\n", datum->dim);
+  if (!datum->data)
+    error("no data in datum to be rotated");
+  if (amount < - (int) (datum->dim))
+    error("silly value of rotation amount");
+  if (amount < 0)
+    amount += datum->dim;
+
+  amount = amount % datum->dim;
+  printf("amount: %d\n", amount);
+
+  double *buf = (double *) malloc(amount * sizeof(double));
+
+  for (uint32_t i = 0; i < datum->nvectors; i++) {
+    double *start = datum->data + i * datum->dim;
+    memcpy(buf, start, amount * sizeof(double));
+    memmove(start, start + amount, (datum->dim - amount) * sizeof(double));
+    memcpy(start + (datum->dim - amount), buf, amount * sizeof(double));
+  }
+
+  free(buf);
+}
+
 void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, adb__queryResponse *adbQueryResponse) {
 
   if(!adb) {
@@ -961,7 +994,54 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     error("unrecognized queryType");
   }
 
-  adb_query_results_t *rs = audiodb_query_spec(adb, &qspec);
+  adb_query_results_t *rs = NULL;
+  if(use_rotate) {
+    int rotate_min = 0;
+    int rotate_max = 0;
+    if(rotate == -1) {
+      adb_status_t s = {0};
+      audiodb_status(adb, &s);
+      rotate_min = 0;
+      rotate_max = s.dim - 1;
+    } else {
+      rotate_min = -rotate;
+      rotate_max = rotate;
+    }
+    adb_query_results_t *ors = NULL;
+    if(query_from_key) {
+      audiodb_retrieve_datum(adb, key, qspec.qid.datum);
+    }
+    rotateDatum(qspec.qid.datum, rotate_min);
+    const char *const sentinel = "";
+    for (int i = rotate_min; i <= rotate_max; i++) {
+      ors = rs;
+      rs = audiodb_query_spec_given_sofar(adb, &qspec, ors);
+      if(ors) {
+        audiodb_query_free_results(adb, &qspec, ors);
+      }
+      for(unsigned int k = 0; k < rs->nresults; k++) {
+        adb_result_t r = rs->results[k];
+        if (r.ikey != sentinel)
+          reporter->add_point(audiodb_key_index(adb, r.ikey), r.qpos, r.ipos, r.dist, i);
+      }
+      for(uint32_t j = 0; j < rs->nresults; j++) {
+        rs->results[j].ikey = sentinel;
+      }
+      rotateDatum(qspec.qid.datum, 1);
+    }
+  } else {
+    rs = audiodb_query_spec(adb, &qspec);
+
+    if(rs == NULL) {
+      error("audiodb_query_spec failed");
+    }
+
+    for(unsigned int k = 0; k < rs->nresults; k++) {
+      adb_result_t r = rs->results[k];
+      reporter->add_point(audiodb_key_index(adb, r.ikey), r.qpos, r.ipos, r.dist);
+    }
+    audiodb_query_free_results(adb, &qspec, rs);
+  }
 
   // FIXME: we don't yet free everything up if there are error
   // conditions during the construction of the query spec (including
@@ -979,17 +1059,7 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     datum.times = NULL;
   }
 
-  if(rs == NULL) {
-    error("audiodb_query_spec failed");
-  }
-
-  for(unsigned int k = 0; k < rs->nresults; k++) {
-    adb_result_t r = rs->results[k];
-    reporter->add_point(audiodb_key_index(adb, r.ikey), r.qpos, r.ipos, r.dist);
-  }
-  audiodb_query_free_results(adb, &qspec, rs);
-
-  reporter->report(adb, soap, adbQueryResponse);
+  reporter->report(adb, soap, adbQueryResponse, use_rotate);
 }
 
 void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, struct soap *soap, adb__lisztResponse* adbLisztResponse) {

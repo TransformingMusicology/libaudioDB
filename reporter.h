@@ -14,6 +14,7 @@ typedef struct nnresult {
   double dist;
   unsigned int qpos;
   unsigned int spos;
+  int rot;
 } NNresult;
 
 typedef struct radresult {
@@ -40,21 +41,21 @@ bool operator> (const Radresult &a, const Radresult &b) {
 class Reporter : public ReporterBase {
 public:
   virtual ~Reporter() {};
-  virtual void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) = 0;
+  virtual void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0) = 0;
   // FIXME: this interface is a bit wacky: a relic of previous, more
   // confused times.  Really it might make sense to have separate
   // reporter classes for WS and for stdout, rather than passing this
   // adbQueryResponse thing everywhere; the adb argument is there
   // solely for converting trackIDs into names.  -- CSR, 2007-12-10.
-  virtual void report(adb_t *adb, struct soap *soap, void* adbQueryResponse) = 0;
+  virtual void report(adb_t *adb, struct soap *soap, void* adbQueryResponse, bool report_rot = false) = 0;
 };
 
 template <class T> class pointQueryReporter : public Reporter {
 public:
   pointQueryReporter(unsigned int pointNN);
   ~pointQueryReporter();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, struct soap *soap, void* adbQueryResponse);
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
+  void report(adb_t *adb, struct soap *soap, void* adbQueryResponse, bool report_rot);
 private:
   unsigned int pointNN;
   std::priority_queue< NNresult, std::vector< NNresult >, T> *queue;
@@ -69,13 +70,14 @@ template <class T> pointQueryReporter<T>::~pointQueryReporter() {
   delete queue;
 }
 
-template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot) {
   if (!isnan(dist)) {
     NNresult r;
     r.trackID = trackID;
     r.qpos = qpos;
     r.spos = spos;
     r.dist = dist;
+    r.rot = rot;
     queue->push(r);
     if(queue->size() > pointNN) {
       queue->pop();
@@ -83,7 +85,7 @@ template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, u
   }
 }
 
-template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   NNresult r;
   std::vector<NNresult> v;
   unsigned int size = queue->size();
@@ -101,7 +103,10 @@ template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *s
 	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
-      std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
+      std::cout << r.dist << " " << r.qpos << " " << r.spos;
+      if(report_rot)
+        std::cout << " " << r.rot;
+      std::cout << std::endl;
     }
   } else {
     adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
@@ -132,8 +137,8 @@ template <class T> class trackAveragingReporter : public Reporter {
  public:
   trackAveragingReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackAveragingReporter();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -150,13 +155,14 @@ template <class T> trackAveragingReporter<T>::~trackAveragingReporter() {
   delete [] queues;
 }
 
-template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot) {
   if (!isnan(dist)) {
     NNresult r;
     r.trackID = trackID;
     r.qpos = qpos;
     r.spos = spos;
     r.dist = dist;
+    r.rot = rot;
     queues[trackID].push(r);
     if(queues[trackID].size() > pointNN) {
       queues[trackID].pop();
@@ -164,7 +170,7 @@ template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackI
   }
 }
 
-template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
@@ -209,7 +215,10 @@ template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soa
 	std::cout << audiodb_index_key(adb, r.trackID) << " ";
       else
 	std::cout << r.trackID << " ";
-      std::cout << r.dist << " " << r.qpos << " " << r.spos << std::endl;
+      std::cout << r.dist << " " << r.qpos << " " << r.spos;
+      if(report_rot)
+        std::cout << " " << r.rot;
+      std::cout << std::endl;
     }
   } else {
     adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
@@ -245,13 +254,13 @@ template <class T> class trackSequenceQueryNNReporter : public trackAveragingRep
   using trackAveragingReporter<T>::pointNN;
  public:
   trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
 };
 
 template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles)
 :trackAveragingReporter<T>(pointNN, trackNN, numFiles){}
 
-template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues 
     = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
@@ -270,6 +279,7 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, stru
         if (r.dist == oldr.dist) {
           r.qpos = oldr.qpos;
           r.spos = oldr.spos;
+          r.rot = oldr.rot;
         } else {
           oldr = r;
         }
@@ -312,7 +322,10 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, stru
       
       for(unsigned int k = 0; k < qsize; k++) {
 	rk = point_queue.top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
+        if(report_rot)
+          std::cout << " " << rk.rot;
+        std::cout << std::endl;
 	point_queue.pop();
       }
     }
@@ -414,8 +427,8 @@ class trackSequenceQueryRadReporter : public Reporter {
 public:
   trackSequenceQueryRadReporter(unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadReporter();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
  protected:
   unsigned int trackNN;
   unsigned int numFiles;
@@ -440,7 +453,7 @@ trackSequenceQueryRadReporter::~trackSequenceQueryRadReporter() {
   delete [] count;
 }
 
-void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot) {
   std::set<std::pair<unsigned int, unsigned int> >::iterator it;
   std::pair<unsigned int, unsigned int> pair = std::make_pair(trackID, qpos); // only count this once
   std::set<triple>::iterator it2;
@@ -457,12 +470,12 @@ void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int
     it = set->find(pair);
     if (it == set->end()) {
       set->insert(pair);
-      count[trackID]++; // only count if <tackID,qpos> pair is unique
+      count[trackID]++; // only count if <trackID,qpos> pair is unique
     }
   }
 }
 
-void trackSequenceQueryRadReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+void trackSequenceQueryRadReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -530,8 +543,8 @@ class trackSequenceQueryRadNNReporter : public Reporter {
 public:
   trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporter();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -562,7 +575,7 @@ trackSequenceQueryRadNNReporter::~trackSequenceQueryRadNNReporter() {
   delete [] count;
 }
 
-void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot) {
   std::set<std::pair<unsigned int, unsigned int> >::iterator it;
   std::set<triple>::iterator it2;
   std::pair<unsigned int, unsigned int> pair;
@@ -594,7 +607,7 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
   }
 }
 
-void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -631,12 +644,12 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void
       int qsize = point_queues[i].size();
       while(qsize--){
 	rk = point_queues[i].top();
-	rep->add_point(i, rk.qpos, rk.spos, rk.dist);
+	rep->add_point(i, rk.qpos, rk.spos, rk.dist, rk.rot);
 	point_queues[i].pop();
       }	
     }
     // Report
-    rep->report(adb, soap, adbQueryResponse);
+    rep->report(adb, soap, adbQueryResponse, report_rot);
     // Exit
     delete[] point_queues;
     return;
@@ -664,7 +677,10 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void
       }
       for(unsigned int k=0; k < qsize; k++){
 	rk = point_queue.top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos << std::endl;
+	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
+        if(report_rot) 
+          std::cout << " " << rk.rot;
+        std::cout << std::endl;
 	point_queue.pop();
       }
     }
@@ -729,8 +745,8 @@ class trackSequenceQueryRadNNReporterOneToOne : public Reporter {
 public:
   trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporterOneToOne();
-  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse);
+  void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
+  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -759,7 +775,7 @@ trackSequenceQueryRadNNReporterOneToOne::~trackSequenceQueryRadNNReporterOneToOn
   delete [] count;
 }
 
-void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist) {
+void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot) {
   std::set< NNresult >::iterator it;
   NNresult r;
 
@@ -778,7 +794,7 @@ void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, un
 
 }
 
-void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, struct soap *soap, void *adbQueryResponse) {
+void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
   if(adbQueryResponse==0) {
     std::vector< NNresult >::iterator vit;
     NNresult rk;
@@ -787,6 +803,8 @@ void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, struct soap *so
       std::cout << rk.dist << " " 
 		<< rk.qpos << " " 
 		<< rk.spos << " ";
+      if (report_rot)
+        std::cout << rk.rot << " ";
       if(adb)
 	std::cout << audiodb_index_key(adb, rk.trackID) << " ";
       else

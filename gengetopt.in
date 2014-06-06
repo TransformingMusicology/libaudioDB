@@ -57,7 +57,7 @@ option "exhaustive" e "exhaustive search: iterate through all query vectors in s
 option "pointnn" n "number of point nearest neighbours to use in retrieval." int typestr="numpoints" default="10" optional
 option "radius"  R "radius search, returns all points/tracks/sequences inside given radius. (Overrides --pointnn)." double default="1.0" optional 
 option "expandfactor" x "time compress/expand factor of result length to query length [1.0 .. 100.0]." double default="1.1" optional hidden
-option "rotate"       o "rotate query vectors for rotationally invariant search." flag off hidden
+option "rotate"       o "rotate query vectors for rotationally invariant search." int default="-1" typestr="max rotation" optional argoptional hidden
 option "resultlength" r "maximum length of the result list." int typestr="length" default="10" optional
 option "sequencelength" l "length of sequences for sequence search." int typestr="length" default="16" optional
 option "sequencehop" - "hop size of sequence window for sequence search." int typestr="hop" default="1" optional

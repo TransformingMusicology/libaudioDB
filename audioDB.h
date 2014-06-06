@@ -252,6 +252,8 @@ class audioDB{
   double absolute_threshold;
   bool use_relative_threshold;
   double relative_threshold;
+  bool use_rotate;
+  int rotate;
   
   ReporterBase* reporter;  // track/point reporter
 
@@ -282,6 +284,7 @@ class audioDB{
   void insert(const char* dbName, const char* inFile);
   void batchinsert(const char* dbName, const char* inFile);
   void datumFromFiles(adb_datum_t *datum);
+  void rotateDatum(adb_datum_t *datum, int amount);
   void query(const char* dbName, const char* inFile, struct soap *soap=0, adb__queryResponse *adbQueryResponse=0);
   void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
 
@@ -386,6 +389,8 @@ class audioDB{
     absolute_threshold(0.0),			\
     use_relative_threshold(false),		\
     relative_threshold(0.0),			\
+    use_rotate(false),                          \
+    rotate(0),                                  \
     reporter(0),                                \
     lisztOffset(0),                             \
     lisztLength(0),                             \
