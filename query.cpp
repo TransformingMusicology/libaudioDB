@@ -19,6 +19,10 @@ bool audiodb_powers_acceptable(const adb_query_refine_t *r, double p1, double p2
 }
 
 adb_query_results_t *audiodb_query_spec(adb_t *adb, const adb_query_spec_t *qspec) {
+  return audiodb_query_spec_given_sofar(adb, qspec, NULL);
+}
+
+adb_query_results_t *audiodb_query_spec_given_sofar(adb_t *adb, const adb_query_spec_t *qspec, const adb_query_results_t *sofar) {
   adb_qstate_internal_t qstate = {0};
   qstate.allowed_keys = new std::set<std::string>;
   adb_query_results_t *results;
@@ -72,6 +76,12 @@ adb_query_results_t *audiodb_query_spec(adb_t *adb, const adb_query_spec_t *qspe
     break;
   default:
     goto error;
+  }
+
+  if(sofar) {
+    for (uint32_t i = 0; i < sofar->nresults; i++) {
+      qstate.accumulator->add_point(&(sofar->results[i]));
+    }
   }
   
   if((qspec->refine.flags & ADB_REFINE_RADIUS) && audiodb_index_exists(adb->path, qspec->refine.radius, qspec->qid.sequence_length)) {

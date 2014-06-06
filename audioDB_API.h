@@ -150,8 +150,9 @@ int audiodb_power(adb_t *adb);
 int audiodb_insert_datum(adb_t *, const adb_datum_t *);
 int audiodb_insert_reference(adb_t *, const adb_reference_t *);
 
-/* query function */
+/* query functions */
 adb_query_results_t *audiodb_query_spec(adb_t *, const adb_query_spec_t *);
+adb_query_results_t *audiodb_query_spec_given_sofar(adb_t *, const adb_query_spec_t *, const adb_query_results_t *);
 int audiodb_query_free_results(adb_t *, const adb_query_spec_t *, adb_query_results_t *);
 
 /* database status */  
