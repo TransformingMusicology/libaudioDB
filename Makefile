@@ -80,16 +80,19 @@ $(LIBRARY): $(LIBOBJS)
 tags:
 	ctags *.cpp *.h
 
+testclean: 
+	-for d in $(TESTDIRS); do (cd $$d && sh ./clean.sh); done
 
-clean:
+bindingsclean:
+	-for d in $(BINDINGDIRS); do (cd $$d && $(MAKE) clean); done
+
+clean: testclean bindingsclean
 	-rm cmdline.c cmdline.h cmdline.o
 	-rm soapServer.cpp soapClient.cpp soapC.cpp soapObject.h soapStub.h soapProxy.h soapH.h soapServerLib.cpp soapClientLib.cpp
 	-rm adb.*
 	-rm HELP.txt
 	-rm $(EXECUTABLE) $(EXECUTABLE).1 $(OBJS)
 	-rm xthresh
-	-for d in $(TESTDIRS); do (cd $$d && sh ./clean.sh); done
-	-for d in $(BINDINGDIRS); do (cd $$d && $(MAKE) clean); done
 	-rm $(LIBRARY)
 	-rm tags
 
