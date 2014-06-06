@@ -831,8 +831,6 @@ void audioDB::datumFromFiles(adb_datum_t *datum) {
 }
 
 void audioDB::rotateDatum(adb_datum_t *datum, int amount) {
-  printf("amount: %d\n", amount);
-  printf("dim: %d\n", datum->dim);
   if (!datum->data)
     error("no data in datum to be rotated");
   if (amount < - (int) (datum->dim))
@@ -841,7 +839,6 @@ void audioDB::rotateDatum(adb_datum_t *datum, int amount) {
     amount += datum->dim;
 
   amount = amount % datum->dim;
-  printf("amount: %d\n", amount);
 
   double *buf = (double *) malloc(amount * sizeof(double));
 
