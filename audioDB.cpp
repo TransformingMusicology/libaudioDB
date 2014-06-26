@@ -919,8 +919,21 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
 
   if(query_from_key) {
     datum.key = key;
+    if(use_absolute_threshold || use_relative_threshold) {
+      if(!(adb->flags | ADB_HEADER_FLAG_POWER)) {
+        error("power threshold given but db has no power information");
+      }
+    }
   } else {
     datumFromFiles(&datum);
+    if(use_absolute_threshold || use_relative_threshold) {
+      if(!datum.power) {
+        error("power threshold but no powerfile given");
+      }
+      if(!(adb->flags | ADB_HEADER_FLAG_POWER)) {
+        error("power threshold given but db has no power information");
+      }
+    }
   }
 
   qspec.qid.datum = &datum;
