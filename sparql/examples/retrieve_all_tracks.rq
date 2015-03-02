@@ -1,8 +1,0 @@
-PREFIX mo: <http://purl.org/ontology/mo/>
-
-SELECT ?signal
-WHERE
-{
-        ?signal a mo:Signal.
-}
-
