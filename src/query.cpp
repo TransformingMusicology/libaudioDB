@@ -1,8 +1,8 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
-#include "accumulators.h"
+#include "audioDB/audioDB-internals.h"
+#include "audioDB/accumulators.h"
 
 bool audiodb_powers_acceptable(const adb_query_refine_t *r, double p1, double p2) {
   if (r->flags & ADB_REFINE_ABSOLUTE_THRESHOLD) {

@@ -1,10 +1,10 @@
-#include "audioDB.h"
+#include "audioDB/audioDB.h"
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
-#include "accumulators.h"
+#include "audioDB/accumulators.h"
 
 static NearestAccumulator<adb_result_dist_lt> *foo = new NearestAccumulator<adb_result_dist_lt>();
 

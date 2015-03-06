@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 static bool audiodb_enough_data_space_free(adb_t *adb, off_t size) {
   adb_header_t *header = adb->header;

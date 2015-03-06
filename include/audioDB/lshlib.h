@@ -35,7 +35,7 @@
 #ifdef MT19937
 #include "mt19937/mt19937ar.h"
 #endif
-#include "multiprobe.h"
+#include "audioDB/multiprobe.h"
 
 #define IntT int
 #define LongUns64T long long unsigned

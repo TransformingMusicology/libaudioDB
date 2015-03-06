@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 static int audiodb_l2norm_existing(adb_t *adb) {
   double *data_buffer = 0, *l2norm_buffer = 0;

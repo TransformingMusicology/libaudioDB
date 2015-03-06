@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 PointPair::PointPair(uint32_t a, uint32_t b, uint32_t c) :
   trackID(a), qpos(b), spos(c) {

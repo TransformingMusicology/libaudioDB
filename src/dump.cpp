@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 int audiodb_dump(adb_t *adb, const char *output) {
   char *fileTable = 0; /* key_table */

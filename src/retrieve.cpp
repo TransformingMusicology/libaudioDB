@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 int audiodb_retrieve_datum(adb_t *adb, const char *key, adb_datum_t *datum) {
   uint32_t index = audiodb_key_index(adb, key);

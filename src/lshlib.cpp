@@ -1,4 +1,4 @@
-#include "lshlib.h"
+#include "audioDB/lshlib.h"
 
 #define getpagesize() (64*1024)
 

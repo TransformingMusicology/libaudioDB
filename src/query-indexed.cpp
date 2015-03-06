@@ -1,8 +1,8 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
-#include "lshlib.h"
+#include "audioDB/audioDB-internals.h"
+#include "audioDB/lshlib.h"
 
 /*
  * Routines and datastructures which are specific to indexed queries.

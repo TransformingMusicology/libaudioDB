@@ -1,8 +1,8 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
-#include "accumulators.h"
+#include "audioDB/audioDB-internals.h"
+#include "audioDB/accumulators.h"
 
 /* 0. if the datum in the spec is sufficiently NULL, do db x db
    sampling;

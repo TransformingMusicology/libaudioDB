@@ -6,8 +6,8 @@
 #include <set>
 #include <functional>
 #include <iostream>
-#include "ReporterBase.h"
-#include "audioDB.h"
+#include "audioDB/ReporterBase.h"
+#include "audioDB/audioDB.h"
 
 typedef struct nnresult {
   unsigned int trackID;

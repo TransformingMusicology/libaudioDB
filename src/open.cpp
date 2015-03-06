@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 static bool audiodb_check_header(adb_header_t *header) {
   /* FIXME: use syslog() or write to stderr or something to give the

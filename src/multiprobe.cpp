@@ -17,7 +17,7 @@
  *
  */
 
-#include "multiprobe.h"
+#include "audioDB/multiprobe.h"
 
 //#define _TEST_MP_LSH
 

@@ -33,9 +33,9 @@
 #include <string>
 #include <vector>
 
-#include "accumulator.h"
-#include "pointpair.h"
-#include "lshlib.h"
+#include "audioDB/accumulator.h"
+#include "audioDB/pointpair.h"
+#include "audioDB/lshlib.h"
 
 using namespace std;
 

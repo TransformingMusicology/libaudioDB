@@ -1,7 +1,7 @@
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 
 adb_liszt_results_t *audiodb_liszt(adb_t *adb) {
   uint32_t nfiles = adb->header->numFiles;
