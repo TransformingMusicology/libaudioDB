@@ -54,7 +54,7 @@ $(BUILD_DIR):
 $(LIBOBJS): $(BUILD_DIR)/%.o: $(SRC)/%.cpp $(INCLUDE)/$(INC_PREFIX)/audioDB_API.h $(INCLUDE)/$(INC_PREFIX)/audioDB-internals.h $(INCLUDE)/$(INC_PREFIX)/accumulator.h $(INCLUDE)/$(INC_PREFIX)/accumulators.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall $<
 
-$(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap reporter.h ReporterBase.h lshlib.h
+$(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall  $<
 
 $(LIBRARY): $(LIBOBJS)
