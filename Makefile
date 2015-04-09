@@ -1,10 +1,11 @@
+PKGCONFIG=pkg-config
 INCLUDE=include
 SRC=src
 BUILD_DIR=build
 INC_PREFIX=audioDB
 ADB_INCLUDE=-I$(INCLUDE)
-GSL_INCLUDE=$(shell pkg-config --cflags gsl)
-LIBGSL=$(shell pkg-config --libs gsl)
+GSL_INCLUDE=$(shell $(PKGCONFIG) --cflags gsl)
+LIBGSL=$(shell $(PKGCONFIG) --libs gsl)
 
 TESTDIRS=libtests
 
