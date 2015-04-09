@@ -15,7 +15,7 @@ INCLUDEDIR=$(PREFIX)/include
 
 _LIBOBJS=lock.o pointpair.o create.o open.o power.o l2norm.o insert.o status.o query.o dump.o close.o index-utils.o query-indexed.o liszt.o retrieve.o lshlib.o multiprobe.o sample.o
 LIBOBJS=$(patsubst %,$(BUILD_DIR)/%,$(_LIBOBJS))
-_INCLUDES=accumulator.h audioDB_API.h dbaccumulator.h multiprobe.h pertrackaccumulator.h ReporterBase.h accumulators.h audioDB-internals.h lshlib.h nearestaccumulator.h pointpair.h reporter.h
+_INCLUDES=accumulator.h audioDB_API.h dbaccumulator.h multiprobe.h pertrackaccumulator.h accumulators.h audioDB-internals.h lshlib.h nearestaccumulator.h pointpair.h
 INCLUDES=$(patsubst %,$(INCLUDE)/$(INC_PREFIX)/%,$(_INCLUDES))
 
 LIBNAME=audioDB
