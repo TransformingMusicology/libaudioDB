@@ -41,7 +41,7 @@ ifeq ($(shell sysctl -n hw.optional.x86_64),1)
 override CFLAGS+=-arch x86_64
 endif
 override LIBRARY=lib$(LIBNAME).$(SOVERSION).$(MINORVERSION).dylib
-override SHARED_LIB_FLAGS=-dynamiclib -current_version $(SOVERSION) -Wl -install_name $(LIBRARY)
+override SHARED_LIB_FLAGS=-dynamiclib -current_version $(SOVERSION) -install_name $(LIBRARY)
 endif
 
 .PHONY: all clean test install 
