@@ -29,6 +29,20 @@ OS X or Win32: make \
 (where the path to GSL_INCLUDE should name the directory which
 gsl_rng.h resides.)
 
+On MacOS X you may alternatively consider using MacPorts to install
+GCC, GSL and required tools:
+
+$ port install gcc49 gcc_select gsl pkgconfig
+
+And then using the g++ and pkg-config ports by passing some arguments
+to make:
+
+$ make \
+  CXX=/opt/local/bin/g++ \
+  PKGCONFIG=/opt/local/bin/pkg-config
+
+(where /opt/local is the destination root you use for MacPorts).
+
 Testing
 -------
 
