@@ -127,31 +127,31 @@ struct adb {
 };
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
+  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
     return strcmp(r1.ikey, r2.ikey) < 0;
   }
 } adb_result_ikey_lt;
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
+  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
     return r1.qpos < r2.qpos;
   }
 } adb_result_qpos_lt;
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
+  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
     return r1.dist < r2.dist;
   }
 } adb_result_dist_lt;
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
+  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
     return r1.dist > r2.dist;
   }
 } adb_result_dist_gt;
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) {
+  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
     return ((r1.ipos < r2.ipos) ||
             ((r1.ipos == r2.ipos) && 
              ((r1.qpos < r2.qpos) ||
