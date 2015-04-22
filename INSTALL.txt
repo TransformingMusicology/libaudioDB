@@ -29,8 +29,14 @@ OS X or Win32: make \
 (where the path to GSL_INCLUDE should name the directory which
 gsl_rng.h resides.)
 
+The default C/C++ compiler on MacOS X is now clang. libaudioDB will
+compile with versions of clang that support C++. You can specify the
+CC and CXX variables to make if you want to use a specific compiler.
+
 On MacOS X you may alternatively consider using MacPorts to install
-GCC, GSL and required tools:
+GCC, GSL and required tools. However, you will need to ensure that you
+are linking against libstdc++ (rather than libc++ which is default on
+MacOS) everywhere.
 
 $ port install gcc49 gcc_select gsl pkgconfig
 
