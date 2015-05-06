@@ -22,6 +22,10 @@ LIBNAME=audioDB
 
 SOVERSION=0
 MINORVERSION=0
+LIB_BUILD_NUMBER=$(shell git rev-parse HEAD)
+LIB_BUILD_DATE=$(shell date +'%Y-%m-%dT%H:%M:%S')
+LIB_BUILD_INFO_CFLAGS=-D__LIB_BUILD_DATE="\"$(LIB_BUILD_DATE)\"" -D__LIB_BUILD_NUMBER="\"$(LIB_BUILD_NUMBER)\""
+
 LIBRARY=lib$(LIBNAME).so.$(SOVERSION).$(MINORVERSION)
 SHARED_LIB_FLAGS=-shared -Wl,-soname,lib$(LIBNAME).so.$(SOVERSION)
 
@@ -52,13 +56,16 @@ all: $(BUILD_DIR) $(LIBRARY)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+$(BUILD_DIR)/build_info.o: $(SRC)/build_info.cpp
+	$(CXX) -o $(BUILD_DIR)/build_info.o -c $(CFLAGS) $(LIB_BUILD_INFO_CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall $(SRC)/build_info.cpp
+
 $(LIBOBJS): $(BUILD_DIR)/%.o: $(SRC)/%.cpp $(INCLUDE)/$(INC_PREFIX)/audioDB_API.h $(INCLUDE)/$(INC_PREFIX)/audioDB-internals.h $(INCLUDE)/$(INC_PREFIX)/accumulator.h $(INCLUDE)/$(INC_PREFIX)/accumulators.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall $<
 
 $(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall  $<
 
-$(LIBRARY): $(LIBOBJS)
+$(LIBRARY): $(LIBOBJS) $(BUILD_DIR)/build_info.o
 	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(CFLAGS) $^ $(LIBGSL)
 
 tags:
@@ -70,6 +77,7 @@ testclean:
 clean: testclean
 	-rm adb.*
 	-rm $(LIBOBJS)
+	-rm $(BUILD_DIR)/build_info.o
 	-rm $(BUILD_DIR)/xthresh
 	-rm $(BUILD_DIR)/$(LIBRARY)
 	-rm tags

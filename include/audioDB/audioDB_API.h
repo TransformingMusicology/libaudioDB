@@ -12,6 +12,8 @@
 int acquire_lock(int, bool);
 int divest_lock(int);
 
+const char* __lib_build_date();
+const char* __lib_build_number();
 
 /*******************************************************************/
 /* Data types for API */
