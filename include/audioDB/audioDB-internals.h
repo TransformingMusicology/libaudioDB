@@ -32,6 +32,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "audioDB/accumulator.h"
 #include "audioDB/pointpair.h"

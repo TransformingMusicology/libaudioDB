@@ -605,6 +605,11 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
     if(wL <= (*adb->track_lengths)[track]) {  // test for short sequences
       
       audiodb_initialize_arrays(adb, spec, track, qpointers.nvectors, query, data_buffer, D, DD);
+      double thresh = qstate->accumulator->threshold((*adb->keys)[track].c_str());
+      if(spec->refine.flags & ADB_REFINE_RADIUS) {
+        if(thresh > spec->refine.radius + ADB_DISTANCE_TOLERANCE)
+          thresh = spec->refine.radius + ADB_DISTANCE_TOLERANCE;
+      }
 
       if((!(spec->refine.flags & ADB_REFINE_DURATION_RATIO)) || 
          fabs(dbpointers.mean_duration[track]-qpointers.mean_duration[0]) < qpointers.mean_duration[0]*spec->refine.duration_ratio) {
@@ -618,6 +623,7 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
             switch(spec->params.distance) {
             case ADB_DISTANCE_EUCLIDEAN_NORMED:
               thisDist = 2-(2/(qn*sn))*DD[j][k];
+              if(thisDist > thresh) continue;
               break;
             case ADB_DISTANCE_EUCLIDEAN:
               thisDist = qn*qn + sn*sn - 2*DD[j][k];
@@ -641,7 +647,7 @@ int audiodb_query_loop(adb_t *adb, const adb_query_spec_t *spec, adb_qstate_inte
                   r.qpos = spec->qid.sequence_start;
                 }
                 r.ipos = k;
-                qstate->accumulator->add_point(&r);
+                qstate->accumulator->add_point(&r, &thresh);
               }
             }
           }

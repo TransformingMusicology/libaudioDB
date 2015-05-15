@@ -2,16 +2,19 @@ template <class T> class DBAccumulator : public Accumulator {
 public:
   DBAccumulator(unsigned int pointNN);
   ~DBAccumulator();
-  void add_point(adb_result_t *r);
+  void add_point(adb_result_t *r, double *thresh = NULL);
+  double threshold(const char *);
   adb_query_results_t *get_points();
 private:
   unsigned int pointNN;
+  double _threshold;
   std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *queue;
 };
 
 template <class T> DBAccumulator<T>::DBAccumulator(unsigned int pointNN)
   : pointNN(pointNN), queue(0) {
   queue = new std::priority_queue< adb_result_t, std::vector<adb_result_t>, T>;
+  _threshold = std::numeric_limits<double>::infinity();
 }
 
 template <class T> DBAccumulator<T>::~DBAccumulator() {
@@ -20,13 +23,23 @@ template <class T> DBAccumulator<T>::~DBAccumulator() {
   }
 }
 
-template <class T> void DBAccumulator<T>::add_point(adb_result_t *r) {
+template <class T> void DBAccumulator<T>::add_point(adb_result_t *r, double *thresh) {
   if(!isnan(r->dist)) {
     queue->push(*r);
     if(queue->size() > pointNN) {
       queue->pop();
     }
+    if(queue->size() == pointNN) {
+      _threshold = queue->top().dist;
+      if(thresh) {
+        *thresh = _threshold;
+      }
+    }
   }
+}
+
+template <class T> double DBAccumulator<T>::threshold(const char *key) {
+  return _threshold;
 }
 
 template <class T> adb_query_results_t *DBAccumulator<T>::get_points() {

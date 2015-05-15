@@ -2,7 +2,8 @@ template <class T> class NearestAccumulator : public Accumulator {
 public:
   NearestAccumulator();
   ~NearestAccumulator();
-  void add_point(adb_result_t *r);
+  void add_point(adb_result_t *r, double *thresh = NULL);
+  double threshold(const char *key);
   adb_query_results_t *get_points();
 private:
   std::set< adb_result_t, adb_result_qpos_lt > *points;
@@ -19,7 +20,11 @@ template <class T> NearestAccumulator<T>::~NearestAccumulator() {
   }
 }
 
-template <class T> void NearestAccumulator<T>::add_point(adb_result_t *r) {
+template <class T> double NearestAccumulator<T>::threshold(const char *key) {
+  return std::numeric_limits<double>::infinity();
+}
+
+template <class T> void NearestAccumulator<T>::add_point(adb_result_t *r, double *thresh) {
   if(!isnan(r->dist)) {
     std::set< adb_result_t, adb_result_qpos_lt >::iterator it;
     it = points->find(*r);

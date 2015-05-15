@@ -2,17 +2,20 @@ template <class T> class PerTrackAccumulator : public Accumulator {
 public:
   PerTrackAccumulator(unsigned int pointNN, unsigned int trackNN);
   ~PerTrackAccumulator();
-  void add_point(adb_result_t *r);
+  void add_point(adb_result_t *r, double *thresh);
+  double threshold(const char *);
   adb_query_results_t *get_points();
 private:
   unsigned int pointNN;
   unsigned int trackNN;
   std::map< const char *, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_strlt> *queues;
+  std::map<const char *, double, adb_strlt> *_thresholds;
 };
 
 template <class T> PerTrackAccumulator<T>::PerTrackAccumulator(unsigned int pointNN, unsigned int trackNN)
   : pointNN(pointNN), trackNN(trackNN), queues(0) {
   queues = new std::map< const char *, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_strlt>;
+  _thresholds = new std::map< const char *, double, adb_strlt>;
 }
 
 template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
@@ -25,7 +28,7 @@ template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
   }
 }
 
-template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r) {
+template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r, double *thresh) {
   if(!isnan(r->dist)) {
     typename std::map< const char *, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_strlt>::iterator it;
     std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *queue;
@@ -41,7 +44,32 @@ template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r) {
     if(queue->size() > pointNN) {
       queue->pop();
     }
+    if(queue->size() == pointNN) {
+      double _threshold = queue->top().dist;
+      (*_thresholds)[r->ikey] = _threshold;
+      if(thresh) {
+        *thresh = _threshold;
+      }
+    }
   }
+}
+
+template <class T> double PerTrackAccumulator<T>::threshold(const char *key) {
+  typename std::map< const char *, double, adb_strlt>::iterator it;
+
+  if(_thresholds->empty()) {
+    return std::numeric_limits<double>::infinity();
+  }
+
+  it = _thresholds->find(key);
+  if(it != _thresholds->end()) {
+    return (*it).second;
+  }
+
+  // FIXME: we can do a bit better here by finding the trackNNth
+  // lowest thresholds and returning pointNN times that.  In practice
+  // it's unlikely to help much.
+  return std::numeric_limits<double>::infinity();
 }
 
 template <class T> adb_query_results_t *PerTrackAccumulator<T>::get_points() {
