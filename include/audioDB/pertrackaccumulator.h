@@ -7,17 +7,17 @@ public:
 private:
   unsigned int pointNN;
   unsigned int trackNN;
-  std::map<adb_result_t, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_result_ikey_lt> *queues;
+  std::map< const char *, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_strlt> *queues;
 };
 
 template <class T> PerTrackAccumulator<T>::PerTrackAccumulator(unsigned int pointNN, unsigned int trackNN)
   : pointNN(pointNN), trackNN(trackNN), queues(0) {
-  queues = new std::map<adb_result_t, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_result_ikey_lt>;
+  queues = new std::map< const char *, std::priority_queue< adb_result_t, std::vector<adb_result_t>, T > *, adb_strlt>;
 }
 
 template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
   if(queues) {
-    typename std::map< adb_result_t, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_result_ikey_lt>::iterator it;
+    typename std::map< const char *, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_strlt>::iterator it;
     for(it = queues->begin(); it != queues->end(); it++) {
       delete (*it).second;
     }
@@ -27,12 +27,12 @@ template <class T> PerTrackAccumulator<T>::~PerTrackAccumulator() {
 
 template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r) {
   if(!isnan(r->dist)) {
-    typename std::map< adb_result_t, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_result_ikey_lt>::iterator it;
+    typename std::map< const char *, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_strlt>::iterator it;
     std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *queue;
-    it = queues->find(*r);
+    it = queues->find(r->ikey);
     if(it == queues->end()) {
       queue = new std::priority_queue< adb_result_t, std::vector< adb_result_t >, T >;
-      (*queues)[*r] = queue;
+      (*queues)[r->ikey] = queue;
     } else {
       queue = (*it).second;
     }
@@ -45,9 +45,9 @@ template <class T> void PerTrackAccumulator<T>::add_point(adb_result_t *r) {
 }
 
 template <class T> adb_query_results_t *PerTrackAccumulator<T>::get_points() {
-  typename std::map< adb_result_t, std::vector< adb_result_t >, adb_result_ikey_lt> points;
+  typename std::map< const char *, std::vector< adb_result_t >, adb_strlt> points;
   typename std::priority_queue< adb_result_t, std::vector< adb_result_t >, T> queue;
-  typename std::map< adb_result_t, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_result_ikey_lt>::iterator it;
+  typename std::map< const char *, std::priority_queue< adb_result_t, std::vector< adb_result_t >, T > *, adb_strlt>::iterator it;
 
   unsigned int size = 0;
   for(it = queues->begin(); it != queues->end(); it++) {
@@ -61,7 +61,7 @@ template <class T> adb_query_results_t *PerTrackAccumulator<T>::get_points() {
       v.push_back(r);
       ((*it).second)->pop();
     }
-    points[r] = v;
+    points[r.ikey] = v;
     dist /= n;
     size += n;
     r.dist = dist;
@@ -81,7 +81,7 @@ template <class T> adb_query_results_t *PerTrackAccumulator<T>::get_points() {
   
   unsigned int k = 0;
   while(queue.size() > 0) {
-    std::vector<adb_result_t> v = points[queue.top()];
+    std::vector<adb_result_t> v = points[queue.top().ikey];
     queue.pop();
     while(v.size() > 0) {
       rs[k++] = v.back();

@@ -127,10 +127,10 @@ struct adb {
 };
 
 typedef struct {
-  bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
-    return strcmp(r1.ikey, r2.ikey) < 0;
+  bool operator() (const char *key1, const char *key2) const {
+    return strcmp(key1, key2) < 0;
   }
-} adb_result_ikey_lt;
+} adb_strlt;
 
 typedef struct {
   bool operator() (const adb_result_t &r1, const adb_result_t &r2) const {
