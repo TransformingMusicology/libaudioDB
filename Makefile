@@ -59,7 +59,7 @@ $(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall  $<
 
 $(LIBRARY): $(LIBOBJS)
-	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(LIBGSL) $(CFLAGS) $^
+	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(CFLAGS) $^ $(LIBGSL)
 
 tags:
 	ctags $(SRC)/*.cpp $(INCLUDE)/$(INC_PREFIX)/*.h
@@ -84,7 +84,7 @@ test: $(LIBRARY)
 	for d in $(TESTDIRS); do (cd $$d && sh ./run-tests.sh); done
 
 xthresh: $(SRC)/xthresh.c
-	$(CC) -o $(BUILD_DIR)/$@ $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) $(LIBGSL) $<
+	$(CC) -o $(BUILD_DIR)/$@ $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) $< $(LIBGSL)
 
 $(LIBNAME).pc:
 	./make-pc.sh "$(LIBNAME)" "$(LIBDIR)" "$(INCLUDEDIR)" $(SOVERSION) $(MINORVERSION) > $(BUILD_DIR)/$(LIBNAME).pc
