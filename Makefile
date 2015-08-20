@@ -22,7 +22,8 @@ LIBNAME=audioDB
 
 SOVERSION=0
 MINORVERSION=0
-LIB_BUILD_ID=$(shell git rev-parse HEAD)
+LIB_BUILD_MODIFIED=$(shell git diff HEAD --no-ext-diff --quiet --exit-code ; if [ $$? -eq "1" ]; then echo "-modified"; fi)
+LIB_BUILD_ID=$(shell git rev-parse HEAD)$(LIB_BUILD_MODIFIED)
 LIB_BUILD_DATE=$(shell date +'%Y-%m-%dT%H:%M:%S')
 LIB_BUILD_INFO_CFLAGS=-DLIB_BUILD_DATE="\"$(LIB_BUILD_DATE)\"" -DLIB_BUILD_ID="\"$(LIB_BUILD_ID)\""
 
