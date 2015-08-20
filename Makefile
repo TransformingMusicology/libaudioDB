@@ -67,7 +67,7 @@ $(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall  $<
 
 $(LIBRARY): $(LIBOBJS)
-	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(CFLAGS) $^ $(LIBGSL)
+	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(CFLAGS) $(BUILD_DIR)/build_info.o $^ $(LIBGSL)
 
 tags:
 	ctags $(SRC)/*.cpp $(INCLUDE)/$(INC_PREFIX)/*.h
