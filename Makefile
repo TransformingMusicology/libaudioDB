@@ -52,12 +52,12 @@ endif
 
 .PHONY: all clean test install 
 
-all: $(BUILD_DIR) $(LIBRARY)
+all: $(BUILD_DIR) build_info $(LIBRARY)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/build_info.o: $(SRC)/build_info.cpp
+build_info:
 	$(CXX) -o $(BUILD_DIR)/build_info.o -c $(CFLAGS) $(LIB_BUILD_INFO_CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall $(SRC)/build_info.cpp
 
 $(LIBOBJS): $(BUILD_DIR)/%.o: $(SRC)/%.cpp $(INCLUDE)/$(INC_PREFIX)/audioDB_API.h $(INCLUDE)/$(INC_PREFIX)/audioDB-internals.h $(INCLUDE)/$(INC_PREFIX)/accumulator.h $(INCLUDE)/$(INC_PREFIX)/accumulators.h
@@ -66,7 +66,7 @@ $(LIBOBJS): $(BUILD_DIR)/%.o: $(SRC)/%.cpp $(INCLUDE)/$(INC_PREFIX)/audioDB_API.
 $(BUILD_DIR)/%.o: $(SRC)/%.cpp audioDB.h audioDB_API.h adb.nsmap lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -Wall  $<
 
-$(LIBRARY): $(LIBOBJS) $(BUILD_DIR)/build_info.o
+$(LIBRARY): $(LIBOBJS)
 	$(CXX) $(SHARED_LIB_FLAGS) -o $(BUILD_DIR)/$(LIBRARY) $(CFLAGS) $^ $(LIBGSL)
 
 tags:
