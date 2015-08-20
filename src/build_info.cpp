@@ -10,10 +10,10 @@ const char* audiodb_lib_build_date()
 #endif
 }
 
-const char* audiodb_lib_build_number()
+const char* audiodb_lib_build_id()
 {
-#ifdef LIB_BUILD_NUMBER
-    return LIB_BUILD_NUMBER;
+#ifdef LIB_BUILD_ID
+    return LIB_BUILD_ID;
 #else
     return "unknown";
 #endif

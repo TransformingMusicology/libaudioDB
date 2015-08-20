@@ -13,7 +13,7 @@ int acquire_lock(int, bool);
 int divest_lock(int);
 
 const char* audiodb_lib_build_date();
-const char* audiodb_lib_build_number();
+const char* audiodb_lib_build_id();
 
 /*******************************************************************/
 /* Data types for API */
