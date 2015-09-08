@@ -1,13 +1,19 @@
+extern "C" {
+#include "audioDB/audioDB_API.h"
+}
 #include "audioDB/lshlib.h"
-
-#define getpagesize() (64*1024)
+#include "audioDB/audioDB-internals.h"
 
 Uns32T get_page_logn(){
+#ifdef WIN32
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  int pagesz = (int)si.dwPageSize;
+#else
   int pagesz = (int)sysconf(_SC_PAGESIZE);
+#endif
   return (Uns32T)log2((double)pagesz);  
 }
-
-unsigned align_up(unsigned x, unsigned w) { return (((x) + ((1<<w)-1)) & ~((1<<w)-1)); }
 
 void H::error(const char* a, const char* b, const char *sysFunc) {
   cerr << a << ": " << b << endl;
@@ -728,7 +734,6 @@ Uns32T G::get_serial_hashtable_offset(){
 
 void G::serialize(char* filename, Uns32T serialFormat){
   int dbfid;
-  char* db;
   int dbIsNew=0;
   FILE* dbFile = 0;
   // Check requested serialFormat
@@ -752,9 +757,7 @@ void G::serialize(char* filename, Uns32T serialFormat){
 
   // Load the on-disk header into core
   dbfid = serial_open(filename, 1); // open for write
-  db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);// get database pointer
-  serial_get_header(db);           // read header
-  serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
+  serial_get_header(dbfid);           // read header
 
   // Check compatibility of core and disk data structures
   if( !serial_can_merge(serialFormat) )
@@ -775,15 +778,12 @@ void G::serialize(char* filename, Uns32T serialFormat){
   }
 
   if(!dbIsNew) { 
-    db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);// get database pointer
-    //serial_get_header(db);           // read header
     cout << "maxp = " << H::maxp << endl;
     lshHeader->maxp=H::maxp;
     // Default to FILEFORMAT1
     if(!(lshHeader->flags&O2_SERIAL_FILEFORMAT2))
       lshHeader->flags|=O2_SERIAL_FILEFORMAT1;
-    memcpy((char*)db, (char*)lshHeader, sizeof(SerialHeaderT));
-    serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
+    serial_write_header(dbfid, lshHeader);
   }  
     serial_close(dbfid);
     if(dbFile){
@@ -829,8 +829,8 @@ int G::serialize_lsh_hashfunctions(int fid){
   Uns32T *pu;
   Uns32T x,y,z;
 
-  char* db = serial_mmap(fid, get_serial_hashtable_offset(), 1);// get database pointer  
-  pf = get_serial_hashfunction_base(db);
+  char* db = (char *)calloc(get_serial_hashtable_offset() - O2_SERIAL_HEADER_SIZE, 1);
+  pf = (float *) db;
 
   // HASH FUNCTIONS
   // Write the random projectors A[][][]
@@ -866,9 +866,31 @@ int G::serialize_lsh_hashfunctions(int fid){
     for( y = 0; y < H::k ; y++)
       *pu++ = H::r2[x][y];  
 
-  serial_munmap(db, get_serial_hashtable_offset());
+  off_t cur = lseek(fid, 0, SEEK_CUR);
+  lseek(fid, O2_SERIAL_HEADER_SIZE, SEEK_SET);
+  write(fid, db, get_serial_hashtable_offset() - O2_SERIAL_HEADER_SIZE);
+  lseek(fid, cur, SEEK_SET);
+
+  free(db);
   return 1;
 }
+
+void G::serial_get_table(int fd, int nth, void *buf, size_t count) {
+  off_t cur = lseek(fd, 0, SEEK_CUR);
+  /* FIXME: if hashTableSize isn't bigger than a page, this loses. */
+  lseek(fd, align_up(get_serial_hashtable_offset() + nth * count, get_page_logn()), SEEK_SET);
+  read(fd, buf, count);
+  lseek(fd, cur, SEEK_SET);
+}
+
+void G::serial_write_table(int fd, int nth, void *buf, size_t count) {
+  off_t cur = lseek(fd, 0, SEEK_CUR);
+  /* FIXME: see the comment in serial_get_table() */
+  lseek(fd, align_up(get_serial_hashtable_offset() + nth * count, get_page_logn()), SEEK_SET);
+  write(fd, buf, count);
+  lseek(fd, cur, SEEK_SET);
+}
+
 
 int G::serialize_lsh_hashtables_format1(int fid, int merge){
   SerialElementT *pe, *pt;
@@ -877,27 +899,19 @@ int G::serialize_lsh_hashtables_format1(int fid, int merge){
   if( merge && !serial_can_merge(O2_SERIAL_FILEFORMAT1) )
     error("Cannot merge core and serial LSH, data structure dimensions mismatch.");
 
-  Uns32T hashTableSize=sizeof(SerialElementT)*lshHeader->numRows*lshHeader->numCols;  
   Uns32T colCount, meanColCount, colCountN, maxColCount, minColCount;
+  size_t hashTableSize=sizeof(SerialElementT)*lshHeader->numRows*lshHeader->numCols;
+  pt = (SerialElementT *) malloc(hashTableSize);
   // Write the hash tables
   for( x = 0 ; x < H::L ; x++ ){
     std::cout << (merge ? "merging":"writing") << " hash table " << x << " FORMAT1...";
     std::cout.flush();
-    // memory map a single hash table for sequential access
-    // Align each hash table to page boundary
-    char* dbtable = serial_mmap(fid, hashTableSize, 1, 
-				align_up(get_serial_hashtable_offset()+x*hashTableSize, get_page_logn()));
-#ifdef __CYGWIN__
-    // No madvise in CYGWIN
-#else
-    if(madvise(dbtable, hashTableSize, MADV_SEQUENTIAL)<0)
-      error("could not advise hashtable memory","","madvise");
-#endif
+    // read a hash table's data from disk
+    serial_get_table(fid, x, pt, hashTableSize);
     maxColCount=0;
     minColCount=O2_SERIAL_MAX_COLS;
     meanColCount=0;
     colCountN=0;
-    pt=(SerialElementT*)dbtable;
     for( y = 0 ;  y < H::N ; y++ ){
       // Move disk pointer to beginning of row
       pe=pt+y*lshHeader->numCols;
@@ -929,10 +943,11 @@ int G::serialize_lsh_hashtables_format1(int fid, int merge){
       std::cout << "#rows with collisions =" << colCountN << ", mean = " << meanColCount/(float)colCountN 
 		<< ", min = " << minColCount << ", max = " << maxColCount 
 		<< endl;
-    serial_munmap(dbtable, hashTableSize);
+    serial_write_table(fid, x, pt, hashTableSize);
   }
   
   // We're done writing
+  free(pt);
   return 1;
 }
 
@@ -1170,7 +1185,7 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
 #else
                      S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
 #endif
-                     )) < 0)    
+                     )) < 0)
 
     error("Can't create serial file", filename, "open");
   get_lock(dbfid, 1);
@@ -1189,14 +1204,8 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
   // write a dummy byte at the last location
   if (write (dbfid, "", 1) != 1)
     error("write error", "", "write");
-  
-  char* db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 1);
-  
-  memcpy (db, lshHeader, O2_SERIAL_HEADER_SIZE);
-  
-  serial_munmap(db, O2_SERIAL_HEADER_SIZE);
-  
 
+  serial_write_header(dbfid, lshHeader);
   close(dbfid);
 
   std::cout << "done initializing tables." << endl;
@@ -1204,31 +1213,26 @@ int G::serial_create(char* filename, float binWidth, Uns32T numTables, Uns32T nu
   return 1;  
 }
 
-char* G::serial_mmap(int dbfid, Uns32T memSize, Uns32T forWrite, off_t offset){
-  char* db;
-  if(forWrite){
-    if ((db = (char*) mmap(0, memSize, PROT_READ | PROT_WRITE,
-			   MAP_SHARED, dbfid, offset)) == (caddr_t) -1)
-      error("mmap error in request for writable serialized database", "", "mmap");  
-  }
-  else if ((db = (char*) mmap(0, memSize, PROT_READ, MAP_SHARED, dbfid, offset)) == (caddr_t) -1)
-    error("mmap error in read-only serialized database", "", "mmap");  
-      
-  return db;
-}
-
-SerialHeaderT* G::serial_get_header(char* db){
+SerialHeaderT* G::serial_get_header(int fd){
+  off_t cur = lseek(fd, 0, SEEK_CUR);
   lshHeader = new SerialHeaderT();
-  memcpy((char*)lshHeader, db, sizeof(SerialHeaderT));  
+  lseek(fd, 0, SEEK_SET);
+  if(read(fd, lshHeader, sizeof(SerialHeaderT)) != (ssize_t) (sizeof(SerialHeaderT)))
+    error("Bad return from read");
 
   if(lshHeader->lshMagic!=O2_SERIAL_MAGIC)
     error("Not an LSH database file");
 
+  lseek(fd, cur, SEEK_SET);
   return lshHeader;
 }
 
-void G::serial_munmap(char* db, Uns32T N){
-  munmap(db, N);
+void G::serial_write_header(int fd, SerialHeaderT *header) {
+  off_t cur = lseek(fd, 0, SEEK_CUR);
+  lseek(fd, 0, SEEK_SET);
+  if(write(fd, header, sizeof(SerialHeaderT)) != (ssize_t) (sizeof(SerialHeaderT)))
+    error("Bad return from write");
+  lseek(fd, cur, SEEK_SET);
 }
 
 int G::serial_open(char* filename, int writeFlag){
@@ -1255,15 +1259,12 @@ void G::serial_close(int dbfid){
 
 int G::unserialize_lsh_header(char* filename){
   int dbfid;
-  char* db;
   // Test to see if file exists
   if((dbfid = open (filename, O_RDONLY)) < 0)
     error("Can't open the file", filename, "open");
   close(dbfid);
   dbfid = serial_open(filename, 0); // open for read
-  db = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 0);// get database pointer
-  serial_get_header(db);           // read header
-  serial_munmap(db, O2_SERIAL_HEADER_SIZE); // drop mmap
+  serial_get_header(dbfid);
 
   // Unserialize header parameters
   H::L = lshHeader->numTables;
@@ -1289,59 +1290,53 @@ void G::unserialize_lsh_functions(int dbfid){
   Uns32T* pu;
 
   // Load the hash functions into core
-  char* db = serial_mmap(dbfid, get_serial_hashtable_offset(), 0);// get database pointer again  
-  
-  pf = get_serial_hashfunction_base(db);
+  off_t cur = lseek(dbfid, 0, SEEK_CUR);
+  void *db = malloc(get_serial_hashtable_offset() - O2_SERIAL_HEADER_SIZE);
+  lseek(dbfid, O2_SERIAL_HEADER_SIZE, SEEK_SET);
+  read(dbfid, db, get_serial_hashtable_offset() - O2_SERIAL_HEADER_SIZE);
+  lseek(dbfid, cur, SEEK_SET);
+  pf = (float *)db;
   
 #ifdef USE_U_FUNCTIONS
   for( j = 0 ; j < H::m ; j++ ){ // L functions gj(v)
     for( kk = 0 ; kk < H::k/2 ; kk++ ){ // Normally distributed hash functions
 #else
-      for( j = 0 ; j < H::L ; j++ ){ // L functions gj(v)
-	for( kk = 0 ; kk < H::k ; kk++ ){ // Normally distributed hash functions
+  for( j = 0 ; j < H::L ; j++ ){ // L functions gj(v)
+    for( kk = 0 ; kk < H::k ; kk++ ){ // Normally distributed hash functions
 #endif
-	  for(Uns32T i = 0 ; i < H::d ; i++ )
-	    H::A[j][kk][i] = *pf++; // Normally distributed random vectors
-	}
-      }
+      for(Uns32T i = 0 ; i < H::d ; i++ )
+        H::A[j][kk][i] = *pf++; // Normally distributed random vectors
+    }
+  }
 #ifdef USE_U_FUNCTIONS
-      for( j = 0 ; j < H::m ; j++ ) // biases b
-	for( kk = 0 ; kk < H::k/2 ; kk++ )
+  for( j = 0 ; j < H::m ; j++ ) // biases b
+    for( kk = 0 ; kk < H::k/2 ; kk++ )
 #else
-	  for( j = 0 ; j < H::L ; j++ ) // biases b
-	    for( kk = 0 ; kk < H::k ; kk++ )
+  for( j = 0 ; j < H::L ; j++ ) // biases b
+    for( kk = 0 ; kk < H::k ; kk++ )
 #endif
-	      H::b[j][kk] = *pf++;
+      H::b[j][kk] = *pf++;
       
-      pu = (Uns32T*)pf;
-      for( j = 0 ; j < H::L ; j++ ) // Z projectors r1
-	for( kk = 0 ; kk < H::k ; kk++ )
-	  H::r1[j][kk] = *pu++;
+  pu = (Uns32T*)pf;
+  for( j = 0 ; j < H::L ; j++ ) // Z projectors r1
+    for( kk = 0 ; kk < H::k ; kk++ )
+      H::r1[j][kk] = *pu++;
       
-      for( j = 0 ; j < H::L ; j++ ) // Z projectors r2
-	for( kk = 0 ; kk < H::k ; kk++ )
-	  H::r2[j][kk] = *pu++;
+  for( j = 0 ; j < H::L ; j++ ) // Z projectors r2
+    for( kk = 0 ; kk < H::k ; kk++ )
+      H::r2[j][kk] = *pu++;
 
-      serial_munmap(db, get_serial_hashtable_offset());
+  free(db);
 }
 
 void G::unserialize_lsh_hashtables_format1(int fid){
   SerialElementT *pe, *pt;
   Uns32T x,y;
   Uns32T hashTableSize=sizeof(SerialElementT)*lshHeader->numRows*lshHeader->numCols;
+  pt = (SerialElementT *) malloc(hashTableSize);
   // Read the hash tables into core
   for( x = 0 ; x < H::L ; x++ ){
-    // memory map a single hash table
-    // Align each hash table to page boundary
-    char* dbtable = serial_mmap(fid, hashTableSize, 0, 
-				align_up(get_serial_hashtable_offset()+x*hashTableSize, get_page_logn()));
-#ifdef __CYGWIN__
-    // No madvise in CYGWIN
-#else
-    if(madvise(dbtable, hashTableSize, MADV_SEQUENTIAL)<0)
-      error("could not advise hashtable memory","","madvise");    
-#endif
-    pt=(SerialElementT*)dbtable;
+    serial_get_table(fid, x, pt, hashTableSize);
     for( y = 0 ; y < H::N ; y++ ){
       // Move disk pointer to beginning of row
       pe=pt+y*lshHeader->numCols;
@@ -1353,8 +1348,8 @@ void G::unserialize_lsh_hashtables_format1(int fid){
       dump_hashtable_row(h[x][y]);
 #endif      
     }
-    serial_munmap(dbtable, hashTableSize);
-  }  
+  }
+  free(pt);
 }
 
 void G::unserialize_hashtable_row_format1(SerialElementT* pe, bucket** b){
@@ -1873,9 +1868,7 @@ void G::dump_hashtable_row(bucket* p){
 void G::serial_retrieve_point_set(char* filename, vector<vector<float> >& vv, ReporterCallbackPtr add_point, void* caller)
 {
   int dbfid = serial_open(filename, 0); // open for read
-    char* dbheader = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 0);// get database pointer
-  serial_get_header(dbheader);           // read header
-  serial_munmap(dbheader, O2_SERIAL_HEADER_SIZE); // drop header mmap
+  serial_get_header(dbfid);
 
   if((lshHeader->flags & O2_SERIAL_FILEFORMAT2)){
     serial_close(dbfid);
@@ -1887,32 +1880,22 @@ void G::serial_retrieve_point_set(char* filename, vector<vector<float> >& vv, Re
   calling_instance = caller; // class instance variable used in ...bucket_chain_point()
   add_point_callback = add_point;
 
+  SerialElementT *pe = (SerialElementT *) malloc(hashTableSize);
   for(Uns32T j=0; j<L; j++){
-    // memory map a single hash table for random access
-    char* db = serial_mmap(dbfid, hashTableSize, 0, 
-			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
-#ifdef __CYGWIN__
-    // No madvise in CYGWIN
-#else
-    if(madvise(db, hashTableSize, MADV_RANDOM)<0)
-      error("could not advise local hashtable memory","","madvise");
-#endif
-    SerialElementT* pe = (SerialElementT*)db ;
+    serial_get_table(dbfid, j, pe, hashTableSize);
     for(Uns32T qpos=0; qpos<vv.size(); qpos++){
       H::compute_hash_functions(vv[qpos]);
       H::generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
       serial_bucket_chain_point(pe+t1*lshHeader->numCols, qpos); // Point to correct row
     }
-    serial_munmap(db, hashTableSize); // drop hashtable mmap
-  }  
+  }
+  free(pe);
   serial_close(dbfid);    
 }
 
 void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, ReporterCallbackPtr add_point, void* caller){
   int dbfid = serial_open(filename, 0); // open for read
-    char* dbheader = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 0);// get database pointer
-  serial_get_header(dbheader);           // read header
-  serial_munmap(dbheader, O2_SERIAL_HEADER_SIZE); // drop header mmap
+  serial_get_header(dbfid);
 
   if((lshHeader->flags & O2_SERIAL_FILEFORMAT2)){
     serial_close(dbfid);
@@ -1924,41 +1907,27 @@ void G::serial_retrieve_point(char* filename, vector<float>& v, Uns32T qpos, Rep
   calling_instance = caller;
   add_point_callback = add_point;
   H::compute_hash_functions(v);
+
+  SerialElementT *pe = (SerialElementT *) malloc(hashTableSize);
   for(Uns32T j=0; j<L; j++){
-    // memory map a single hash table for random access
-    char* db = serial_mmap(dbfid, hashTableSize, 0, 
-			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
-#ifdef __CYGWIN__
-    // No madvise in CYGWIN
-#else
-    if(madvise(db, hashTableSize, MADV_RANDOM)<0)
-      error("could not advise local hashtable memory","","madvise");
-#endif
-    SerialElementT* pe = (SerialElementT*)db ;
+    // read a single hash table for random access
+    serial_get_table(dbfid, j, pe, hashTableSize);
     H::generate_hash_keys(*(g+j),*(r1+j),*(r2+j)); 
     serial_bucket_chain_point(pe+t1*lshHeader->numCols, qpos); // Point to correct row
-    serial_munmap(db, hashTableSize); // drop hashtable mmap
-  }  
+  }
+  free(pe);
   serial_close(dbfid);    
 }
 
 void G::serial_dump_tables(char* filename){
   int dbfid = serial_open(filename, 0); // open for read
-    char* dbheader = serial_mmap(dbfid, O2_SERIAL_HEADER_SIZE, 0);// get database pointer
-  serial_get_header(dbheader);           // read header
-  serial_munmap(dbheader, O2_SERIAL_HEADER_SIZE); // drop header mmap
+  serial_get_header(dbfid);
   Uns32T hashTableSize=sizeof(SerialElementT)*lshHeader->numRows*lshHeader->numCols;
+  SerialElementT *db = (SerialElementT *) malloc(hashTableSize);
   for(Uns32T j=0; j<L; j++){
-    // memory map a single hash table for random access
-    char* db = serial_mmap(dbfid, hashTableSize, 0, 
-			   align_up(get_serial_hashtable_offset()+j*hashTableSize,get_page_logn()));
-#ifdef __CYGWIN__
-    // No madvise in CYGWIN
-#else
-    if(madvise(db, hashTableSize, MADV_SEQUENTIAL)<0)
-      error("could not advise local hashtable memory","","madvise");
-#endif
-    SerialElementT* pe = (SerialElementT*)db ;
+    // read a single hash table for random access
+    serial_get_table(dbfid, j, db, hashTableSize);
+    SerialElementT *pe = db;
     printf("*********** TABLE %d ***************\n", j);
     fflush(stdout);
     int count=0;
@@ -1969,6 +1938,7 @@ void G::serial_dump_tables(char* filename){
       pe+=lshHeader->numCols;
     }while(pe<(SerialElementT*)db+lshHeader->numRows*lshHeader->numCols);
   }
+  free(db);
 }
 
 void G::serial_bucket_dump(SerialElementT* pe){

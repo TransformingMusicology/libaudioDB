@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
@@ -306,8 +305,6 @@ class G: public H{
   void release_lock(int fd);
   int serial_create(char* filename, Uns32T FMT);
   int serial_create(char* filename, float binWidth, Uns32T nTables, Uns32T nRows, Uns32T nCols, Uns32T k, Uns32T d, Uns32T FMT);
-  char* serial_mmap(int dbfid, Uns32T sz, Uns32T w, off_t offset = 0);
-  void serial_munmap(char* db, Uns32T N);
   int serial_open(char* filename,int writeFlag);
   void serial_close(int dbfid);
 
@@ -347,7 +344,10 @@ class G: public H{
   float* get_serial_hashfunction_base(char* db);
   SerialElementT* get_serial_hashtable_base(char* db);  
   Uns32T get_serial_hashtable_offset();                   // Size of SerialHeader + HashFunctions
-  SerialHeaderT* serial_get_header(char* db);
+  SerialHeaderT* serial_get_header(int fd);
+  void serial_write_header(int fd, SerialHeaderT *header);
+  void serial_get_table(int, int, void *, size_t);
+  void serial_write_table(int, int, void *, size_t);
   SerialHeaderT* lshHeader;
 
   // Core Retrieval/Inspections Functions

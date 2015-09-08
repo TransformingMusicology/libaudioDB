@@ -1,5 +1,6 @@
 #if defined(WIN32)
 #include <sys/locking.h>
+#include <direct.h>
 #endif
 #if !defined(WIN32)
 #include <sys/mman.h>
