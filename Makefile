@@ -27,8 +27,9 @@ LIB_BUILD_ID=$(shell git rev-parse HEAD)$(LIB_BUILD_MODIFIED)
 LIB_BUILD_DATE=$(shell date +'%Y-%m-%dT%H:%M:%S')
 LIB_BUILD_INFO_CFLAGS=-DLIB_BUILD_DATE="\"$(LIB_BUILD_DATE)\"" -DLIB_BUILD_ID="\"$(LIB_BUILD_ID)\""
 
+SONAME=lib$(LIBNAME).so.$(SOVERSION)
 LIBRARY=lib$(LIBNAME).so.$(SOVERSION).$(MINORVERSION)
-SHARED_LIB_FLAGS=-shared -Wl,-soname,lib$(LIBNAME).so.$(SOVERSION)
+SHARED_LIB_FLAGS=-shared -Wl,-soname,$(SONAME)
 
 override CFLAGS+=-g -O3 -fPIC 
 
