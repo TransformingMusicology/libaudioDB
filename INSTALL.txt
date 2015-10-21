@@ -23,8 +23,8 @@ Use the following make commands to compile libaudioDB on your system:
 Linux:         make
 
 OS X or Win32: make \
-  GSL_INCLUDE'"-I /path/to/gsl/"
-  LIBGSL="-L/path/to/libgsl/libraries -lgsl -lgslcblas"
+  GSL_INCLUDE="-I /path/to/gsl/"
+  LIBGSL="-L /path/to/libgsl/libraries -lgsl -lgslcblas"
 
 (where the path to GSL_INCLUDE should name the directory which
 gsl_rng.h resides.)
